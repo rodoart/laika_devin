@@ -1,0 +1,4 @@
+[submodule "framework"]
+	path = framework
+	url = git@github.com:rodoart/minerva_devin.git
+	branch = framework
