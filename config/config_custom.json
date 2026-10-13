@@ -1,0 +1,23 @@
+{
+    "sources": [
+        "pnl_new","pnl_cohort"
+    ],
+    "working_path": "/data/gcgaacqmxpysp/work/hive/gcgaacqmxpysp_work/rm36973/athenas/xx2",
+    "year_id": "202601",
+    "n_mis": "12",
+    "period": "3",
+    "pivot_path": "/data/gcgaacqmxpysp/work/hive/gcgaacqmxpysp_work/rm36973/athenas/pivots/pnl",
+    "lista_trans": [
+        "min",
+        "max",
+        "avgmov",
+        "mean",
+        "sum"
+    ],
+    "email_sender": "rm36973",
+    "email_receivers": [
+        "rm36973"
+    ],
+    "n_threads": "4",
+    "write_mode": "overwrite"
+}

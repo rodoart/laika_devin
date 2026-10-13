@@ -1,0 +1,43 @@
+{
+    "sources": [
+        "payroll_streaks"
+    ],
+    "working_path": "/data/gcprcmsbx/work/hive/gcprcmsbx_work/rg49392/camelot_survival/camelot_st/2025_03_26-three_week_to_fortnightly",
+    "year_id": "202401",
+    "n_mis": "4",
+    "period": "12",
+    "pivot_path": "/data/gcprcmsbx/work/hive/gcprcmsbx_work/rg49392/camelot_survival/camelot_st/2025_02_13-recreation/pivot_tables/202401_stress/pivot",
+    "lista_trans": [
+        "is_new_onz_mt",
+        "kolmogorov_complexity_onz_mt",
+        "weighted_mean_mt",
+        "first_1_onz_mt",
+        "longest_1_streak_onz_mt",
+        "first_streaks_onz_mt",
+        "transitions_onz_mt",
+        "cmpx_mt",
+        "skew_mt",
+        "curt_mt",
+        "mean_mt",
+        "std_mt",
+        "sum_mt",
+        "max_mt",
+        "logmean_mt",
+        "square_mt",
+        "inverse_mt",
+        "trend_mt",
+        "rmeans_mt",
+        "incremental_mt",
+        "vp_mt",
+        "rt_mt",
+        "so_mt",
+        "avgmov_mt",
+        "rms_mt"
+    ],
+    "email_sender": "rg49392",
+    "email_receivers": [
+        "rg49392"
+    ],
+    "n_threads": "8",
+    "write_mode": "overwrite"
+}
