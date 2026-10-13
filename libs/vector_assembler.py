@@ -1,6 +1,17 @@
+"""
+Project: Data Pull Framework
+Developer: @rm36973
+
+``FeaturesVectorAssembler`` — crea el vector final de features del
+datapull: ensambla cada transformación de ``features/`` en su propio
+vector, las une al pivot de raw features y reescribe los metadatos ML
+para que cada slot del vector conserve el nombre de su feature.
+"""
 from pyspark.sql.functions import col
+from pyspark.sql import DataFrame, SparkSession
 import subprocess
 from pyspark.ml.feature import VectorAssembler
+from typing import Any, Dict, List, Tuple
 import os
 import re
 import logging
@@ -10,51 +21,55 @@ logging.basicConfig(format='%(asctime)s | %(message)s',
 
 
 class FeaturesVectorAssembler:
-    """
-    Class Feature Vector Assembler for creating the final vector of the features.
+    """Feature Vector Assembler para crear el vector final de features.
 
     Parameters
     ----------
-    path_features: string
-        Path where the features including raw are located
-    save_path: string
-        Path to save the va
-    sqlContext: spark context
-        Your sqlContext
-    raw_name: string
-        Optional, the name of folder of raw features, by default is raw_features
-    mode: string
-        Optional, mode of write of parquet, by default overwrite
-    id_column: string
-        Optional, name of id column in the features
-
+    path_features : str
+        Path donde están las features, incluida la raw.
+    save_path : str
+        Path donde guardar el vector assembler.
+    sqlContext : SparkSession
+        Tu sqlContext.
+    raw_name : str
+        Opcional, nombre de la carpeta de raw features; por defecto
+        ``raw_features``.
+    mode : str
+        Opcional, modo de escritura del parquet; por defecto
+        ``overwrite``.
+    id_column : str
+        Opcional, nombre de la columna id en las features.
     """
-    def __init__(self, path_features, save_path, sqlContext, raw_name = "raw_features", mode = "overwrite", id_column =
-    "id_msf_tools_v2_12315") -> None:
-        self.path_features = path_features
-        self.save_path = save_path
-        self.sqlContext = sqlContext
-        self.raw_name = raw_name
-        self.transformations = self._check_files(path_features)
+    def __init__(self, path_features: str, save_path: str,
+                 sqlContext: SparkSession, raw_name: str = "raw_features",
+                 mode: str = "overwrite",
+                 id_column: str = "id_msf_tools_v2_12315") -> None:
+        self.path_features: str = path_features
+        self.save_path: str = save_path
+        self.sqlContext: SparkSession = sqlContext
+        self.raw_name: str = raw_name
+        self.transformations: List[str] = self._check_files(path_features)
         self.transformations.remove(raw_name)
         if "assembled_features" in self.transformations:
             self.transformations.remove("assembled_features")
-        self.mode = mode
-        self.id_column = id_column
+        self.mode: str = mode
+        self.id_column: str = id_column
 
-    def _check_files(self,path) -> list[str]:
-        """
-        Obtain a list with the files of certain path in hadoop.
+    def _check_files(self, path: str) -> List[str]:
+        """Lista los ficheros/directorios de ``path`` en Hadoop.
+
+        En ejecuciones locales se sustituye por
+        ``libs.steps.path_listdir`` (ver ``patch_filesystem``).
 
         Parameters
         ----------
-        path: string
-            path to obtain the files
+        path : str
+            Path a listar.
 
         Returns
         -------
-        List
-            List with all the files in the path
+        List[str]
+            Lista con todos los ficheros del path.
         """
         args_list=['hdfs', 'dfs', '-ls', path]
         proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -62,19 +77,19 @@ class FeaturesVectorAssembler:
         proc.wait()
         return [elem[re.search(path, elem).end():].replace("/","") for elem in stdout.decode('ascii','ignore').splitlines() if path
         in elem]
-    def _evaluate_path(self,path) -> Any | bool:
-        """
-        Evaluate if certain path exists in hadoop.
+
+    def _evaluate_path(self, path: str) -> bool:
+        """Evalúa si ``path`` existe en Hadoop.
 
         Parameters
         ----------
-        path: string
-            path to check if exists
+        path : str
+            Path a comprobar.
 
         Returns
         -------
         bool
-            True if path exist false otherwise
+            ``True`` si el path existe; ``False`` si no.
         """
         args_list=['hdfs', 'dfs', '-test', '-d', path]
         proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,
@@ -83,14 +98,13 @@ class FeaturesVectorAssembler:
         value=proc.returncode==0 and True or False
         return value
 
-    def _delete_intermediate(self, path) -> None:
-        """
-        Function to delete paths using hadoop
+    def _delete_intermediate(self, path: str) -> None:
+        """Borra ``path`` con ``hdfs dfs -rm`` si existe.
 
         Parameters
         ----------
-        path: string
-            Path to delete
+        path : str
+            Path a borrar.
         """
         if (self._evaluate_path(path)):
             args_list = ['hdfs', 'dfs', '-rm', '-f', '-r', '-skipTrash', path]
@@ -98,13 +112,20 @@ class FeaturesVectorAssembler:
                 args_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             proc.communicate()
 
-    def _features_vec_assemb(self) -> tuple[()]:
-        """
-        Creates the vector using vector assembler of spark with all the features created.
+    def _features_vec_assemb(self) -> Tuple[()]:
+        """Crea el vector final con ``VectorAssembler`` de Spark.
+
+        Para cada transformación de ``self.transformations``:
+
+        1. Lee ``<path_features>/<trans>`` y la ensambla en un vector.
+        2. Hace join de todos los vectores sobre el pivot de raw features.
+        3. Ensambla todo en ``features_vector`` y reescribe los metadatos
+           ``ml_attr`` con los nombres reales de las features.
+        4. Guarda ``<save_path>`` uniendo las columnas raw (no features)
+           con el vector final.
         """
         features_to_process = []
         colz = []
-        path_assmb = []
         id_column = self.id_column
         for feature in self.transformations:
             features_path = os.path.join(self.path_features,feature)
@@ -155,19 +176,18 @@ class FeaturesVectorAssembler:
         self._delete_intermediate(os.path.join(self.save_path + "_aux"))
         return()
 
-    def _create_new_meta(self, colz) -> dict[Any, Any]:
-        """
-        Creates the vector using vectorassembler of spark with all the features created.
+    def _create_new_meta(self, colz: List[List[str]]) -> Dict[int, str]:
+        """Construye el dict ``{idx: nombre_columna}`` para los metadatos ML.
 
         Parameters
         ----------
-        colz: list
-            List of columns to creates the new metadata
+        colz : List[List[str]]
+            Lista de listas de columnas (una por transformación).
 
         Returns
         -------
-        Dictionary
-            Dictionary with new metadata
+        Dict[int, str]
+            Diccionario con la nueva metadata ``idx -> nombre``.
         """
         colz_list = []
         cont = 0
@@ -184,8 +204,7 @@ class FeaturesVectorAssembler:
             dict_colz[cont] = x
             cont += 1
         return(dict_colz)
+
     def run(self) -> None:
-        """
-        Perform the vector assembler.
-        """
+        """Ejecuta el vector assembler."""
         self._features_vec_assemb()

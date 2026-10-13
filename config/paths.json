@@ -1,0 +1,15 @@
+{
+  "_comment": "INTERNAL config - do not edit. Relative stage paths below <working_path>/<year_id>/<source>/. Resolved by libs/paths.py; override location with LAIKA_PATHS_CONFIG.",
+  "stages": {
+    "extract":  {"path": "extract",             "keep_or_delete": "keep"},
+    "weeks":    {"path": "weekly_extract",      "keep_or_delete": "delete"},
+    "mt":       {"path": "missing_treatment",   "keep_or_delete": "delete"},
+    "groupby":  {"path": "groupby",             "keep_or_delete": "keep"},
+    "pivoting": {"path": "pivot",               "keep_or_delete": "delete"},
+    "ratios":   {"path": "ratios",              "keep_or_delete": "keep"},
+    "fe":       {"path": "features",            "keep_or_delete": "keep"},
+    "mobs":     {"path": "mobs/imputate_mobs",  "keep_or_delete": "keep"},
+    "va":       {"path": "vector_assembler",    "keep_or_delete": "keep"},
+    "cols2vec": {"path": "vector_assembler",    "keep_or_delete": "keep"}
+  }
+}

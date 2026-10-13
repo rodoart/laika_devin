@@ -4,14 +4,17 @@ Developer: @rm36973 @bb25173
 Update Date: 2023-01-04
 Version: 0.1
 
-Class and Functions required to aggregate (general)
+Clase y funciones para agregación (general): dispatcher ``GroupBy`` que
+instancia el agregador correcto según la fuente, más una copia de
+``GeneratePivot`` (transposición long -> wide).
 """
 
 import os
-from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, lit, array, explode, struct, concat_ws
 from pyspark.sql.types import IntegerType
 import logging
+from typing import Any, Dict, List, Optional, Type
 
 from .aggregattes.bureau_cohort import BureauCohortAggregate
 from .aggregattes.bureau_pull import BureauPullAggregate
@@ -26,7 +29,7 @@ from .aggregattes.pnl_new import PNLNewAggregate
 from .aggregattes.pnl_cohort import PNLCohortAggregate
 from .aggregattes.product_data import ProductDataAggregate
 from .aggregattes.profundidad import ProfundidadAggregate
-from .aggregattes.rev_balance import RevBalanceAggregate
+from .aggregattes.rev_balnce import RevBalanceAggregate
 from .aggregattes.payroll_streaks import PayrollStreaksAggregate
 from .aggregattes.laika import LaikaAggregate
 from .aggregattes.suguru import SuguruAggregate
@@ -39,62 +42,43 @@ logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
 
 class GeneratePivot:
-    """
-    Class Generate Pivot for transposing a data table
+    """Transpone una tabla de datos (long -> wide).
 
     Parameters
     ----------
-    previous_path: string
-        Path where data is read.
-    pivot_dict: Dictionary
-        Parameters needed by the class(key, group_by, etc).
-    sqlContext: spark context
-        Your sqlContext
-    mode: string, optional
-        Parquet write mode, defaults to 'overwrite'.
+    previous_path : str
+        Path donde se leen los datos.
+    pivot_dict : Dict[str, Any]
+        Parámetros que necesita la clase (``source``, ``pivot_key``,
+        ``table_name``).
+    sqlContext : SparkSession
+        Tu sqlContext.
+    mode : str, optional
+        Modo de escritura del parquet, por defecto ``'overwrite'``.
     """
 
-    def __init__(self, previous_path, pivot_dict, sqlContext, mode="overwrite") -> None:
-        """
-        Class constructor.
-        """
-        self.previous_path = previous_path
-        self.pivot_dict = pivot_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
+    def __init__(self, previous_path: str, pivot_dict: Dict[str, Any],
+                 sqlContext: SparkSession, mode: str = "overwrite") -> None:
+        """Constructor de la clase."""
+        self.previous_path: str = previous_path
+        self.pivot_dict: Dict[str, Any] = pivot_dict
+        self.sqlContext: SparkSession = sqlContext
+        self.mode: str = mode
 
-    def _save_parquet(self, df_save, path) -> None:
-        """
-        Save data as parquet on desired location.
+    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
+        """Guarda datos como parquet en la ubicación indicada.
 
         Parameters
         ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-
+        df_save : DataFrame
+            Datos a guardar.
+        path : str
+            Path donde almacenar los datos.
         """
-
         df_save.write.mode(self.mode).parquet(path)
 
     def pivot_data(self) -> None:
-        """
-        Process to go from long format data to wide format.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
-        """
+        """Pasa de formato largo a ancho y guarda en ``pivot``."""
         source = self.pivot_dict["source"]
         if source in ("corporate", "clocks", "bureau_pull", "bureau_cohort"):
             read_path = os.path.join(
@@ -107,7 +91,7 @@ class GeneratePivot:
         cols, dtypes = zip(*[(c, t)
             for (c, t) in df_in.dtypes if c not in group_by])
         kvs = explode(array(
-            struct(lit(c).alias("key"), col(c).alias("value")) for c in cols)).alias("kvs")
+            *[struct(lit(c).alias("key"), col(c).alias("value")) for c in cols])).alias("kvs")
         df_long = df_in.select(group_by + [kvs]).select(
             group_by + ["kvs.key", "kvs.value"])
         df_long = df_long.withColumn("tfrom", col("tfrom").cast(IntegerType()))
@@ -119,27 +103,21 @@ class GeneratePivot:
         self._save_parquet(df_wide, os.path.join(head, "pivot"))
         df_wide.unpersist()
 
-    def pivot_data_aux(self, path, group_by) -> None:
-        """
-        Auxiliar function to go from long format data to wide format.
+    def pivot_data_aux(self, path: str, group_by: List[str]) -> None:
+        """Versión auxiliar de long -> wide sobre un path arbitrario.
 
         Parameters
         ----------
-        path: string
-            Path to read the data from.
-        group_by: List
-            String list of columns to exclude from the transposing process.
-
-        Returns
-        -------
-        None
-
+        path : str
+            Path del que leer los datos.
+        group_by : List[str]
+            Columnas excluidas del proceso de transposición.
         """
         df_in = self.sqlContext.read.parquet(path)
         cols, dtypes = zip(*[(c, t)
             for (c, t) in df_in.dtypes if c not in group_by])
         kvs = explode(array(
-            struct(lit(c).alias("key"), col(c).alias("value")) for c in cols)).alias("kvs")
+            *[struct(lit(c).alias("key"), col(c).alias("value")) for c in cols])).alias("kvs")
         df_long = df_in.select(group_by + [kvs]).select(
             group_by + ["kvs.key", "kvs.value"])
         df_long = df_long.withColumn("tfrom", col("tfrom").cast(IntegerType()))
@@ -151,69 +129,64 @@ class GeneratePivot:
         df_wide.write.mode("overwrite").parquet(os.path.join(head, "pivot"))
         df_wide.unpersist()
 
+
 class GroupBy:
-    """
-    Class Group By for creating the grouped data in datapull.
+    """Group By para crear los datos agrupados del datapull.
+
+    Dispatcher: según ``source`` instancia el ``*Aggregate``
+    correspondiente (ver :meth:`_obtain_object`) y llama a su
+    ``aggregate()``.
 
     Parameters
     ----------
-    source: string
-        Data Source name
-    previous_path: string
-        Path to save the groupby
-    agg_dict: Dictionary
-        All parameters needed by the class(key, group_by, querys)
-    sqlContext: spark context
-        Your sqlContext
+    source : str
+        Nombre de la fuente.
+    previous_path : str
+        Path del paso anterior (entrada del groupby).
+    agg_dict : Dict[str, Any]
+        Todos los parámetros que necesita la clase (key, group_by,
+        queries).
+    sqlContext : SparkSession
+        Tu sqlContext.
     n_mis : int
-        Number of missing values allowed
+        Número de meses de información.
     period : int
-        Time period for the groupby
+        Periodo temporal del groupby.
     pivot_path : str, optional
-        Path for pivot table, defaults to an empty string
+        Path de la tabla pivot; por defecto cadena vacía.
     tables : str, optional
-        List of tables involved in the groupby, defaults to an empty string
+        Lista de tablas involucradas en el groupby; por defecto cadena
+        vacía.
     mode : str, optional
-        Parquet write mode, defaults to 'overwrite'
+        Modo de escritura del parquet; por defecto ``'overwrite'``.
     """
 
     def __init__(self,
-        source:str,
+        source: str,
         previous_path: str,
-        agg_dict:dict,
-        sqlContext:SparkSession,
-        n_mis:int,
-        period:int,
-        pivot_path:str="",
-        tables:str="",
-        mode:str="overwrite"
+        agg_dict: Dict[str, Any],
+        sqlContext: SparkSession,
+        n_mis: int,
+        period: int,
+        pivot_path: str = "",
+        tables: Any = "",
+        mode: str = "overwrite"
     ) -> None:
-        """
-        Class constructor
-        """
-        self.source = source
-        self.previous_path = previous_path
-        self.pivot_path = pivot_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
-        self.n_mis = n_mis
-        self.period = period
-        self.tables = tables
-        self.mode = mode
+        """Constructor de la clase."""
+        self.source: str = source
+        self.previous_path: str = previous_path
+        self.pivot_path: str = pivot_path
+        self.agg_dict: Dict[str, Any] = agg_dict
+        self.sqlContext: SparkSession = sqlContext
+        self.n_mis: int = n_mis
+        self.period: int = period
+        self.tables: Any = tables
+        self.mode: str = mode
 
     def run(self) -> None:
-        """
-        Executes groupby process.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
-        """
+        """Ejecuta el proceso de groupby: instancia el agregador de la
+        fuente (con el set de argumentos que cada uno espera) y llama a su
+        ``aggregate()``."""
         group_class = self._obtain_object()
         if self.source in ["product_data", "payroll_income"]:
             group_obj = group_class(
@@ -242,17 +215,12 @@ class GroupBy:
         group_obj.aggregate()
         #
     def _obtain_object(self) -> type[FinancieraAggregate] | type[ChannelsAggregate] | type[ProductDataAggregate] | type[CorporateAggregate] | type[ProfundidadAggregate] | type[PNLAggregate] | type[PNLNewAggregate] | type[PNLCohortAggregate] | type[LaikaAggregate] | type[SuguruAggregate] | type[S15NFAggregate] | type[S15Aggregate] | type[MorkitaraAggregate] | type[AtmsAggregate] | type[MacrogirosAggregate] | type[BureauCohortAggregate] | type[BureauPullAggregate] | type[LiabilitiesPullAggregate] | type[RevBalanceAggregate] | type[PayrollIncomeAggregate] | type[PayrollStreaksAggregate]:
-        """
-        Returns the corresponding groupby object of the source
-
-        Parameters
-        ----------
-        None
+        """Devuelve la clase ``*Aggregate`` correspondiente a ``self.source``.
 
         Returns
         -------
-        object
-            Source GroupBy Object
+        type
+            Clase agregadora de la fuente.
         """
         if self.source == "financiera":
             group_class = FinancieraAggregate

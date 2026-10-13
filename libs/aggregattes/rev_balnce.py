@@ -9,9 +9,11 @@ Class and Functions required to aggregate (general)
 
 import os
 import pandas as pd
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws
 from pyspark.sql.types import IntegerType, DoubleType
 from itertools import chain
+from typing import Any, Dict, Optional
 import logging
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
@@ -34,7 +36,8 @@ class RevBalanceAggregate:
         Optional, parquet write mode, defaults to overwrite
     """
 
-    def __init__(self, previous_path, agg_dict, sqlContext, mode="overwrite") -> None:
+    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
+        sqlContext: SparkSession, mode: str = "overwrite") -> None:
         """
         Class constructor.
         """
@@ -43,7 +46,7 @@ class RevBalanceAggregate:
         self.sqlContext = sqlContext
         self.mode = mode
 
-    def _save_parquet(self, df_save, path) -> None:
+    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
         """
         Save data as parquet on desired location.
 
@@ -60,7 +63,7 @@ class RevBalanceAggregate:
         """
         df_save.write.mode(self.mode).parquet(path)
 
-    def epp_aggregate(self, sqlContext, epp_path, agg_dict, epp_dict) -> Any:
+    def epp_aggregate(self, sqlContext: SparkSession, epp_path: str, agg_dict: Dict[str, Any], epp_dict: Dict[str, Any]) -> DataFrame:
         """
         Agregates EPP Data.
 
@@ -133,7 +136,7 @@ class RevBalanceAggregate:
 
         return epp_agg
 
-    def plan_aggregate(self, sqlContext, plan_path) -> Any:
+    def plan_aggregate(self, sqlContext: SparkSession, plan_path: str) -> DataFrame:
         """
         Aggregates plan data.
 
@@ -191,7 +194,7 @@ class RevBalanceAggregate:
 
         return plan_agg
 
-    def revbalance_aggregate(self, ccp_path, agg_dict, epp_agg, plan_agg) -> Any:
+    def revbalance_aggregate(self, ccp_path: str, agg_dict: Dict[str, Any], epp_agg: DataFrame, plan_agg: DataFrame) -> DataFrame:
         """
         Joins together the epp and plan data. Credit Card level is aggregated
         to Customer Level.

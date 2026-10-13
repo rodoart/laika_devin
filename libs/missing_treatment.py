@@ -13,9 +13,8 @@ import os
 import re
 import subprocess
 from pathlib import PosixPath
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
-from numpy import source
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql.functions import (
     avg,
@@ -69,20 +68,20 @@ class MissingTreatment:
     mode:
         How will the parquets be written
     """
-    def __init__(self, year, mt_dict, source, n_mis, n_threads, mode="overwrite") -> None:
-        """
-        Constructor of missing_treatment class
-        ----------
-        """
-        self.year = year
-        self.mt_dict = mt_dict
-        self.source = source
-        self.n_mis = n_mis
-        self.n_threads = n_threads
-        self.mode = mode
+    def __init__(self, year: str, mt_dict: Dict[str, Any], source: str,
+                 n_mis: int, n_threads: int,
+                 mode: str = "overwrite") -> None:
+        """Constructor de la clase MissingTreatment."""
+        self.year: str = year
+        self.mt_dict: Dict[str, Any] = mt_dict
+        self.source: str = source
+        self.n_mis: int = n_mis
+        self.n_threads: int = n_threads
+        self.mode: str = mode
 
     ######################################## metodo principal mobs (run_missing_treatment) ########################################
-    def run_mt(self, path_mt, tables_mt, path_write, sql_context) -> None:
+    def run_mt(self, path_mt: str, tables_mt: List[str], path_write: str,
+               sql_context: SparkSession) -> None:
         """
         This method is the main method to run missing treatment, the objective is to fill missing values using statistics (median,ave...
 
@@ -197,7 +196,8 @@ class MissingTreatment:
                 pathwrite, feat_list, periodo, sql_context)
 
     ######################################## metodos para llenado mobs (Calculate) ########################################
-    def calculate_mobs(self, historic_path, pathwrite, sql_context=None) -> None:
+    def calculate_mobs(self, historic_path: str, pathwrite: str,
+                       sql_context: Optional[SparkSession] = None) -> None:
         """
         This method calls the corresponding calculate mobs depending on the sources
         that are received. Then it stores the obtained dataframe into the pathwrite.
@@ -238,7 +238,8 @@ class MissingTreatment:
         #
         self.__write_parquet(df_full, pathwrite, "calculate_mobs")
 
-    def liabilities_mobs(self, tables_path, table_names, sql_context=None) -> Any:
+    def liabilities_mobs(self, tables_path: str, table_names: List[str],
+                         sql_context: Optional[SparkSession] = None) -> DataFrame:
         """
         This method specifies the columns to be selected in the query for the
         6 liabilities tables and then calls _get_dataframes, _calculate_separated_mobs
@@ -251,7 +252,7 @@ class MissingTreatment:
         table_names: array
             contains the names of the tables to be used (for liabilities must be an array with 6 names)
         """
-        def mobs_tables_union(dfs_liab) -> Any:
+        def mobs_tables_union(dfs_liab: List[DataFrame]) -> DataFrame:
             """
             This method makes a union of all the data frames received.
 
@@ -287,7 +288,8 @@ class MissingTreatment:
         base = mobs_tables_union(dfs_liab)
         return base
 
-    def credit_card_mobs(self, tables_path, table_names, sql_context=None) -> Any:
+    def credit_card_mobs(self, tables_path: str, table_names: List[str],
+                         sql_context: Optional[SparkSession] = None) -> DataFrame:
         """
         This method specifies the columns to be selected in the query for the pnl table
         and then calls _get_dataframes, _calculate_separated_mobs and mobs_tables_union.
@@ -316,7 +318,8 @@ class MissingTreatment:
             dfs_credit, query, 'credit_card', calculate_mobs)
         return dfs_credit[0]
 
-    def bureau_mobs(self, tables_path, list_tables, sql_context=None) -> DataFrame:
+    def bureau_mobs(self, tables_path: str, list_tables: List[str],
+                    sql_context: Optional[SparkSession] = None) -> DataFrame:
         """
         Calculate months in bureau of bureau customers.
 
@@ -428,7 +431,9 @@ class MissingTreatment:
         #
         return df_mobs
     ######################################## metodos para llenado mobs (Imputacion) ########################################
-    def previous_fixer(self, path_mobs_fe, features_path, write_mobs, feat_list, periodo, sql_context) -> None:
+    def previous_fixer(self, path_mobs_fe: str, features_path: str,
+                       write_mobs: str, feat_list: List[List[str]],
+                       periodo: int, sql_context: SparkSession) -> None:
         """
         Description:
         Fills the information for each feature, taking 3,6,9,12 months depending on how many months on books does the client have.
@@ -469,7 +474,10 @@ class MissingTreatment:
             print(f"inicia copia {feature}")
             self.__copy_feature(features_path, feature, pathwrite, sql_context)
         self._delete_intermediate_list(pathwrite, list(set(df_paths)))
-    def valor_previo4(self,features_path, feature,mobs_info, pathwrite, lista_meses, sql_context) -> None:
+    def valor_previo4(self, features_path: str, feature: str,
+                      mobs_info: DataFrame, pathwrite: str,
+                      lista_meses: List[int],
+                      sql_context: SparkSession) -> None:
         feats_path =  os.path.join(features_path,feature)
         for i in range(len(lista_meses)):
             num_temp = f"temp{str(i)}"
@@ -479,7 +487,10 @@ class MissingTreatment:
                 path_out = os.path.join(pathwrite,num_temp)
             self.valor_previo4_step(feats_path, feature,mobs_info, path_out, lista_meses[i], i, lista_meses, sql_context)
             feats_path = os.path.join(path_out,feature)
-    def valor_previo4_step(self,features_path, feature,mobs_info, pathwrite, mes, num_iteracion, lista_meses, sql_context) -> None:
+    def valor_previo4_step(self, features_path: str, feature: str,
+                           mobs_info: DataFrame, pathwrite: str, mes: int,
+                           num_iteracion: int, lista_meses: List[int],
+                           sql_context: SparkSession) -> None:
         data_feature =  sql_context.read.parquet(features_path)
         id_var = 'id_msf_tools_v2_12315'
         i = num_iteracion
@@ -525,23 +536,48 @@ class MissingTreatment:
         path_ = os.path.join(pathwrite,feature)
         df_exit.write.mode("overwrite").parquet(path_)
     ######################################## metodos para llenado de MT ########################################
-    def fill_historic(self, df, grouped, kmiss,path_write,sql_context) -> Any:
+    def fill_historic(self, df: DataFrame, grouped: List[str], kmiss: int,
+                      path_write: str,
+                      sql_context: SparkSession) -> DataFrame:
+        """Rellena los missings usando valores históricos del propio cliente.
+
+        Cadena: ``last_null`` (extremo final) -> ``snapshot`` (tfrom 0) ->
+        ``interpolacion`` (media de vecinos) -> ``moving_average``
+        (media móvil de ``kmiss`` meses). Solo se aplica a clientes con
+        menos de ``null_count`` nulos según el config.
+
+        Parameters
+        ----------
+        df : DataFrame
+            Dataframe a procesar.
+        grouped : List[str]
+            Columnas de agrupación de la ventana.
+        kmiss : int
+            Tamaño de la ventana de la media móvil.
+        path_write : str
+            Working path (para los parquets temporales).
+        sql_context : SparkSession
+            Tu sqlContext.
+
+        Returns
+        -------
+        DataFrame
+            Dataframe con los valores rellenados.
         """
-        Description:
-        Method to iterate the main dictionary and process the DF acording to the dict
-        """
-        def snapshot(df,variable,grouped) -> Any:
+        def snapshot(df: DataFrame, variable: str, grouped: List[str]) -> DataFrame:
             wp_client = Window.partitionBy(grouped).orderBy(col("tfrom")).rangeBetween(Window.unboundedPreceding, Window.unboundedFollowing)
             df = df.withColumn(variable,when((col("tfrom") == 0) & (col("null_count") <= 2) & (col(variable).isNull()), first(col(variable), ignorenulls=True).over(wp_client)).otherwise(col(variable)))
             return(df)
 
-        def last_null(df,variable,grouped,n_mis) -> Any:
+        def last_null(df: DataFrame, variable: str, grouped: List[str],
+                      n_mis: int) -> DataFrame:
             wp_client_desc = Window.partitionBy(grouped).orderBy(col("tfrom").desc()).rangeBetween(Window.unboundedPreceding, Window.unboundedFollowing)
             df = df.withColumn(variable,
             when((col("tfrom") == (int(n_mis)-1)) & (col("null_count") <= 2) & (col(variable).isNull()), first(col(variable), ignorenulls=True).over(wp_client_desc)).otherwise(col(variable)))
             return(df)
 
-        def interpolacion(df,variable,grouped,n_mis) -> Any:
+        def interpolacion(df: DataFrame, variable: str, grouped: List[str],
+                          n_mis: int) -> DataFrame:
             wp_client_mid = Window.partitionBy(grouped).orderBy(col("tfrom")).rangeBetween(-1, 1)
             df = df.withColumn(variable,
             when(
@@ -549,7 +585,8 @@ class MissingTreatment:
             ).otherwise(col(variable)))
             return(df)
 
-        def moving_average(df,variable,grouped,kmiss,n_mis) -> Any:
+        def moving_average(df: DataFrame, variable: str, grouped: List[str],
+                           kmiss: int, n_mis: int) -> DataFrame:
             wp_mov_avg_b = Window.partitionBy(grouped).orderBy(col("tfrom")).rangeBetween(1, kmiss)
             wp_mov_avg_l = Window.partitionBy(grouped).orderBy(col("tfrom")).rangeBetween((kmiss)*-1, -1)
             df = df.withColumn(variable,
@@ -584,7 +621,7 @@ class MissingTreatment:
                     df=sql_context.read.parquet(dir_temp1)
             return (df)
 
-    def fill_value(self, df, nmbr_id_variables) -> Any:
+    def fill_value(self, df: DataFrame, nmbr_id_variables: int) -> DataFrame:
         """
         Description:
         Method to iterate the main dictionary and process the DF acording to the dict
@@ -615,7 +652,9 @@ class MissingTreatment:
                         col(variable).isNull(), nmbr_rplce).otherwise(col(variable)))
         return (df)
 
-    def fill_stat(self, df, grouped, nmbr_id_stat,path_write,sql_context) -> Any:
+    def fill_stat(self, df: DataFrame, grouped: List[str],
+                  nmbr_id_stat: str, path_write: str,
+                  sql_context: SparkSession) -> DataFrame:
         """
         Description:
         Method to iterate the main dictionary and process the DF acording to the dict
@@ -661,7 +700,7 @@ class MissingTreatment:
                     df=sql_context.read.parquet(dir_temp1)
         return (df)
 
-    def fill_snap(self, df, grouped) -> Any:
+    def fill_snap(self, df: DataFrame, grouped: List[str]) -> DataFrame:
         """
         Description:
         Method to iterate the main dictionary and process the DF acording to the dict
@@ -689,7 +728,8 @@ class MissingTreatment:
                         df[variable], ignorenulls=True).over(window_spec)).otherwise(df[variable]))
         return (df)
 
-    def fill_debito(self, df, grouped, sql_context) -> Any:
+    def fill_debito(self, df: DataFrame, grouped: List[str],
+                    sql_context: SparkSession) -> DataFrame:
         """
         Description:
         Method to fill_debito (liabilities)
@@ -750,7 +790,7 @@ class MissingTreatment:
     ###############################################################
     # Helper methods
     ###############################################################
-    def __vars_select(self,df,dict_stat) -> Any:
+    def __vars_select(self, df: DataFrame, dict_stat: List[str]) -> DataFrame:
         """
         Description:
         Method to prepare the variables of the bureau_cohort data source
@@ -781,7 +821,8 @@ class MissingTreatment:
                 df=df.withColumnRenamed(f"{item}_0",item)
         return(df)
 
-    def __copy_feature(self, features_path, feature, pathwrite, sql_context) -> None:
+    def __copy_feature(self, features_path: str, feature: str,
+                       pathwrite: str, sql_context: SparkSession) -> None:
         """
         Description:
         Method to copy features that will not be processed
@@ -835,7 +876,9 @@ class MissingTreatment:
             dfs.append(df)
         return dfs
 
-    def _calculate_separated_mobs(self, dfs, query, source, calculate_mobs) -> list[Any]:
+    def _calculate_separated_mobs(self, dfs: List[DataFrame],
+                                  query: List[str], source: str,
+                                  calculate_mobs: Column) -> List[DataFrame]:
         """
         This method applies the query to each data frame in the dfs array,
         validates clients and then calculate mobs.
@@ -877,7 +920,7 @@ class MissingTreatment:
                     self.mt_dict["missing_treatment"]["mobs"]["table_name"][item])
         return (list_tables)
 
-    def __get_months(self, periodo:Union[str,int]) -> list[Any]:
+    def __get_months(self, periodo: Union[str, int]) -> List[int]:
         """
         Description:
         Method to create the months period ([3,6,9,12],[2,4,6,...,])
@@ -891,7 +934,7 @@ class MissingTreatment:
                 months_list.append(self.n_mis)
         return (months_list)
 
-    def __evaluate_path(self, path) -> bool:
+    def __evaluate_path(self, path: str) -> bool:
         """
         Function to evaluate if a path exists
         """
@@ -902,7 +945,7 @@ class MissingTreatment:
         value = True if proc.returncode == 0 else False
         return value
 
-    def _delete_intermediate(self, path) -> None:
+    def _delete_intermediate(self, path: str) -> None:
         """
         Function to delete paths using hadoop
         """
@@ -912,7 +955,7 @@ class MissingTreatment:
                 args_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             proc.communicate()
 
-    def _delete_intermediate_list(self, path, id_list) -> None:
+    def _delete_intermediate_list(self, path: str, id_list: List[str]) -> None:
         """
         Function to delete paths using hadoop but using a list with multiple paths
 
@@ -1006,7 +1049,10 @@ def count_non_null_values(df: DataFrame, vintage_column:str, id_column:str, colu
     return result
 
 
-def get_last_contiguous_non_null_value(df, vintage_column, id_column, column_to_check, sorting_column, output_column) -> Any:
+def get_last_contiguous_non_null_value(df: DataFrame, vintage_column: str,
+                                       id_column: str, column_to_check: str,
+                                       sorting_column: str,
+                                       output_column: str) -> DataFrame:
     """
     Obtiene el último valor contiguo de `sorting_column` en el que `column_to_check` no es nulo.
 

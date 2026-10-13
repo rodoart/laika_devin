@@ -5,69 +5,60 @@ Developer: @rm36973
 Update Date: 2023-01-04
 Version: 0.1
 
-Class and Functions required to transpose table data A.K.A go from
-a long data form to wide
-
+Clase y funciones para empaquetar las features en un vector
+(``VectorAssembler`` de Spark ML) — producto final del datapull.
 """
 
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import array, col, explode, struct, lit, concat_ws
 from pyspark.sql.types import IntegerType
 from pyspark.ml.feature import VectorAssembler
 import os
+from typing import Any, Dict
+
 
 class ColumnsToVector:
-    """
-    Class
+    """Ensambla las columnas de features en un ``features_vector``.
 
     Parameters
     ----------
-    previous_path: string
-        Path where data is read.
-    pivot_dict: Dictionary
-        Parameters needed by the class(key, group_by, etc).
-    sqlContext: spark context
-        Your sqlContext
-    mode: string, optional
-        Parquet write mode, defaults to 'overwrite'.
+    write_path : str
+        Path de trabajo de la fuente (se lee ``prev_path`` y se escribe
+        ``vector_assembler`` dentro de él).
+    v2c_dict : Dict[str, Any]
+        Parámetros que necesita la clase (``source``, ``prev_path``,
+        ``table_name``).
+    sqlContext : SparkSession
+        Tu sqlContext.
+    mode : str, optional
+        Modo de escritura del parquet, por defecto ``'overwrite'``.
     """
 
-    def __init__(self, write_path, v2c_dict, sqlContext, mode="overwrite") -> None:
-        self.write_path = write_path
-        self.v2c_dict = v2c_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
+    def __init__(self, write_path: str, v2c_dict: Dict[str, Any],
+                 sqlContext: SparkSession, mode: str = "overwrite") -> None:
+        self.write_path: str = write_path
+        self.v2c_dict: Dict[str, Any] = v2c_dict
+        self.sqlContext: SparkSession = sqlContext
+        self.mode: str = mode
 
-    def _save_parquet(self, df_save, path) -> None:
-        """
-        Save data as parquet on desired location.
+    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
+        """Guarda datos como parquet en la ubicación indicada.
 
         Parameters
         ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-
+        df_save : DataFrame
+            Datos a guardar.
+        path : str
+            Path donde almacenar los datos.
         """
-
         df_save.write.mode(self.mode).parquet(path)
 
     def run(self) -> None:
-        """
-        Process to go from long format data to wide format.
+        """Ejecuta el empaquetado: lee las features, las pone en un
+        ``features_vector`` y guarda ``vector_assembler``.
 
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
+        Solo conserva ``numcliente``, ``vintage`` y ``features_vector``
+        en la salida final.
         """
         source = self.v2c_dict["source"]
         print("V2C: "+source)

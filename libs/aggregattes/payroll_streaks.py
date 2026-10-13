@@ -11,9 +11,9 @@ Class and Functions required to aggregate (payroll streaks)
 from dateutil.relativedelta import relativedelta
 import subprocess
 from pathlib import PosixPath
-from typing import Callable, Dict, List, Optional,  Union
+from typing import Callable, Dict, List, Optional, Union
 
-from pyspark.sql import DataFrame, Row, SparkSession, Window
+from pyspark.sql import Column, DataFrame, Row, SparkSession, Window
 from pyspark.sql.functions import (array, array_contains, coalesce, col,
 collect_list, sort_array, first, greatest, last, lit, row_number,
 min as spark_min, sum as spark_sum, trunc, when, max as spark_max,
@@ -72,7 +72,11 @@ class PayrollStreaksAggregate:
         self.n_mis = int(n_mis)
         self.period = int(period)
         self.sqlContext = sqlContext
-        self._columns_not_to_be_renamed = ["numcliente", "vintage_date"]
+        self._columns_not_to_be_renamed = [
+            "numcliente", "vintage_date", "n_tef", "tfrom", "tfrom_date", "tfrom_month",
+            "week_of_month", "count_paid_in_month", "weeks_of_month",
+            "payment_type_per_month", "client_payment_type",
+        ]
         #
         # Mode of operation
         if mode is None:
@@ -218,9 +222,9 @@ class PayrollStreaksAggregate:
             #     # CHECK POINT
             #     self._save_parquet(previous_df, self.hdfs["middle_patterned_check_point"])
             #     previous_df =  self.sqlContext.read.parquet(self.hdfs["middle_patterned_check_point"])
-            self._setattr_(f"{pattern_name}_step", pattern_step_object)
+            setattr(self, f"{pattern_name}_step", pattern_step_object)
         # Only last pattern
-        return self._getattribute_(f"{pattern_name}_step")
+        return getattr(self, f"{pattern_name}_step")
 
     #
     @cached_property
@@ -279,7 +283,7 @@ class PayrollStreaksAggregate:
         df_save.write.mode(self.mode).parquet(path)
 
     #
-    def _delete_intermediate(self,path) -> None:
+    def _delete_intermediate(self, path: str) -> None:
         """
         Elimina rutas utilizando Hadoop.
         """
@@ -830,13 +834,19 @@ class _PatternStep(_Step):
             self.prefixes_to_drop = []
         # optional attributes
         self.optional_attributes = {
-            "remove_previous_prefix": getattr(self.step_config, "remove_previous_prefix", False)
-            if hasattr(self.step_config, "remove_previous_prefix") else False
+            "remove_previous_prefix": self.step_config["remove_previous_prefix"]
+            if "remove_previous_prefix" in self.step_config.keys() else False
         }
-        self.remove_previous_prefix = getattr(self.step_config, "remove_previous_prefix", False) \
-            if hasattr(self.step_config, "remove_previous_prefix") else False
+        remove_previous_prefix = str(self.step_config["remove_previous_prefix"]).lower() \
+            if "remove_previous_prefix" in self.step_config.keys() else "false"
+        if remove_previous_prefix == "false":
+            self.remove_previous_prefix = False
+        elif remove_previous_prefix == "true":
+            self.remove_previous_prefix = True
+        else:
+            raise ValueError("The remove_previous_prefix value should be a boolean.")
         self.previous_prefix = previous_prefix
-        self._columns_not_to_be_renamed = self.parent._columns_not_to_be_renamed
+        self._columns_not_to_be_renamed = parent._columns_not_to_be_renamed
         #
         super().__init__(parent)
         return None
@@ -1795,7 +1805,7 @@ def unusual_pattern_rule(df: DataFrame, columns_to_apply: List[str], prefix:str,
     return result
 
 
-def get_when_otherwise_nested(conditions, true_operations) -> "Column":
+def get_when_otherwise_nested(conditions: List[Column], true_operations: List[Column]) -> "Column":
     if len(conditions) == 1:
         return when(conditions[0], true_operations[0])
     else:
@@ -1881,10 +1891,10 @@ def reverse_pattern_rule(
     lags = [-tfrom_max + 2*(i) for i in range(tfrom_max+1)]
     lag_conditions = [(col("lag") == lag_) for lag_ in lags]
     #
-    def true_operations(column) -> "list[Column]":
+    def true_operations(column: str) -> "list[Column]":
         return [lag(col(column), lag_).over(rowNumberWindowSpec) for lag_ in lags]
     #
-    def lag_operator(column) -> "Column":
+    def lag_operator(column: str) -> "Column":
         return get_when_otherwise_nested(lag_conditions, true_operations(column))
     #
     # Añadir la columna de numeración

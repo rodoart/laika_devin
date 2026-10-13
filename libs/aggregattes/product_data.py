@@ -9,7 +9,9 @@ Class and Functions required to aggregate (general)
 
 import os
 import pandas as pd
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import IntegerType
+from typing import Any, Dict, List, Optional
 from ..generate_pivot import GeneratePivot
 import logging
 
@@ -33,7 +35,8 @@ class ProductDataAggregate:
         Optional, parquet write mode, defaults to overwrite
     """
 
-    def __init__(self, previous_path, agg_dict, n_mis, period, sqlContext, mode="overwrite") -> None:
+    def __init__(self, previous_path: str, agg_dict: Dict[str, Any], n_mis: int,
+                 period: int, sqlContext: SparkSession, mode: str = "overwrite") -> None:
         """
         Class constructor.
         """
@@ -44,7 +47,7 @@ class ProductDataAggregate:
         self.period = period
         self.mode = mode
 
-    def _create_groupby_query(self, query_dict, group_by, tempview) -> Any:
+    def _create_groupby_query(self, query_dict: Dict[str, Any], group_by: List[str], tempview: str) -> str:
         """
         Creates the SQL aggregation query string use to group the bureau pull data
 
@@ -71,7 +74,7 @@ class ProductDataAggregate:
             " FROM "+tempview+" GROUP BY "+group_str
         return query_str
 
-    def _save_parquet(self, df_save, path) -> None:
+    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
         """
         Save data as parquet on desired location.
 

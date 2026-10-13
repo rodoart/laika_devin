@@ -10,7 +10,9 @@ Script containing the class and functions for the feature engineering in datapul
 import os
 import numpy as np
 import pandas as pd
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 import pyspark.sql.functions as F
+from pyspark.sql import DataFrame, SparkSession
 import zlib
 
 from numpy.typing import NDArray
@@ -51,11 +53,15 @@ class FeatureEngineering:
     overwrite: string
         mode of write of parquets, by default overwrite
     """
-    CLOSE_AS = ") as "
+    CLOSE_AS = ")) as "
     FROM_DF = " from df"
     SELECT_ID = "select id_msf_tools_v2_12315, "
 
-    def __init__(self, df, working_path, period, sqlContext, fe_dict=None, number_threads = 32, mode="overwrite") -> None:
+    def __init__(self, df: "DataFrame", working_path: str, period: int,
+                 sqlContext: "SparkSession",
+                 fe_dict: Optional[Dict[str, Any]] = None,
+                 number_threads: int = 32,
+                 mode: str = "overwrite") -> None:
         self.path = os.path.join(working_path, "features")
         self.sqlContext = sqlContext
         self.period = period
@@ -77,7 +83,7 @@ class FeatureEngineering:
 
         self.weights_dict = {last_weight:self.assign_weights(last_weight) for last_weight in [0.0, 0.25, 0.5, 0.75]}
 
-    def _check_raw(self,df) -> Any:
+    def _check_raw(self, df: DataFrame) -> DataFrame:
         """
         Creates if exist the raw features parquet, if not, creates it
 
@@ -96,7 +102,7 @@ class FeatureEngineering:
         else:
             return self._create_dataframe(df)
 
-    def _create_dataframe(self, df) -> Any:
+    def _create_dataframe(self, df: DataFrame) -> DataFrame:
         """
         Creates the dataframe for the transformations and the raw variables parquet
 
@@ -114,7 +120,7 @@ class FeatureEngineering:
         df = self._fill_na_zero(df)
         return df
 
-    def _get_lista_metodo(self) -> list[Any]:
+    def _get_lista_metodo(self) -> List[List[str]]:
         """
         Creates the list of lists of variables for certain methods, this list has all the months of variables, for example, for 6
         months of variable a5 returns:
@@ -136,7 +142,7 @@ class FeatureEngineering:
             lista_metodo.append(lista_aux_2)
         return lista_metodo
 
-    def _get_mvars(self, period) -> list[Any]:
+    def _get_mvars(self, period: int) -> List[List[str]]:
         """
         Makes the list with the variables grouped by months
 
@@ -150,7 +156,7 @@ class FeatureEngineering:
         list_mvars = self._list_mvars(variables,cols_df,period)
         return list_mvars
 
-    def _create_raw_variables(self,df,path) -> Any:
+    def _create_raw_variables(self, df: DataFrame, path: str) -> DataFrame:
         """
         Creates a parquet with the raw variables.
 
@@ -175,7 +181,7 @@ class FeatureEngineering:
         #print("Ending raw features")
         return(df)
 
-    def _obtain_columns(self, df) -> list[Any]:
+    def _obtain_columns(self, df: DataFrame) -> List[str]:
         """
         Make the array with only numerical columns
 
@@ -193,7 +199,8 @@ class FeatureEngineering:
         cols_df = [x for x in cols if x in col_string]
         return cols_df
 
-    def _filter_columns_feature(self, cols_df, feature) -> dict[Any, Any]:
+    def _filter_columns_feature(self, cols_df: List[str],
+                                feature: str) -> Dict[str, List[str]]:
         """
         Obtaing a list of features in cols of dataframe
 
@@ -220,7 +227,7 @@ class FeatureEngineering:
             dict_feat[feature_aux[n+1:]] = feature_aux
         return dict_feat
 
-    def _obtain_variables(self, cols_df) -> list[Any]:
+    def _obtain_variables(self, cols_df: List[str]) -> List[str]:
         """
         Obtain a list with the set of all raw features in dataframe
 
@@ -247,7 +254,8 @@ class FeatureEngineering:
         variables = list(set(variables))
         return variables
 
-    def _list_mvars(self, variables, cols_df, periodo) -> list[Any]:
+    def _list_mvars(self, variables: List[str], cols_df: List[str],
+                    periodo: int) -> List[List[str]]:
         """
         Obtain the list of variables by month, for example, using 6 months of variable a5 and a period of 2, returns
         [[a5_0, a5_1],
@@ -284,7 +292,7 @@ class FeatureEngineering:
                     return_features.append(list_aux)
         return return_features
 
-    def _fill_na_zero(self,df) -> Any:
+    def _fill_na_zero(self, df: DataFrame) -> DataFrame:
         """
         Fill the null values of dataframe with zeros
 
@@ -301,7 +309,8 @@ class FeatureEngineering:
         df=df.na.fill(0)
         return(df)
 
-    def _write_parquet(self,df, path, file_name) -> tuple[()]:
+    def _write_parquet(self, df: DataFrame, path: str,
+                       file_name: str) -> Tuple[()]:
         """
         Write the parquet of a certain df
 
@@ -354,7 +363,7 @@ class FeatureEngineering:
         """
         return OnesAndZerosMethodsMT(self)
 
-    def _run_transformation(self, transformation) -> None:
+    def _run_transformation(self, transformation: str) -> None:
         """
         Run the transformations required
 
@@ -373,7 +382,7 @@ class FeatureEngineering:
         else:
             exec("""self._"""+transformation+"""Transformation()""")
 
-    def run(self, transformations:list) -> None:
+    def run(self, transformations: List[str]) -> None:
         """
         Run the transformations required
 
@@ -399,7 +408,7 @@ class FeatureEngineering:
             thread_pool.map(fun, trans_dependeces)
         thread_pool.close()
 
-    def _app_transformation(self,list_vars,key) -> LiteralString | str | Any:
+    def _app_transformation(self, list_vars: str, key: List[str]) -> str:
         """
         Make the query to do the transformation using the register raw variables dataframe
 
@@ -441,7 +450,9 @@ class FeatureEngineering:
 
         return app_transformation
 
-    def _defineUdfTransformation(self, key:list, transformation:list, list_vars:any, tipo:any=DoubleType()) -> Any:
+    def _defineUdfTransformation(self, key: List[str],
+                                 transformation: List[Any], list_vars: str,
+                                 tipo: Any = DoubleType()) -> DataFrame:
         """
         Define the udf transformation and apply for the list of variables
 
@@ -466,7 +477,9 @@ class FeatureEngineering:
         return_transformation = self.sqlContext.sql(app_transformation)
         return return_transformation
 
-    def _runUdfTransformation(self, name:str, key:list, transformation:list, list_vars:str, tipo:any=DoubleType()) -> None:
+    def _runUdfTransformation(self, name: str, key: List[str],
+                              transformation: List[Any], list_vars: str,
+                              tipo: Any = DoubleType()) -> None:
         """
         Run the transformation using one or many udf's
         Parameters
@@ -533,7 +546,7 @@ class FeatureEngineering:
         Calculates the logarithm of the mean :math:`log(\\mu)` if the mean is higher than 1
         else returns 0, using group of <period> months defined in class
         """
-        def logmean(x) -> float:
+        def logmean(x: Sequence[float]) -> float:
             mean_value = float(np.mean(x))
             if mean_value>0:
                 return float(np.log(mean_value))
@@ -543,7 +556,7 @@ class FeatureEngineering:
         """
         Calculates the square of the mean :math:`\\mu^{2}` using group of <period> months defined in class.
         """
-        def square(x) -> float:
+        def square(x: Sequence[float]) -> float:
             mean_value = float(np.mean(x))
             return float(mean_value)**2
         self._runUdfTransformation("square", ['square'], [square], "list_mvars", DoubleType())
@@ -552,7 +565,7 @@ class FeatureEngineering:
         Calculates the inverse of the mean :math:`\\frac{1}{\\mu}` using group of <period> months defined in class.
         If mean equals to zero the returns a high value (1e5)
         """
-        def inverse(x) -> float:
+        def inverse(x: Sequence[float]) -> float:
             mean_value = float(np.mean(x))
             if mean_value != 0.0:
                 return 1/mean_value
@@ -568,7 +581,7 @@ class FeatureEngineering:
         using group of <period> months defined in class.
 
         """
-        def trend(x) -> float:
+        def trend(x: Sequence[float]) -> float:
             n = len(x)
             y = len(x)
             sum_xy = 0.0
@@ -599,7 +612,7 @@ class FeatureEngineering:
         of months 1,2 and 3, also calculates the ratio of mean of months 7, 8, 9, 10, 11 and 12 and the mean
         of months 1,2,3,4,5 and 6.
         """
-        def rmeans(x,y) -> float:
+        def rmeans(x: Sequence[float], y: Sequence[float]) -> float:
             m_1 = np.mean(x)
             m_2 = np.mean(y)
             if m_2 != 0.0:
@@ -634,7 +647,7 @@ class FeatureEngineering:
 
         where :math:`\\mu` is the mean, using group of <period> months defined in class
         """
-        def incremental(x) -> float:
+        def incremental(x: Sequence[float]) -> float:
             x.reverse()
             const_inc=0.0
             for i in range(len(x)-1):
@@ -667,7 +680,7 @@ class FeatureEngineering:
 
         If the denominator equals to 0 then the denominator is replaced by a small value (1e-5)
         """
-        def means_vp(x) -> float:
+        def means_vp(x: Sequence[float]) -> float:
             list_vp=list()
             t=0
             while t + 1 < len(x):
@@ -679,7 +692,7 @@ class FeatureEngineering:
                 t+=1
             m = float(np.mean(list_vp))
             return m
-        def std_vp(x) -> float:
+        def std_vp(x: Sequence[float]) -> float:
             list_vp=list()
             t=0
             while t + 1 < len(x):
@@ -701,7 +714,7 @@ class FeatureEngineering:
 
         If the denominator equals to 0 then the denominator is replaced by a small value (1e-5)
         """
-        def means_rt(x) -> float:
+        def means_rt(x: Sequence[float]) -> float:
             list_ratios=list()
             t=0
             while t + 1 < len(x):
@@ -713,7 +726,7 @@ class FeatureEngineering:
                 t+=1
             m=float(np.mean(list_ratios))
             return m
-        def std_rt(x) -> float:
+        def std_rt(x: Sequence[float]) -> float:
             list_ratios=list()
             t=0
             while t + 1 < len(x):
@@ -734,7 +747,7 @@ class FeatureEngineering:
 
         If the denominator equals to 0 then the return value is 1.
         """
-        def stochastic_oscillator(x) -> Any | float:
+        def stochastic_oscillator(x: Sequence[float]) -> Any | float:
             media=sum(x)/len(x)
             minimo=min(x)
             maximo=max(x)
@@ -750,7 +763,7 @@ class FeatureEngineering:
         """
         Calculates the movil averages across the group of months
         """
-        def avg_aux(x) -> float:
+        def avg_aux(x: Sequence[float]) -> float:
             cont=0.0
             num1=0.0
             den1=0.0
@@ -760,7 +773,7 @@ class FeatureEngineering:
                 cont=cont+1
             return(float(num1)/float(den1))
         self._runUdfTransformation("avgmov", ['avgmov'], [avg_aux], "list_mvars", DoubleType())
-    def _run_ratios(self,tran_rt) -> None:
+    def _run_ratios(self, tran_rt: Tuple[str, str]) -> None:
         """
         Perform the ratios transformation of ratiosmod
 
@@ -787,7 +800,7 @@ class FeatureEngineering:
         self._write_parquet(df_aux, self.path, f"r{name_ratio}_features")
         df_aux.unpersist()
 
-    def _run_deltas(self, tran_d) -> None:
+    def _run_deltas(self, tran_d: Tuple[str, str]) -> None:
         """
         Perform the ratios transformation of ratiosmod
 
@@ -820,13 +833,13 @@ class FeatureEngineering:
         Calculates ratios and deltas between the combinations of min, max and mean of all variables.
         This transformation need the mean, min and max transformations.
         """
-        def rt_mod(x) -> float:
+        def rt_mod(x: Sequence[float]) -> float:
             if x[1] != 0.0:
                 rt=float((x[0] / x[1]))
             else:
                 rt = 0.0
             return rt
-        def df_mod(x) -> float:
+        def df_mod(x: Sequence[float]) -> float:
             dif = float((x[0] - x[1]))
             return dif
         #print("Running ratiosmod transformation")
@@ -861,7 +874,7 @@ class FeatureEngineering:
         :math:`\\sqrt{\\frac{1}{n} \\sum_{i=1}^{n} x_{i}^2}`
 
         """
-        def rms(x) -> float:
+        def rms(x: Sequence[float]) -> float:
             return float(np.sqrt(np.mean(np.square(x))))
         self._runUdfTransformation("rms", ['rms'], [rms], "list_mvars", DoubleType())
     def _cmpxTransformation(self) -> None:
@@ -871,7 +884,7 @@ class FeatureEngineering:
         :math:`\\sqrt{\\sum_{i=1}^{n} (x_{i+1}-x_{i})^2}`
 
         """
-        def complexity(x) -> float:
+        def complexity(x: Sequence[float]) -> float:
             x = np.diff(x)
             return float(np.sqrt(np.dot(x, x)))
         self._runUdfTransformation("cmpx", ['cmpx'], [complexity], "list_mvars", DoubleType())
@@ -880,7 +893,7 @@ class FeatureEngineering:
         Returns the sample skewness across all the months(calculated with the adjusted Fisher-Pearson
         standardized moment coefficient G1)
         """
-        def skewness(x) -> float:
+        def skewness(x: Sequence[float]) -> float:
             if len(x) < 4:
                 value = 0.0
             else:
@@ -893,7 +906,7 @@ class FeatureEngineering:
         Returns the kurtosis of all months (calculated with the adjusted Fisher-Pearson standardized
         moment coefficient G2)
         """
-        def curtosis(x) -> float:
+        def curtosis(x: Sequence[float]) -> float:
             if len(x) < 4:
                 value = 0.0
             else:
@@ -906,8 +919,8 @@ class FeatureEngineering:
         """
         Calculates the weighted mean using the weights defined in the class
         """
-        def create_weighted_mean_functions(weights) -> Callable[..., float]:
-            def weighted_mean(x) -> float:
+        def create_weighted_mean_functions(weights: Sequence[float]) -> Callable[..., float]:
+            def weighted_mean(x: Sequence[float]) -> float:
                 truncated_weights = weights[:len(x)]
                 return float(np.average(x, weights=truncated_weights))
             return weighted_mean
@@ -921,7 +934,7 @@ class FeatureEngineering:
         weights = np.linspace(1, last_weight, max_leng_mvars)
         return weights
     #
-    def _evaluate_path(self,path) -> Any | bool:
+    def _evaluate_path(self, path: str) -> bool:
         """
         Evaluate if certain path exists in hadoop
         Parameters
@@ -942,6 +955,12 @@ class FeatureEngineering:
     #
 
 class ExternalTransformations:
+    """Clase base de las transformaciones "externas" (MT y ONZ).
+
+    Recibe el ``FeatureEngineering`` padre y copia sus atributos
+    compartidos (``sqlContext``, ``lista_metodo``, ``list_mvars``,
+    constantes de query, ``number_threads``).
+    """
     def __init__(
         self,
         parent:"FeatureEngineering"
@@ -958,7 +977,8 @@ class ExternalTransformations:
         self.SELECT_ID = self.parent.SELECT_ID
         self.number_threads = self.parent.number_threads
     #
-    def _write_parquet(self,df, path, file_name) -> tuple[()]:
+    def _write_parquet(self, df: DataFrame, path: str,
+                       file_name: str) -> Tuple[()]:
         """
         Write the parquet of a certain df
 
@@ -976,7 +996,9 @@ class ExternalTransformations:
         """
         return self.parent._write_parquet(df, path, file_name)
     #
-    def _runUdfTransformation(self, name:str, key:list, transformation:list, list_vars:str, tipo:any=DoubleType()) -> None:
+    def _runUdfTransformation(self, name: str, key: List[str],
+                              transformation: List[Any], list_vars: str,
+                              tipo: Any = DoubleType()) -> None:
         """
         Run the transformation using one or many udf's
         Parameters
@@ -993,7 +1015,7 @@ class ExternalTransformations:
             Type to return in udf
         """
         return self.parent._runUdfTransformation(name, key, transformation, list_vars, tipo)
-    def _evaluate_path(self,path) -> Any | bool:
+    def _evaluate_path(self, path: str) -> bool:
         """
         Evaluate if certain path exists in hadoop
         Parameters
@@ -1018,7 +1040,7 @@ class StandardMethodsMT(ExternalTransformations):
         using group of <period> months defined in class
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def mean_mt(x) -> float:
+        def mean_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1033,7 +1055,7 @@ class StandardMethodsMT(ExternalTransformations):
         where :math:`\\mu` is the mean, using group of <period> months defined in class
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def std_mt(x) -> float:
+        def std_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1050,7 +1072,7 @@ class StandardMethodsMT(ExternalTransformations):
         using group of <period> months defined in class.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def sum_mt(x) -> float:
+        def sum_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1061,7 +1083,7 @@ class StandardMethodsMT(ExternalTransformations):
         Calculates the minimum using group of <period> months defined in class.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def min_mt(x) -> float:
+        def min_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1072,7 +1094,7 @@ class StandardMethodsMT(ExternalTransformations):
         Calculates the maximum using group of <period> months defined in class.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def max_mt(x) -> float:
+        def max_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1084,7 +1106,7 @@ class StandardMethodsMT(ExternalTransformations):
         else returns 0, using group of <period> months defined in class
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def logmean_mt(x) -> float:
+        def logmean_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1098,7 +1120,7 @@ class StandardMethodsMT(ExternalTransformations):
         Calculates the square_mt of the mean :math:`\\mu^{2}` using group of <period> months defined in class.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def square_mt(x) -> float:
+        def square_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1111,7 +1133,7 @@ class StandardMethodsMT(ExternalTransformations):
         If mean equals to zero the returns a high value (1e5)
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def inverse_mt(x) -> float:
+        def inverse_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1131,7 +1153,7 @@ class StandardMethodsMT(ExternalTransformations):
 
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def trend_mt(x) -> float:
+        def trend_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1166,7 +1188,7 @@ class StandardMethodsMT(ExternalTransformations):
         of months 1,2,3,4,5 and 6.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def rmeans_mt(x,y) -> float:
+        def rmeans_mt(x: Sequence[float], y: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             y = [val for val in y if val != ignore_value]
             if len(x) == 0:
@@ -1205,7 +1227,7 @@ class StandardMethodsMT(ExternalTransformations):
         where :math:`\\mu` is the mean, using group of <period> months defined in class
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def incremental_mt(x) -> float:
+        def incremental_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1242,7 +1264,7 @@ class StandardMethodsMT(ExternalTransformations):
         If the denominator equals to 0 then the denominator is replaced by a small value (1e-5)
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def means_vp_mt(x) -> float:
+        def means_vp_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1257,7 +1279,7 @@ class StandardMethodsMT(ExternalTransformations):
                 t+=1
             m = float(np.mean(list_vp_mt))
             return m
-        def std_vp_mt(x) -> float:
+        def std_vp_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1286,7 +1308,7 @@ class StandardMethodsMT(ExternalTransformations):
         If the denominator equals to 0 then the denominator is replaced by a small value (1e-5)
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def means_rt_mt(x) -> float:
+        def means_rt_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1302,7 +1324,7 @@ class StandardMethodsMT(ExternalTransformations):
             m=float(np.mean(list_ratios))
             return m
 
-        def std_rt_mt(x) -> float:
+        def std_rt_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1330,7 +1352,7 @@ class StandardMethodsMT(ExternalTransformations):
         If the denominator equals to 0 then the return value is 1.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def stochastic_oscillator(x) -> float | Any:
+        def stochastic_oscillator(x: Sequence[float]) -> float | Any:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1350,7 +1372,7 @@ class StandardMethodsMT(ExternalTransformations):
         Calculates the movil averages across the group of months
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def avg_aux(x) -> float:
+        def avg_aux(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1363,7 +1385,7 @@ class StandardMethodsMT(ExternalTransformations):
                 cont=cont+1
             return(float(num1)/float(den1))
         self._runUdfTransformation("avgmov_mt", ['avgmov_mt'], [avg_aux], "list_mvars", DoubleType())
-    def _run_ratios_mt(self,tran_rt_mt) -> None:
+    def _run_ratios_mt(self, tran_rt_mt: Tuple[str, str]) -> None:
         """
         Perform the ratios transformation of ratiosmod_mt
         Parameters
@@ -1389,7 +1411,7 @@ class StandardMethodsMT(ExternalTransformations):
         df_aux = self.sqlContext.sql(app_rt_mt_mod_rnumden)
         self._write_parquet(df_aux, self.path, f"r{name_ratio}_features")
         df_aux.unpersist()
-    def _run_deltas_mt(self, tran_d) -> None:
+    def _run_deltas_mt(self, tran_d: Tuple[str, str]) -> None:
         """
         Perform the ratios transformation of ratiosmod_mt
         Parameters
@@ -1423,7 +1445,7 @@ class StandardMethodsMT(ExternalTransformations):
         This transformation need the mean, min and max transformations.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def rt_mt_mod(x) -> float:
+        def rt_mt_mod(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1432,7 +1454,7 @@ class StandardMethodsMT(ExternalTransformations):
             else:
                 rt_mt = 0.0
             return rt_mt
-        def df_mt_mod(x) -> float:
+        def df_mt_mod(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             dif = float((x[0] - x[1]))
             return dif
@@ -1468,7 +1490,7 @@ class StandardMethodsMT(ExternalTransformations):
 
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def rms_mt(x) -> float:
+        def rms_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1482,7 +1504,7 @@ class StandardMethodsMT(ExternalTransformations):
 
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def complexity(x) -> float:
+        def complexity(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1495,7 +1517,7 @@ class StandardMethodsMT(ExternalTransformations):
         standardized moment coefficient G1)
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def skew_mtness(x) -> float:
+        def skew_mtness(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1512,7 +1534,7 @@ class StandardMethodsMT(ExternalTransformations):
         moment coefficient G2)
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def curt_mtosis(x) -> float:
+        def curt_mtosis(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1528,8 +1550,8 @@ class StandardMethodsMT(ExternalTransformations):
         Calculates the weighted mean using the weights defined in the class
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def create_weighted_mean_functions(weights, ignore_value) -> Callable[..., float]:
-            def weighted_mean_mt(x) -> float:
+        def create_weighted_mean_functions(weights: Sequence[float], ignore_value: float) -> Callable[..., float]:
+            def weighted_mean_mt(x: Sequence[float]) -> float:
                 # ignore values
                 filtered_x = []
                 filtered_weights = []
@@ -1572,7 +1594,7 @@ class OnesAndZerosMethods(ExternalTransformations):
         ( p(x_i) ) is the probability of occurrence of each unique value ( x_i )
         in the dataset.
         """
-        def entropy_onz(x) -> float:
+        def entropy_onz(x: Sequence[float]) -> float:
             # Calcula la frecuencia de cada valor en el array
             values, counts = np.unique(x, return_counts=True)
             probabilities = counts / counts.sum()
@@ -1594,7 +1616,7 @@ class OnesAndZerosMethods(ExternalTransformations):
         -   [] -> -99999
         """
         default = self.parent.default_non_found_value
-        def first_1_onz(x) -> float:
+        def first_1_onz(x: Sequence[float]) -> float:
             try:
                 return float(x.index(1) + 1)
             except:
@@ -1604,7 +1626,7 @@ class OnesAndZerosMethods(ExternalTransformations):
         """The length of the longest one's streak.
         """
         default = self.parent.default_non_found_value
-        def longest_1_streak_onz(x) -> float:
+        def longest_1_streak_onz(x: Sequence[float]) -> float:
             # Encuentra todas las cadenas de 1s
             streaks = [len(list(group)) for key, group in it_groupby(x) if key == 1]
             # Devuelve la longitud de la cadena más larga o 0 si no hay cadenas de 1s
@@ -1619,8 +1641,8 @@ class OnesAndZerosMethods(ExternalTransformations):
         """
         default = self.parent.default_non_found_value
         range_ = range(2, 8)
-        def create_streak_function(length, default) -> Callable[..., float]:
-            def first_lo1_streak_onz(x) -> float:
+        def create_streak_function(length: int, default: float) -> Callable[..., float]:
+            def first_lo1_streak_onz(x: Sequence[float]) -> float:
                 if len(x) < length:
                     return float(default)  # Devuelve -1 si la longitud de x es menor que length
                 count = 0
@@ -1641,8 +1663,8 @@ class OnesAndZerosMethods(ExternalTransformations):
     def _find_pattern_onzTransformation(self) -> None:
         patterns = [[1, 0, 0, 0], [0, 1, 0, 0]]
         default = self.parent.default_non_found_value
-        def create_pattern_function(pattern, pattern_length, default) -> Callable[..., float]:
-            def first_pattern_onz(x) -> float:
+        def create_pattern_function(pattern: Sequence[int], pattern_length: int, default: float) -> Callable[..., float]:
+            def first_pattern_onz(x: Sequence[float]) -> float:
                 if len(x) < pattern_length:
                     return float(default)  # Devuelve -1 si la longitud de x es menor que el patrón
                 for i in range(len(x) - pattern_length + 1):
@@ -1661,7 +1683,7 @@ class OnesAndZerosMethods(ExternalTransformations):
         in a list. A transition is defined as a change from one value to another in consecutive elements of the list.
         """
         default = self.parent.default_non_found_value
-        def transitions_onz(x) -> float:
+        def transitions_onz(x: Sequence[float]) -> float:
             if len(x) < 2:
                 return default # No hay transiciones si la longitud de x es menor que 2
             x = np.array(x)
@@ -1675,7 +1697,7 @@ class OnesAndZerosMethods(ExternalTransformations):
         Autocorrelation measures the similarity between a signal and a delayed
         version of itself over varying time intervals.
         """
-        def autocorrelation_onz(x) -> float:
+        def autocorrelation_onz(x: Sequence[float]) -> float:
             if len(x) < 2:
                 return 0.0  # No hay autocorrelación si la longitud de x es menor que 2
             x = np.array(x)
@@ -1701,7 +1723,7 @@ class OnesAndZerosMethods(ExternalTransformations):
         2.  The string is compressed with zlib library from Python, which uses the DEFLATE algorithm.
         3.  The final compresed string is measured.
         """
-        def kolmogorov_complexity_onz(x) -> float:
+        def kolmogorov_complexity_onz(x: Sequence[float]) -> float:
             if len(x) == 0:
                 return 0.0  # No hay complejidad si la longitud de x es 0
             x_str = ''.join(map(str, x))
@@ -1712,7 +1734,7 @@ class OnesAndZerosMethods(ExternalTransformations):
 
     #
     def _pattern_diversity_onzTransformation(self) -> None:
-        def pattern_diversity_onz(x) -> float:
+        def pattern_diversity_onz(x: Sequence[float]) -> float:
             if len(x) == 0:
                 return 0.0  # No hay diversidad si la longitud de x es 0
             x_str = ''.join(map(str, x))
@@ -1746,7 +1768,7 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         in the dataset.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def entropy_onz_mt(x) -> float:
+        def entropy_onz_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1771,7 +1793,7 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
         default = self.parent.default_non_found_value
-        def first_1_onz_mt(x) -> float:
+        def first_1_onz_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1785,7 +1807,7 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
         default = self.parent.default_non_found_value
-        def longest_1_streak_onz_mt(x) -> float:
+        def longest_1_streak_onz_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1806,8 +1828,8 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
         default = self.parent.default_non_found_value
         range_ = range(2,8)
-        def create_streak_function(length, default, ignore_value) -> None:
-            def first_lo1_streak_onz_mt(x) -> float:
+        def create_streak_function(length: int, default: float, ignore_value: float) -> Callable[..., float]:
+            def first_lo1_streak_onz_mt(x: Sequence[float]) -> float:
                 x = [val for val in x if val != ignore_value]
                 if len(x) == 0:
                     return -99999.0
@@ -1833,8 +1855,8 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         patterns = [[1, 0, 0, 0], [0, 1, 0, 0]]
         default = self.parent.default_non_found_value
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def create_pattern_function(pattern, pattern_length, default, ignore_value) -> Callable[..., float]:
-            def first_pattern_onz_mt(x) -> float:
+        def create_pattern_function(pattern: Sequence[int], pattern_length: int, default: float, ignore_value: float) -> Callable[..., float]:
+            def first_pattern_onz_mt(x: Sequence[float]) -> float:
                 x = [val for val in x if val != ignore_value]
                 if len(x) == 0:
                     return -99999.0
@@ -1857,7 +1879,7 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
         default = self.parent.default_non_found_value
-        def transitions_onz_mt(x) -> float:
+        def transitions_onz_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1883,7 +1905,7 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         3.  The final compresed string is measured.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def kolmogorov_complexity_onz_mt(x) -> float:
+        def kolmogorov_complexity_onz_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1900,7 +1922,7 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         Autocorrelation measures the similarity between a signal and a delayed version of itself over varying time intervals.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def autocorrelation_onz_mt(x) -> float:
+        def autocorrelation_onz_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1924,7 +1946,7 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         within the list when treated as a string.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def pattern_diversity_onz_mt(x) -> float:
+        def pattern_diversity_onz_mt(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
             if len(x) == 0:
                 return -99999.0
@@ -1955,7 +1977,7 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         removing the ignored values.
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
-        def is_new_onz_mt(x) -> float:
+        def is_new_onz_mt(x: Sequence[float]) -> float:
             len_previous_mt = len(x)
             x = [val for val in x if val != ignore_value]
             len_after_mt = len(x)

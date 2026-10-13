@@ -1,4 +1,24 @@
-from numpy import extract
+"""
+``datapull.py`` — clase principal :class:`DataPull` del proceso datapull
+del equipo COE.
+
+Orquesta el pipeline completo de una fuente: ``extract`` -> ``weeks`` ->
+``mt`` -> ``groupby`` -> ``pivoting`` -> ``ratios`` -> ``fe`` -> ``mobs``
+-> ``va`` -> ``cols2vec``, según el ``steps_list`` de
+``configuration.json``. Cada etapa queda guardada como parquet bajo
+``<working_path>/<year_id>/<source>/<stage>`` y las comprobaciones
+``_check_*`` hacen el pipeline idempotente.
+
+Notas
+-----
+- ``reset_spark_session`` decora los ``_perform_*`` pesados: para y
+  recrea la sesión Spark entre etapas (evita que un driver saturado
+  arrastre fallos a la siguiente etapa).
+- Los helpers de filesystem (``_check_files``, ``_evaluate_path``)
+  shell-out a ``hdfs dfs``; en ejecuciones locales se sustituyen por los
+  helpers duales de :mod:`libs.steps` (ver ``patch_datapull_fs`` en
+  ``main_dynamic.py``).
+"""
 from pyspark import conf
 from libs.email_sender import EmailSender
 from libs.extract import Extract
@@ -12,7 +32,7 @@ from libs.generate_ratios import GenerateRatios
 from libs.colums_2_vector import ColumnsToVector
 import pyspark.sql.functions as F
 from functools import reduce
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, SparkSession
 
 import os
 import subprocess
@@ -25,15 +45,19 @@ import unidecode
 import time
 import logging
 
-from typing import List
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
 
 
-def reset_spark_session(func) -> Callable[..., Any]:# -> Callable[..., Any]:
-    """
-    Decorator to reset the Spark session before executing a function.
+def reset_spark_session(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorador que resetea la sesión de Spark antes de ejecutar la función.
+
+    Para la sesión activa (si la hay), crea una nueva con
+    ``self.spark_session_builder()`` y re-registra la UDF
+    ``quita_acentos``. Así cada ``_perform_*`` corre sobre una sesión
+    limpia.
     """
     def wrapper(self, *args, **kwargs) -> Any:
         # Stop the existing session if active
@@ -55,16 +79,18 @@ def reset_spark_session(func) -> Callable[..., Any]:# -> Callable[..., Any]:
 #
 
 class DataPull():
-    """
-    Main class of datapull process of COE team
+    """Clase principal del proceso datapull del equipo COE.
+
     Parameters
     ----------
-    :config_rigid: dictionary
-        Dictionary with all configurations setting by default by the data engineer team of COE Advance Analytics
-    :config_custom: dictionary
-        Dictionary with all custom settings defined by the final users
-    :spark_session_builder: Callable[[], SparkSession]
-        function which generates the sqlContext defined in the script
+    config_rigid : Dict[str, Any]
+        Configuraciones por defecto del equipo de ingeniería de datos de
+        COE Advance Analytics (``configuration.json``).
+    config_custom : Dict[str, Any]
+        Configuraciones custom definidas por el usuario final
+        (``config_custom.json``).
+    spark_session_builder : Callable[[], SparkSession]
+        Función que genera el ``sqlContext`` del script.
     """
     message_start_controls_stract = """
 <head>
@@ -113,30 +139,30 @@ class DataPull():
     message_end = """</body>"""
     subject_controls = "Input controls for source {}"
     subject_source_completed = "Datapull process for source {}"
-    def __init__(self, config_rigid, config_custom, spark_session_builder) -> None:
-        self.config_rigid = config_rigid
-        self.config_custom = config_custom
+
+    def __init__(self, config_rigid: Dict[str, Any],
+                 config_custom: Dict[str, Any],
+                 spark_session_builder: Callable[[], SparkSession]) -> None:
+        self.config_rigid: Dict[str, Any] = config_rigid
+        self.config_custom: Dict[str, Any] = config_custom
         self._change_types_config()
-        self.spark_session_builder = spark_session_builder
-        self.sources = self._get_sources()
-        self.email_sender = EmailSender(self.config_custom["email_sender"])
+        self.spark_session_builder: Callable[[], SparkSession] = spark_session_builder
+        self.sources: List[str] = self._get_sources()
+        self.email_sender: EmailSender = EmailSender(self.config_custom["email_sender"])
         self._quita_acentos()
     #
     @property
-    def sqlContext(self) -> Any:
-        """
-        Devuelve la sesión de Spark si ya existe, o la crea si no está inicializada.
-        """
+    def sqlContext(self) -> SparkSession:
+        """Sesión de Spark perezosa: la crea si no está inicializada."""
         if not hasattr(self, '_sqlContext'):
             self._sqlContext = self.spark_session_builder()
             self._quita_acentos()  # Ensure UDF is registered whenever the session is created
         return self._sqlContext
 
     @property
-    def pivot(self) -> Any | DataFrame:
-        """
-        Devuelve la sesión de Spark si ya existe, o la crea si no está inicializada.
-        """
+    def pivot(self) -> DataFrame:
+        """Tabla pivot (cliente x vintage), preparada si alguna fuente la
+        necesita enriquecida."""
         try:
             self._pivot = self.sqlContext.read.parquet(self._path_new_pivot)
         except:
@@ -144,22 +170,21 @@ class DataPull():
         #
         return self._pivot
 
-    def _get_sources(self) -> Any | list[Any]:
-        """
-        Identify if the sources from the custom settings is a list of a string and return a list
-        :Returns:
-        ------
-        list
-            All the sources for the execution defined by the final user
+    def _get_sources(self) -> List[str]:
+        """Normaliza ``config_custom["sources"]`` a lista.
+
+        Returns
+        -------
+        List[str]
+            Todas las fuentes a ejecutar definidas por el usuario final.
         """
         if type(self.config_custom["sources"]) is list:
             return(self.config_custom["sources"])
         else:
             return([self.config_custom["sources"]] )
+
     def run(self) -> None:
-        """
-        Perform the process of datapull
-        """
+        """Ejecuta el proceso datapull para todas las fuentes configuradas."""
         for source in self.sources:
             try:
                 self._pipeline(source)
@@ -174,13 +199,19 @@ class DataPull():
                     '{}'.format(subject),
                     mess_error + f"\n{traceback_output}"
                     )
-    def _pipeline(self,source) -> None:
-        """
-        Create and perform the pipeline for a specified source
+
+    def _pipeline(self, source: str) -> None:
+        """Crea y ejecuta el pipeline de una fuente concreta.
+
+        Recorre ``steps_list`` de la config rígida enhebrando
+        ``previous_path`` entre etapas (extract -> weekly_extract ->
+        missing_treatment -> groupby -> pivot -> ratios/features -> mobs
+        -> vector_assembler) y manda el correo con los tiempos al final.
+
         Parameters
         ----------
-        :source: string
-            Name of source for making the datapull process
+        source : str
+            Nombre de la fuente sobre la que correr el datapull.
         """
         logging.info("############# DATAPULL START FOR SOURCE: %s ###############", source.upper())
         ########### Define general constants ###########
@@ -197,7 +228,8 @@ class DataPull():
         previous_path = None
         #Defining missing treatment (required because contains missing treatment and mobs in the same class)
         #mt=missing_treatment(year_id,source_dict,source,self.config_custom["n_mis"])
-        mt=MissingTreatment(year_id,source_dict,source,self.config_custom["n_mis"], self.config_custom["n_threads"])
+        mt = MissingTreatment(year_id, source_dict, source,
+                              self.config_custom["n_mis"], self.config_custom["n_threads"])
         time_execution = []
         for step in steps_list:
             time_start = time.time()
@@ -309,26 +341,26 @@ class DataPull():
             )
 
     def _quita_acentos(self) -> None:
-        """
-        Define the udf for removing special characters.
-        """
-        def quita_acentos(unicodestring) -> Any | Literal['']:
+        """Registra la UDF ``quita_acentos`` (minúsculas sin caracteres
+        especiales)."""
+        def quita_acentos(unicodestring: Optional[str]) -> str:
             if unicodestring == None:
                 return ""
             return unidecode.unidecode(unicodestring).lower()
         self.sqlContext.udf.register("quita_acentos",quita_acentos)
 
-    def _calculate_time(self, time_passed) -> str:
-        """
-        Calculates and gives format of minutes, hours and seconds for a certain time in seconds given
+    def _calculate_time(self, time_passed: float) -> str:
+        """Da formato (horas/minutos/segundos) a un tiempo en segundos.
+
         Parameters
         ----------
-        :time_passed: float
-            Time passes, is the time to convert and give format
-        :Returns:
-        ------
-        string
-            The time of that transformation
+        time_passed : float
+            Tiempo transcurrido, en segundos, a convertir y formatear.
+
+        Returns
+        -------
+        str
+            El tiempo formateado de esa transformación.
         """
         time_passed = round(time_passed)
         if time_passed / 3600 > 1:
@@ -346,21 +378,23 @@ class DataPull():
     ############# Perform of steps#####################
     ###################################################
 
-    def _perform_extract(self, source_dict, write_path, number_threads, write_mode, source) -> None:
-        """
-        Perform extract
+    def _perform_extract(self, source_dict: Dict[str, Any], write_path: str,
+                         number_threads: int, write_mode: str,
+                         source: str) -> None:
+        """Ejecuta la extracción.
+
         Parameters
         ----------
-        :source_dict: string
-            Dictionary of the source
-        :write_path: string
-            Path to write the extract
-        :number_threads:
-            Number of threads to use in execution
-        :write_mode:
-            Mode of write of parquets
-        :source:
-            Source to perform the extract
+        source_dict : Dict[str, Any]
+            Diccionario de configuración de la fuente.
+        write_path : str
+            Path donde escribir el extract.
+        number_threads : int
+            Número de hilos a usar en la ejecución.
+        write_mode : str
+            Modo de escritura de los parquets.
+        source : str
+            Fuente sobre la que hacer la extracción.
         """
         logging.info("%s - Starting Extract", source.upper())
         #print("Starting extract")
@@ -386,17 +420,18 @@ class DataPull():
             #print(f"Extract was already performed for source {source}!")
     #
     @reset_spark_session
-    def _perform_weeks(self, path_weeks:str, tables_weeks:List[str], source:str) -> None:
-        """
-        Perform missing treatment
+    def _perform_weeks(self, path_weeks: str, tables_weeks: List[str],
+                       source: str) -> None:
+        """Ejecuta el reetiquetado semanal (``WeeklyTFrom``).
+
         Parameters
         ----------
-        :path_weeks: string
-            Path where the dataframes with the extraxt step
-        :tables_weeks: list
-            List with all the tables to perform missing
-        :path_write: string
-            Correspond to working path
+        path_weeks : str
+            Path donde están los dataframes del paso extract.
+        tables_weeks : List[str]
+            Lista con todas las tablas a las que aplicar el reetiquetado.
+        source : str
+            Fuente en ejecución.
         """
         logging.info("%s - Starting Weeks Re TFrom", source.upper())
         #print("Starting missing treatment")
@@ -418,19 +453,20 @@ class DataPull():
             logging.info("%s - Weeks Re TFrom was already performed", source.upper())
     #
     @reset_spark_session
-    def _perform_mt(self, mt, path_mt, tables_mt, source) -> None:
-        """
-        Perform missing treatment
+    def _perform_mt(self, mt: MissingTreatment, path_mt: str,
+                    tables_mt: List[str], source: str) -> None:
+        """Ejecuta el tratamiento de missings.
+
         Parameters
         ----------
-        :mt: object of MissingTreatment class
-            The mt object of the source
-        :path_mt: string
-            Path where the dataframes with missings are saved
-        :tables_mt: list
-            List with all the tables to perform missing
-        :path_write: string
-            Correspond to working path
+        mt : MissingTreatment
+            Objeto de tratamiento de la fuente.
+        path_mt : str
+            Path donde se guardan los dataframes con missings tratados.
+        tables_mt : List[str]
+            Lista con todas las tablas a tratar.
+        source : str
+            Fuente en ejecución.
         """
         logging.info("%s - Starting Missing Treatment", source.upper())
         #print("Starting missing treatment")
@@ -445,21 +481,30 @@ class DataPull():
             logging.info("%s - Missing Treatment was already performed", source.upper())
     #
     @reset_spark_session
-    def _perform_groupby(self, path_groupby, source, previous_path, pivot_path, agg_dict, n_mis, period, tables) -> None:
-        """
-        Perform groupby
+    def _perform_groupby(self, path_groupby: str, source: str,
+                         previous_path: Optional[str], pivot_path: str,
+                         agg_dict: Dict[str, Any], n_mis: int, period: int,
+                         tables: List[str]) -> None:
+        """Ejecuta el groupby/agregaciones.
+
         Parameters
         ----------
-        :path_groupby: string
-            Path where the groupby is saved
-        :source: string
-            Name of source
-        :previous_path:
-            Path of the previous step
-        :agg_dict:
-            Dictionary of groupby
-        :tables: list
-            List of tables involved in the groupby
+        path_groupby : str
+            Path donde se guarda el groupby.
+        source : str
+            Nombre de la fuente.
+        previous_path : str
+            Path del paso anterior.
+        pivot_path : str
+            Path del pivot de clientes.
+        agg_dict : Dict[str, Any]
+            Diccionario de agregaciones del groupby.
+        n_mis : int
+            Meses de información.
+        period : int
+            Periodo de agrupación.
+        tables : List[str]
+            Lista de tablas involucradas en el groupby.
         """
         if self._check_groupby(path_groupby):
             logging.info("%s - Starting GroupBy", source.upper())
@@ -479,13 +524,20 @@ class DataPull():
             #print("Groupby was already performed!")
     #
     @reset_spark_session
-    def _perform_pivoting(self, path_pivoting, previous_path, pivot_dict, source) -> None:
-        """
-        Perform pivoting
+    def _perform_pivoting(self, path_pivoting: str, previous_path: str,
+                          pivot_dict: Dict[str, Any], source: str) -> None:
+        """Ejecuta el pivoting.
+
         Parameters
         ----------
-        :path_pivoting: string
-            Path where the pivoting is saved
+        path_pivoting : str
+            Path donde se guarda el pivoting.
+        previous_path : str
+            Path del paso anterior (groupby).
+        pivot_dict : Dict[str, Any]
+            Config de pivoting de la fuente.
+        source : str
+            Fuente en ejecución.
         """
         #print("Starting pivoting")
         logging.info("%s - Starting Pivoting", source.upper())
@@ -499,13 +551,23 @@ class DataPull():
         logging.info("%s - Ending Pivoting", source.upper())
     #
     @reset_spark_session
-    def _perform_fe(self, path_transpose, write_path, source, fe_dict=None) -> None:
-        """
-        Path to input dataframe to transpose
-        :write_path: string
-            Path to write the output of feature engineering
-        :fe_dict:
-            Dictionary of feature engineering, is optional,
+    def _perform_fe(self, path_transpose: str, write_path: str, source: str,
+                    fe_dict: Optional[Dict[str, Any]] = None) -> None:
+        """Ejecuta el feature engineering.
+
+        Si ``features/`` ya existe, solo corre las transformaciones que
+        falten según :meth:`_fe_performed` (reanudación a mitad de etapa).
+
+        Parameters
+        ----------
+        path_transpose : str
+            Path del dataframe de entrada a transponer.
+        write_path : str
+            Path donde escribir la salida del feature engineering.
+        source : str
+            Fuente en ejecución.
+        fe_dict : Optional[Dict[str, Any]]
+            Diccionario de feature engineering; es opcional.
         """
         ########## Constants of feature engineering ##########
         #trans_list = self.config_custom["lista_trans"]
@@ -540,7 +602,24 @@ class DataPull():
                 logging.info("%s - Feature Engineering was already performed", source.upper())
     #
     @reset_spark_session
-    def _perform_mobs(self, working_path, path_fe, mt, path_mobs, source) -> None:
+    def _perform_mobs(self, working_path: str, path_fe: str,
+                      mt: MissingTreatment, path_mobs: str,
+                      source: str) -> None:
+        """Ejecuta los MOBs (months on books / imputación por antigüedad).
+
+        Parameters
+        ----------
+        working_path : str
+            Working path raíz de la corrida.
+        path_fe : str
+            Path de las transformaciones de feature engineering.
+        mt : MissingTreatment
+            Objeto de tratamiento de la fuente (también corre los mobs).
+        path_mobs : str
+            Path de salida de los mobs.
+        source : str
+            Fuente en ejecución.
+        """
         #print("Performing mobs!")
         logging.info("%s - Starting MOBs", source.upper())
         files_fe = self._check_files(path_fe)
@@ -556,15 +635,18 @@ class DataPull():
         logging.info("%s - Ending MOBs", source.upper())
     #
     @reset_spark_session
-    def _perform_va(self, path_features, write_path, source) -> None:
-        """
-        Perform vector assembler
+    def _perform_va(self, path_features: str, write_path: str,
+                    source: str) -> None:
+        """Ejecuta el vector assembler.
+
         Parameters
         ----------
-        :path_features: string
-            Path where the features are located
-        :write_path: string
-            Path to write the vector assembler
+        path_features : str
+            Path donde están las features (salida de mobs).
+        write_path : str
+            Path donde escribir el vector assembler.
+        source : str
+            Fuente en ejecución.
         """
         #print("Starting vector assembler")
         logging.info("%s - Starting Vector Assembler", source.upper())
@@ -580,15 +662,19 @@ class DataPull():
             #print("Ending vector assembler")
     #
     @reset_spark_session
-    def _perform_cols2vec(self, write_path, cols2vec_dict, source) -> None:
-        """
-        Perform cols2vec
+    def _perform_cols2vec(self, write_path: str,
+                          cols2vec_dict: Dict[str, Any],
+                          source: str) -> None:
+        """Ejecuta el cols2vec (empaquetado final del producto).
+
         Parameters
         ----------
-        :path_features: string
-            Path where the features are located
-        :write_path: string
-            Path to write the vector assembler
+        write_path : str
+            Path de trabajo de la fuente.
+        cols2vec_dict : Dict[str, Any]
+            Config de cols2vec de la fuente.
+        source : str
+            Fuente en ejecución.
         """
         #print("Starting cols2vec")
         logging.info("%s - Starting Cols2Vec(VectorAssembler)", source.upper())
@@ -605,19 +691,22 @@ class DataPull():
     ###################################################
     ########### Check the current step#################
     ###################################################
-    def _check_extract(self, path_extract, extract_dictionary) -> bool:
-        """
-        Check if extract was previously executed in the workpath
+    def _check_extract(self, path_extract: str,
+                       extract_dictionary: Dict[str, Any]) -> bool:
+        """Comprueba si el extract ya se ejecutó en el workpath.
+
         Parameters
         ----------
-        :path_extract: string
-            path of extract
-        :extract_dictionary: dict
-            Dictionary of extract for a given source
-        :Returns:
+        path_extract : str
+            Path del extract.
+        extract_dictionary : Dict[str, Any]
+            Diccionario de extract de la fuente.
+
+        Returns
         -------
-        Boolean
-            True if extract need to be performed and False if already exist (for all tables)
+        bool
+            ``True`` si el extract hay que ejecutarlo y ``False`` si ya
+            existe (para todas las tablas).
         """
         tables_historic = [table + "_historic" for table in extract_dictionary["table_name"]]
         files = self._check_files(path_extract)
@@ -631,19 +720,23 @@ class DataPull():
                 return False
         else:
             return True
-    def _check_missing(self, path_missing, tables_missing) -> bool:
-        """
-        Check if missing treatment was previously executed in the workpath
+
+    def _check_missing(self, path_missing: str,
+                       tables_missing: List[str]) -> bool:
+        """Comprueba si el missing treatment ya se ejecutó en el workpath.
+
         Parameters
         ----------
-        :path_missing: string
-            path of extract
-        :tables_missing: list
-            List of the missing tables of output
-        :Returns:
+        path_missing : str
+            Path del missing treatment.
+        tables_missing : List[str]
+            Lista de tablas de salida esperadas.
+
+        Returns
         -------
-        Boolean
-            True if extract need to be performed and False if already exist (for all tables)
+        bool
+            ``True`` si hay que ejecutarlo; ``False`` si ya existe (para
+            todas las tablas).
         """
         tables_aux = tables_missing.copy()
         files = self._check_files(path_missing)
@@ -657,52 +750,58 @@ class DataPull():
                 return False
         else:
             return True
-    def _check_groupby(self,path_groupby) -> bool:
-        """
-        Check if group by was previously executed in the workpath
+
+    def _check_groupby(self, path_groupby: str) -> bool:
+        """Comprueba si el groupby ya se ejecutó en el workpath.
+
         Parameters
         ----------
-        :path_groupby: string
-            path of group by
-        :Returns:
+        path_groupby : str
+            Path del groupby.
+
+        Returns
         -------
-        Boolean
-            True if group by need to be performed and False if already exist (for all tables)
+        bool
+            ``True`` si hay que ejecutarlo; ``False`` si ya existe.
         """
         if self._evaluate_path(path_groupby):
             return False
         else:
             return True
-    def _check_pivoting(self,path_pivoting) -> bool:
-        """
-        Check if pivoting was previously executed in the workpath
+
+    def _check_pivoting(self, path_pivoting: str) -> bool:
+        """Comprueba si el pivoting ya se ejecutó en el workpath.
+
         Parameters
         ----------
-        :path_pivoting: string
-            path of pivoting
-        :Returns:
+        path_pivoting : str
+            Path del pivoting.
+
+        Returns
         -------
-        Boolean
-            True if pivoting need to be performed and False if already exist (for all tables)
+        bool
+            ``True`` si hay que ejecutarlo; ``False`` si ya existe.
         """
         if self._evaluate_path(path_pivoting):
             return False
         else:
             return True
-    def _fe_performed(self, path_fe, trans_list) -> Any | list[Any] | list[str]:
-        """
-        Check what transformations of feature engineering was already performed and returns the transformations that was not
-        performed.
+
+    def _fe_performed(self, path_fe: str, trans_list: List[str]) -> List[str]:
+        """Devuelve las transformaciones de feature engineering que quedan
+        por ejecutar.
+
         Parameters
         ----------
-        :path_fe: string
-            path of fe
-        :trans_list: list
-            List of transformations
-        :Returns:
+        path_fe : str
+            Path de ``features/``.
+        trans_list : List[str]
+            Lista de transformaciones configuradas.
+
+        Returns
         -------
-        list
-            Transformations that was already performed
+        List[str]
+            Transformaciones pendientes (``[]`` si no queda ninguna).
         """
         trans_list_aux = trans_list.copy()
         files = self._check_files(path_fe)
@@ -717,19 +816,22 @@ class DataPull():
                 return []
             else:
                 return ["ratiosmod"]
-    def _check_mobs(self, path_mobs, files_fe) -> bool:
-        """
-        Check if mobs was previously performed
+
+    def _check_mobs(self, path_mobs: str, files_fe: List[str]) -> bool:
+        """Comprueba si los mobs ya se ejecutaron.
+
         Parameters
         ----------
-        :path_mobs: string
-            path of extract
-        :files_fe: list
-            Files in feature engineering
-        :Returns:
+        path_mobs : str
+            Path de ``mobs/imputate_mobs``.
+        files_fe : List[str]
+            Directorios presentes en feature engineering.
+
+        Returns
         -------
-        Boolean
-            True if extract need to be performed and False if already exist (for all tables)
+        bool
+            ``True`` si hay que ejecutarlo; ``False`` si ya existe (para
+            todas las transformaciones).
         """
         files = self._check_files(path_mobs)
         if files:
@@ -746,14 +848,20 @@ class DataPull():
     ########### Preparation of steps#####################
     ###################################################
     @reset_spark_session
-    def _pivot_preparation(self,sources) -> Any | DataFrame:
-        """
-        Prepares the pivot, it takes the normal pivot and return a pivot with multiple
-        liabilities and credit cards accounts for specified sources.
+    def _pivot_preparation(self, sources: List[str]) -> DataFrame:
+        """Prepara el pivot: lo enriquece con tarjetas de crédito y contratos
+        de liabilities si alguna fuente lo requiere.
+
         Parameters
         ----------
-        :sources: list
-            List of all sources to see if preparation is needed.
+        sources : List[str]
+            Lista de fuentes para ver si hace falta preparación.
+
+        Returns
+        -------
+        DataFrame
+            El pivot (leído de ``pivot_path`` o el preparado y persistido
+            en ``pivot_prepared``).
         """
         #print("Preparing pivot for the sources")
         logging.info(f"Preparing Pivot for sources: {sources}")
@@ -822,16 +930,10 @@ class DataPull():
         return pivot
     #
     def _create_mobs_extract(self) -> None:
-        """
-        Creates an extraction for mobs module
-        Parameters
-        ----------
-        :time_passed: float
-            Time passes, is the time to convert and give format
-        :Returns:
-        ------
-        string
-            The time of that transformation
+        """Crea la extracción previa que necesita el módulo de mobs.
+
+        Escribe ``<working_path>/<year_id>/mobs_preparation`` con un
+        ``Extract`` sobre la config ``mobs_preparation``.
         """
         logging.info("Starting MOBs Preparation")
         sources_cat = self.config_rigid["mobs_preparation"]
@@ -848,66 +950,75 @@ class DataPull():
             logging.info("PreMOBs was already performed")
         #print("Ending mobs preparation")
         logging.info("Ending MOBs Preparation")
-    def _check_mobs_extract(self,path_premobs) -> bool:
-        """
-        Check if premobs was already performed
+
+    def _check_mobs_extract(self, path_premobs: str) -> bool:
+        """Comprueba si el premobs ya se ejecutó.
+
         Parameters
         ----------
-        :path_premobs: string
-            Path where premobs is located
-        :Returns:
+        path_premobs : str
+            Path donde se ubica el premobs.
+
+        Returns
         -------
-        boolean
-            True if need to be performed false if not
+        bool
+            ``True`` si hay que ejecutarlo; ``False`` si no.
         """
         if len(self._check_files(path_premobs)) == 3:
             return False
         else:
             return True
-    def _check_crd_acct_nbr(self,sources) -> bool:
-        """
-        Check if some source need the credit account number
+
+    def _check_crd_acct_nbr(self, sources: List[str]) -> bool:
+        """Comprueba si alguna fuente necesita el número de tarjeta de crédito.
+
         Parameters
         ----------
-        :sources: list
-            List of sources to check if need the credit account number
-        :Returns:
+        sources : List[str]
+            Lista de fuentes a comprobar.
+
+        Returns
         -------
-        boolean
-            True if some source need false if not
+        bool
+            ``True`` si alguna la necesita.
         """
         for source in sources:
             if source in self.config_rigid["need_crd_acct_nbr"]:
                 return True
         return False
-    def _check_contratos(self,sources) -> bool:
-        """
-        Check if some source need the "contrato" number
+
+    def _check_contratos(self, sources: List[str]) -> bool:
+        """Comprueba si alguna fuente necesita el número de "contrato".
+
         Parameters
         ----------
-        :sources: list
-            List of sources to check if need the "contrato" number
-        :Returns:
+        sources : List[str]
+            Lista de fuentes a comprobar.
+
+        Returns
         -------
-        boolean
-            True if some source need false if not
+        bool
+            ``True`` si alguna lo necesita.
         """
         for source in sources:
             if source in self.config_rigid["need_contratos"]:
                 return True
         return False
-    def _get_mobs_list(self,path_fe:str) -> List[List[str]]:
-        """
-        Creates two list, the first contains all the transformations that need a mobs treatment and the second
-        contains the transformations that just are copied
+
+    def _get_mobs_list(self, path_fe: str) -> Tuple[List[str], List[str]]:
+        """Clasifica las transformaciones de fe en (con imputación de mobs,
+        solo copia).
+
         Parameters
         ----------
-        :path_fe: string
-            Path where the transformations were saved
-        :Returns:
+        path_fe : str
+            Path donde se guardaron las transformaciones.
+
+        Returns
         -------
-        tuple
-            Tuple containing (transformations need imputation, transfromations just need be copied)
+        Tuple[List[str], List[str]]
+            Tupla ``(transformaciones que necesitan imputación,
+            transformaciones que solo se copian)``.
         """
         files_fe = self._check_files(path_fe)
         list_no_mobs = self.config_rigid["list_no_mobs"]
@@ -922,112 +1033,128 @@ class DataPull():
     ###################################################
     ########### Auxiliary/general functions#############
     ###################################################
-    def _get_vintages_dates(self,pivot) -> list[Any]:
-        """
-        Get the distinct vintages dates from pivot
+    def _get_vintages_dates(self, pivot: DataFrame) -> List[Any]:
+        """Obtiene las fechas de vintage distintas del pivot.
 
         Parameters
         ----------
-        :pivot: pyspark DataFrame
-            Dataframe containing the customers we want the information and the vintage date of that customer
-        :Returns:
+        pivot : DataFrame
+            Dataframe con los clientes y su fecha de vintage.
+
+        Returns
         -------
-        List
-            All the vintages dates in pivot
+        List[Any]
+            Todas las fechas de vintage del pivot (orden descendente).
         """
         pivot.createOrReplaceTempView("pivot_temporal")
         vintages = self.sqlContext.sql("select distinct vintage from pivot_temporal").collect()
         vintages = [vintages[p][0] for p in range(len(vintages))]
         vintages.sort(reverse = True)
         return vintages
-    def _get_range_dates(self, vintages, lag, n_mis, strftime = "%Y-%m-%d") -> tuple[Any, Any]:
-        """
-        Get the range of dates to get customers list in one table
+
+    def _get_range_dates(self, vintages: List[Any], lag: int, n_mis: int,
+                         strftime: str = "%Y-%m-%d") -> Tuple[str, str]:
+        """Obtiene el rango de fechas para la lista de clientes de una tabla.
 
         Parameters
         ----------
-        :vintages: list
-            list with all vintages dates in pivot
-        :lag: int
-            number of months of lag in the source
-        :vintages: pyspark DataFrame
-            number of months of information we want
-        :strftime: string
-            format to display the date to string, by default "%Y-%m-%d"
-        :n_mis:
+        vintages : list
+            Lista con todas las fechas de vintage del pivot.
+        lag : int
+            Meses de lag de la fuente.
+        n_mis : int
+            Meses de información deseados.
+        strftime : str
+            Formato de fecha a string; por defecto ``"%Y-%m-%d"``.
+
+        Returns
         -------
-        Tuple
-            Tuple in form (max_date,min_date)
+        Tuple[str, str]
+            Tupla ``(max_date, min_date)``.
         """
         max_date = max(vintages) + relativedelta(days = 1) - relativedelta(months = -1, days = 1)
         min_date = min(vintages) + relativedelta(days = 1) - relativedelta(months = n_mis + lag - 1, days = 1)
         return (max_date.strftime(strftime),min_date.strftime(strftime))
-    def _get_time_window(self,n_mis,period) -> list[Any]:
-        """
-        Get a list with the grouped months of information in feature engineering
+
+    def _get_time_window(self, n_mis: int, period: int) -> List[int]:
+        """Lista con los meses agrupados de información del feature
+        engineering.
+
         Parameters
         ----------
-        :n_mis: int
-            Number of months of information
-        :period: int
-            Number of grouped months in fe
-        :Returns:
+        n_mis : int
+            Número de meses de información.
+        period : int
+            Número de meses agrupados en fe.
+
+        Returns
         -------
-        list
-            List with the amount of grouped months, example: [3,6,9,12]
+        List[int]
+            Lista con la cantidad de meses agrupados, p. ej. ``[3,6,9,12]``.
         """
         time_window = []
         for k in range(1,n_mis+1):
             if k % period == 0:
                 time_window.append(period * (k // period))
         return time_window
-    def _obtain_path(self,path,substring) -> Any | None:
-        """
-        Obtain the path that contain a certain substring
+
+    def _obtain_path(self, path: str, substring: str) -> Optional[str]:
+        """Obtiene el path dentro de ``path`` que contiene ``substring``.
+
         Parameters
         ----------
-        :path: string
-            Obtain the path that contains a certain substring
-        :substring: string
-            Substring to obtain path
-        :Returns:
+        path : str
+            Directorio a listar.
+        substring : str
+            Substring a buscar en los nombres.
+
+        Returns
         -------
-        string
-            The path that contains subscript
+        Optional[str]
+            El path completo que contiene el substring, o ``None``.
         """
         files = self._check_files(path)
-        for string in string_list:
+        for string in files:
             if substring in string:
                 return os.path.join(path,string)
-    def _check_substring(self,string_list,substring) -> bool:
-        """
-        Check if a substring is contained in a list of strings
+        return None
+
+    def _check_substring(self, string_list: List[str], substring: str) -> bool:
+        """Comprueba si ``substring`` está contenido en alguna string de la
+        lista.
+
         Parameters
         ----------
-        :string_list: list
-            List with strings to check if contain the substring
-        :substring: string
-            String to check if is contained in one string of the list
-        :Returns:
+        string_list : List[str]
+            Lista de strings donde buscar.
+        substring : str
+            Substring a buscar.
+
+        Returns
         -------
-        Boolean
-            True if substring is in a string of list, False if not
+        bool
+            ``True`` si el substring está en alguna string de la lista.
         """
         for string in string_list:
             if substring in string:
                 return True
         return False
-    def _check_files(self,path) -> list[str]:
-        """
-        Obtain a list with the files of certain path in hadoop.
+
+    def _check_files(self, path: str) -> List[str]:
+        """Lista los ficheros/directorios de ``path`` en Hadoop.
+
+        En ejecuciones locales se sustituye por
+        ``libs.steps.path_listdir`` (ver ``patch_datapull_fs``).
+
         Parameters
         ----------
-        :path: string
-            path to obtain the files
-        :Returns:
+        path : str
+            Path a listar.
+
+        Returns
         -------
-        List
-            List with all the files in the path
+        List[str]
+            Lista con todos los ficheros del path.
         """
         args_list=['hdfs', 'dfs', '-ls', path]
         proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -1035,17 +1162,22 @@ class DataPull():
         proc.wait()
         return [elem[re.search(path, elem).end():].replace("/","") for elem in stdout.decode('ascii','ignore').splitlines() if path
         in elem]
-    def _evaluate_path(self,path) -> Any | bool:
-        """
-        Evaluate if certain path exists in hadoop
+
+    def _evaluate_path(self, path: str) -> bool:
+        """Evalúa si ``path`` existe en Hadoop.
+
+        En ejecuciones locales se sustituye por
+        ``libs.steps.path_exists``.
+
         Parameters
         ----------
-        :path: string
-            path to check if exists
-        :Returns:
+        path : str
+            Path a comprobar.
+
+        Returns
         -------
-        Boolean
-            True if path exist false if not
+        bool
+            ``True`` si el path existe; ``False`` si no.
         """
         args_list=['hdfs', 'dfs', '-test', '-d', path]
         proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,
@@ -1053,28 +1185,36 @@ class DataPull():
         proc.communicate()
         value=proc.returncode==0 and True or False
         return value
+
     def _change_types_config(self) -> None:
-        """
-        Change types of the custom config dictionary
-        """
+        """Convierte a ``int`` las claves ``n_mis``/``period``/``n_threads``
+        del config custom."""
         for key in ["n_mis","period","n_threads"]:
             self.config_custom[key] = int(self.config_custom[key])
-    def _create_html_notification_times(self, table_times, message_start,message_style,message_end, table_id = "default") -> Any:
-        """
-        :table_times: pandas dataframe
-            Dataframe with time of every step
-        :message_start: string
-            Innitial comment for title in the email
-        :message_syle: string
-            Should contain the style you want to use for tables
-        :message_end: string
-            Contains the final comment and the <\body>
-        :table_id: string
-            Style in message_style you want to use, it has default value
+
+    def _create_html_notification_times(self, table_times: pd.DataFrame,
+                                        message_start: str,
+                                        message_style: str, message_end: str,
+                                        table_id: str = "default") -> str:
+        """Construye el HTML del correo de tiempos de ejecución.
+
+        Parameters
+        ----------
+        table_times : pd.DataFrame
+            Dataframe con el tiempo de cada step.
+        message_start : str
+            Comentario inicial para el título del correo.
+        message_style : str
+            Debe contener el estilo a usar para las tablas.
+        message_end : str
+            Contiene el comentario final y el ``</body>``.
+        table_id : str
+            Estilo de ``message_style`` a usar; tiene valor por defecto.
+
         Returns
         -------
-        String
-            Contains the full html code for sending an email
+        str
+            El código HTML completo para enviar un correo.
         """
         mess_final = message_start + message_style + f"<br> Below are showed the time of execution of every step: <br> {table_times.to_html(index=False,table_id = table_id)} <br>" + message_end
         return mess_final

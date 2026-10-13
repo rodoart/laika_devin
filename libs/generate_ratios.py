@@ -5,10 +5,14 @@ Developer: @rm36973 @bb25173
 Update Date: 2023-01-04
 Version: 0.1
 
-Class and Functions required to calculate ratios (features transformations)
+Clase y funciones para calcular ratios (transformaciones de features):
+``pnl``, ``pnl_new`` (cocientes numerador/denominador por ventana de
+tiempo) y ``corporate`` (cocientes sobre features unidas en un aux).
 """
 from pyspark.sql.functions import array, col, explode, struct, lit, concat_ws
 from pyspark.sql.types import IntegerType
+from pyspark.sql import DataFrame, SparkSession
+from typing import Any, Dict, List
 import pandas as pd
 import os
 import re
@@ -19,63 +23,46 @@ logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
 
 class GenerateRatios:
-    """
-    Class to calculate ratios features
+    """Calcula las features de ratios de una fuente.
 
     Parameters
     ----------
-    previous_path: string
-        Path to read data from
-    ratios_dict: Dictionary
-        Parameters needed by the class(key, group_by, etc)
-    source: string
-        Data Source(e.g. "corporate")
-    sqlContext: spark context
-        Your sqlContext
-    mode: string, optional
-        Parquet write mode, defaults to 'overwrite'.
-
+    previous_path : str
+        Path del que leer los datos.
+    ratios_dict : Dict[str, Any]
+        Parámetros que necesita la clase (``ratio_dict``, ``prefix``,
+        ``n_time``, ``time_window``, ``percentiles``, ...).
+    source : str
+        Fuente de datos (p. ej. ``"corporate"``).
+    sqlContext : SparkSession
+        Tu sqlContext.
+    mode : str, optional
+        Modo de escritura del parquet, por defecto ``'overwrite'``.
     """
 
-    def __init__(self, previous_path, ratios_dict, source, sqlContext, mode="overwrite") -> None:
-        self.previous_path = previous_path
-        self.ratios_dict = ratios_dict
-        self.source = source
-        self.sqlContext = sqlContext
-        self.mode = mode
+    def __init__(self, previous_path: str, ratios_dict: Dict[str, Any],
+                 source: str, sqlContext: SparkSession,
+                 mode: str = "overwrite") -> None:
+        self.previous_path: str = previous_path
+        self.ratios_dict: Dict[str, Any] = ratios_dict
+        self.source: str = source
+        self.sqlContext: SparkSession = sqlContext
+        self.mode: str = mode
 
-    def _save_parquet(self, df_save, path) -> None:
-        """
-        Save data as parquet on desired location.
+    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
+        """Guarda datos como parquet en la ubicación indicada.
 
         Parameters
         ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-
+        df_save : DataFrame
+            Datos a guardar.
+        path : str
+            Path donde almacenar los datos.
         """
-
         df_save.write.mode(self.mode).parquet(path)
 
     def run(self) -> None:
-        """
-        Calculate ratios based on given source specified on constructor.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
-        """
+        """Calcula los ratios según la fuente del constructor."""
         if self.source == "pnl":
             self.ratios_pnl()
         if self.source == "pnl_new":
@@ -84,17 +71,11 @@ class GenerateRatios:
             self.ratios_corporate()
 
     def ratios_pnl(self) -> None:
-        """
-        Calculate ratios features for PNL data source.
+        """Calcula las features de ratios de la fuente PNL.
 
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
+        Genera ``<prefix>_<num>_<den>_<t>`` como ``num_t/den_t`` (o -1 si
+        el denominador es 0) para cada par del ``ratio_dict`` y cada
+        ventana ``t`` de ``n_time``; guarda en ``ratios``.
         """
         df_in = self.sqlContext.read.parquet(self.previous_path)
         df_in.createOrReplaceTempView("temp")
@@ -113,17 +94,10 @@ class GenerateRatios:
         self._save_parquet(df_final, os.path.join(head, "ratios"))
 
     def ratios_pnl_new(self) -> None:
-        """
-        Calculate ratios features for PNL data source.
+        """Calcula las features de ratios de la fuente PNL nueva.
 
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
+        Igual que :meth:`ratios_pnl` pero iterando primero los pares y
+        luego las ventanas (orden de columnas distinto en la salida).
         """
         df_in = self.sqlContext.read.parquet(self.previous_path)
         df_in.createOrReplaceTempView("temp")
@@ -142,17 +116,12 @@ class GenerateRatios:
         self._save_parquet(df_final, os.path.join(head, "ratios"))
 
     def ratios_corporate(self) -> None:
-        """
-        Calculate ratios features for Corporate data source.
+        """Calcula las features de ratios de la fuente Corporate.
 
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-
+        Une todas las features configuradas en un dataframe auxiliar
+        (:meth:`_join_features_ratios_corporate`), genera los cocientes
+        ``<prefix>_<num>_<den>`` de :meth:`_make_dicts_aux_corporate` y
+        guarda en ``features/ratios_features``.
         """
         path_write = self.previous_path.replace("/features", "")
         df_fe_all = self._join_features_ratios_corporate(
@@ -170,21 +139,22 @@ class GenerateRatios:
         ratios_path = os.path.join(self.previous_path, "ratios_features")
         self._save_parquet(df_final, ratios_path)
 
-    def _make_dicts_aux_corporate(self, time_window, percentiles) -> DataFrame:
-        """
-        Creates the Corporate Ratios Dictionary.
+    def _make_dicts_aux_corporate(self, time_window: List[int],
+                                  percentiles: List[Any]) -> pd.DataFrame:
+        """Construye el dict de ratios de Corporate (numerador/denominador).
 
         Parameters
         ----------
-        time_window: list
-            List of all months grouped in features
-        percentiles: list
-            List of percentiles used in corporate
+        time_window : List[int]
+            Lista de meses agrupados en las features.
+        percentiles : List[Any]
+            Lista de percentiles usados en corporate.
 
         Returns
-        ------
-        bool
-            True if path exist, False otherwise
+        -------
+        pd.DataFrame
+            DataFrame con columnas ``numerador``/``denominador`` (un par
+            por fila).
         """
         lista_fe = self.ratios_dict["lista_fe"]
         num_antiguedad = ['sum_t_bajas_a_{}_{}m'.format(
@@ -229,21 +199,22 @@ class GenerateRatios:
         corp_ratios = pd.DataFrame.from_dict(dicti_corp)
         return corp_ratios
 
-    def _join_features_ratios_corporate(self, path_features, path_write) -> Any:
-        """
-        Join Corporate Data source ratios features.
+    def _join_features_ratios_corporate(self, path_features: str,
+                                        path_write: str) -> DataFrame:
+        """Une las features de ratios de la fuente Corporate.
 
         Parameters
         ----------
-        path_features: string
-            path where features are located
-        path_write: string
-            path to write the auxiliar pivot
+        path_features : str
+            Path donde están las features.
+        path_write : str
+            Path donde escribir el pivot auxiliar.
 
         Returns
         -------
-        Pyspark dataframe
-            Dataframe with all features needed
+        DataFrame
+            Dataframe con todas las features necesarias (raw +
+            transformaciones unidas por ``id_msf_tools_v2_12315``).
         """
         # list of all features
         raw_name = self.ratios_dict["raw_name"]
@@ -265,19 +236,18 @@ class GenerateRatios:
         pivot = self.sqlContext.read.parquet(path_write_pivot)
         return (pivot)
 
-    def _evaluate_path(self, path) -> Any | bool:
-        """
-        Check if path exists in hadoop.
+    def _evaluate_path(self, path: str) -> bool:
+        """Comprueba si ``path`` existe en Hadoop.
 
         Parameters
         ----------
-        path: string
-            Path to check if exists
+        path : str
+            Path a comprobar.
 
         Returns
         -------
         bool
-            True if path exist, False otherwise
+            ``True`` si el path existe; ``False`` si no.
         """
         args_list = ['hdfs', 'dfs', '-test', '-d', path]
         proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,

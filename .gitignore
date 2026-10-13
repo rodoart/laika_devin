@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+
+# Local test outputs (workdirs with generated parquets)
+tests/local/workdir/
+tests/local/workdir_dyn/
+tests/local/__pycache__/
+
+# Local Hadoop binaries for Windows Spark (re-downloadable, see
+# tests/local/README.md)
+tests/local/hadoop/bin/*.dll
+tests/local/hadoop/bin/*.exe
+
+# Spark / framework jars
+*.jar
+
+# Logs & OS files
+*.log
+.DS_Store
+Thumbs.db

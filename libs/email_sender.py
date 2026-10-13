@@ -5,6 +5,8 @@ Developer: Hector Morales
 Update Date: 2021-03-05
 Version: 1.0
 
+Envío de correos (notificaciones del datapull) a través del SMTP del
+clúster EAP.
 """
 
 import smtplib
@@ -13,30 +15,35 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 import os.path
+from typing import List, Optional
+
 
 class EmailSender:
-    """
-    Class for sending emails using EAP cluster
-    """
-    def __init__(self, sender_soeid) -> None:
-        self.email = '{}@imcla.lac.nsroot.net'.format(sender_soeid)
+    """Envío de correos usando el clúster EAP.
 
-    def send(self, receivers_soeid, subject, message, file=None) -> None:
-        """
-        This function sends an email from the sender email to the receivers.
+    Parameters
+    ----------
+    sender_soeid : str
+        SOEID del remitente; el email se construye como
+        ``<soeid>@imcla.lac.nsroot.net``.
+    """
+    def __init__(self, sender_soeid: str) -> None:
+        self.email: str = '{}@imcla.lac.nsroot.net'.format(sender_soeid)
+
+    def send(self, receivers_soeid: List[str], subject: str, message: str,
+             file: Optional[str] = None) -> None:
+        """Envía un correo desde el remitente a los receptores.
 
         Parameters
         ----------
-        receivers_soeid: List
-            List containing the SOEID's of the persons that must
-            receive the email
-        subject: string
-            The subject of the email
-        message: string
-            Message that the email will contain
-        file: string
-            Optional path that should be sent
-
+        receivers_soeid : List[str]
+            Lista de SOEIDs de las personas que deben recibir el correo.
+        subject : str
+            Asunto del correo.
+        message : str
+            Cuerpo del correo (HTML).
+        file : Optional[str]
+            Path opcional de un adjunto a enviar.
         """
         receivers = ['{}@imcla.lac.nsroot.net'.format(soeid)\
                 for soeid in receivers_soeid]

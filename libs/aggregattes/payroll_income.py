@@ -947,7 +947,7 @@ class PayrollIncomeAggregate:
         # Registrar UDF y tabla
         #
         # Definir una función para extraer el primer elemento del vector
-        def extract_first_element(vector) -> Union[float, None]:
+        def extract_first_element(vector: Any) -> Union[float, None]:
             return float(vector[0]) if vector else None
         #
         self.sqlContext.udf.register("extract_first_element", extract_first_element, DoubleType())

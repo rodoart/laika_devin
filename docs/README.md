@@ -15,6 +15,9 @@ resultado listo en Parquet para consumo de modelos.
 | [03_groupby_aggregates.md](03_groupby_aggregates.md) | Agregación por fuente (`groupby`), pivoteo (`pivoting`) y ratios |
 | [04_feature_engineering.md](04_feature_engineering.md) | Transformaciones de variables (estándar, MT, ONZ, externas) |
 | [05_mobs_vector_assembly.md](05_mobs_vector_assembly.md) | Cálculo de MOBs, ensamblado de vectores y salida final |
+| [06_step_framework.md](06_step_framework.md) | Framework de `Step`s: ejecución dinámica, persistencia/reanudación, supervisor y sesiones |
+| [07_features.md](07_features.md) | Catálogo de features: transformaciones estándar, variantes MT/ONZ, `ratiosmod`, convención de nombres |
+| [08_execution.md](08_execution.md) | Cómo ejecutar: clúster (`run_fs.sh`, `main_dynamic`, supervisor) y local (env, datos tiny, flags) |
 
 ## En una frase
 

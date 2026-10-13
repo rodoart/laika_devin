@@ -1,0 +1,13 @@
+{
+ "sources": ["payroll_streaks"],
+ "working_path": "D:/projects/laika_devin/tests/local/workdir_dyn",
+ "year_id": "202601",
+ "n_mis": "4",
+ "period": "3",
+ "pivot_path": "D:/projects/laika_devin/tests/local/workdir/pivot",
+ "lista_trans": ["min", "max", "mean", "sum"],
+ "email_sender": "local",
+ "email_receivers": ["local"],
+ "n_threads": "4",
+ "write_mode": "overwrite"
+}

@@ -4,10 +4,18 @@ Developer: Brayan Borquez
 Update Date: 2022-12-22
 Version: 1.1
 
-Script containing the class and functions for the extract in datapull
+Script con la clase y funciones del extract del datapull: lee las tablas
+fuente de Hive por mes, las cruza con el pivot de clientes y genera los
+parquets ``<table>_historic`` (cohortes por vintage) junto a los controles
+de entrada/salida que se envían por correo.
 """
 from datetime import datetime
-from pyspark.sql import DataFrame
+from typing import Any, Dict, List, Optional, Tuple
+from pyspark.sql import DataFrame, SparkSession
+try:
+    from pyspark.sql.pandas.types import DataFrameLike
+except ImportError:
+    DataFrameLike = DataFrame
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 import pyspark.sql.functions as F
@@ -22,77 +30,82 @@ from .extract_special_treatments.default import ExtractSpecialTreatment
 from .extract_special_treatments.payroll_streaks import PayrollStreaksExtractSpecialTreatment
 
 class Extract():
+    #: Fuentes a las que se aplica tratamiento especial en la extracción.
     special_treatment_sources = [
         "payroll_streaks", "payroll_income"
     ]
-    """
-    Class used for extract in datapull
+    """Clase usada para el extract en datapull.
 
     Parameters
     ----------
-    pivot_table: pyspark dataframe
-        Dataframe of the pivot
-    path: string
-        path where we want to save the tables
-    sources_cat: Dictionary
-        All the constants and information of the sources we want to make the extraction
-    source: string
-        Name of the source
-    date_id: string
-        Name of the id to save folder
-    sqlContext: pyspark sqlContext
-        Your sqlContext
-    number_threads: int
-        Number of threads to use for paralelism, by default 32
-    mode: string
-        Mode for writes parquets, by default and recommended overwrite
-    name: string
-        Name for saving the step, by default extract
-
-
+    pivot_table : DataFrame
+        Dataframe del pivot (cliente x vintage).
+    working_path : str
+        Path donde guardar las tablas.
+    sources_cat : Dict[str, Any]
+        Todas las constantes e info de las fuentes a extraer (tablas,
+        libname, select_variables, retraso, name_mis, keys...).
+    source : str
+        Nombre de la fuente.
+    n_mis : int
+        Meses de información a extraer.
+    sqlContext : SparkSession
+        Tu sqlContext.
+    number_threads : int
+        Número de hilos para el paralelismo; por defecto 32.
+    mode : str
+        Modo de escritura de parquets; por defecto y recomendado
+        ``overwrite``.
+    name : str
+        Nombre con el que guardar el paso; por defecto ``extract``.
     """
     FORMAT_TIME = "%Y-%m-%d"
 
-    def __init__(self,pivot_table,working_path,n_mis,sources_cat, source, sqlContext,number_threads=32,mode="overwrite",
-    name="extract") -> None:
-        self.pivot_table = pivot_table
-        self.working_path = working_path
-        self.sources_cat = sources_cat
-        self.source = source
-        self.sqlContext = sqlContext
-        self.mode = mode
-        self.n_mis = n_mis
-        self.number_threads = number_threads
-        self.tables_in = []
-        self.controls_in = []
-        self.controls_out = []
-        self.controls_out_f = []
-        self.name = name
+    def __init__(self, pivot_table: DataFrame, working_path: str, n_mis: int,
+                 sources_cat: Dict[str, Any], source: str,
+                 sqlContext: SparkSession, number_threads: int = 32,
+                 mode: str = "overwrite", name: str = "extract") -> None:
+        self.pivot_table: DataFrame = pivot_table
+        self.working_path: str = working_path
+        self.sources_cat: Dict[str, Any] = sources_cat
+        self.source: str = source
+        self.sqlContext: SparkSession = sqlContext
+        self.mode: str = mode
+        self.n_mis: int = n_mis
+        self.number_threads: int = number_threads
+        self.tables_in: List[str] = []
+        self.controls_in: List[pd.DataFrame] = []
+        self.controls_out: List[pd.DataFrame] = []
+        self.controls_out_f: List[pd.DataFrame] = []
+        self.name: str = name
 
-    def _create_queries(self, list_dates, table_name, database, type_date, name_mis, select_variables) -> tuple[list[Any], list[Any]]:
-
-        """
-        Functions that creates the queries
+    def _create_queries(self, list_dates: List[str], table_name: str,
+                        database: str, type_date: str, name_mis: str,
+                        select_variables: str) -> Tuple[List[str], List[str]]:
+        """Construye las queries del extract.
 
         Parameters
         ----------
-        list_dates: list
-            list with all dates we want information
-        table_name: string
-            Name of the table source
-        database: string
-            Name of the database where table is located
-        type_date: string
-            The type of date if the information comes for month tables, if table is partitioned should be ""
-        name_mis: string
-            Name of the date column in partitioned table
+        list_dates : List[str]
+            Lista con todas las fechas de las que se quiere información.
+        table_name : str
+            Nombre de la tabla fuente.
+        database : str
+            Nombre de la base de datos donde está la tabla.
+        type_date : str
+            Tipo de fecha si la info viene en tablas mensuales
+            (``YYYYMM``, ``YYYYM``, ``YYMM``, ``mmmYY``, ``MM_YYYY``); si
+            la tabla está particionada debe ser ``""``.
+        name_mis : str
+            Nombre de la columna de fecha en la tabla particionada.
+        select_variables : str
+            Columnas a seleccionar en el SELECT.
 
         Returns
         -------
-        queries: list
-            All the queries needed for the extract
-        tables: list
-            Names of all the tables used for queries
+        Tuple[List[str], List[str]]
+            ``(queries, tables)``: todas las queries del extract y los
+            nombres de las tablas usadas en ellas.
         """
         n = len(list_dates)
         queries = []
@@ -134,25 +147,27 @@ class Extract():
                 queries.append(query)
         return queries,tables_list
 
-    def _special_treatment(self, input_df: DataFrame, table_name:str, date:str, query:str) -> "ExtractSpecialTreatment":
-        """
-        Despues de lo filtro de fecha y del select, hace un tratamiento especial a la tabla.
+    def _special_treatment(self, input_df: DataFrame, table_name: str,
+                           date: str, query: str) -> "ExtractSpecialTreatment":
+        """Aplica un tratamiento especial a la tabla tras el filtro de fecha
+        y el select.
 
         Parameters
         ----------
-        input_df: DataFrame
-            DataFrame containing the input data.
-        table_name: str
-            Name of the source table.
-        date: str
-            Date for which the information is needed.
-        query: str
-            Query string to be used for extraction.
+        input_df : DataFrame
+            DataFrame con los datos de entrada.
+        table_name : str
+            Nombre de la tabla fuente.
+        date : str
+            Fecha de la que se quiere información.
+        query : str
+            Query usada en la extracción.
 
         Returns
         -------
         ExtractSpecialTreatment
-            An instance of ExtractSpecialTreatment or its subclass based on the source.
+            Instancia de ``ExtractSpecialTreatment`` o de su subclase
+            según la fuente.
         """
         if self.source in ["payroll_streaks", "payroll_income"]:
             special_treatment_object = PayrollStreaksExtractSpecialTreatment
@@ -161,25 +176,26 @@ class Extract():
         return special_treatment_object(parent=self, input_df=input_df, table_name=table_name, date=date, query=query,
         sqlContext=self.sqlContext)
 
-    def _get_vintages_dates(self,pivot,name_vintage_date,table_key,sqlContext) -> list[Any]:
-        """
-        Get the distinct vintages dates from pivot
+    def _get_vintages_dates(self, pivot: DataFrame, name_vintage_date: str,
+                            table_key: str,
+                            sqlContext: SparkSession) -> List[Any]:
+        """Obtiene las fechas de vintage distintas del pivot.
 
         Parameters
         ----------
-        pivot: pyspark DataFrame
-            Dataframe containing the customers we want the information and the vintage date of that customer
-        name_vintage_date: string
-            Name we are using as vintage in the pivot
-        table_key: string
-            key for temporal view, usually "master_data"
-        sqlContext: pyspark sqlContext
-            Your sqlContext
+        pivot : DataFrame
+            Dataframe con los clientes y su fecha de vintage.
+        name_vintage_date : str
+            Nombre de la columna que usamos como vintage en el pivot.
+        table_key : str
+            Clave de la vista temporal, normalmente ``"master_data"``.
+        sqlContext : SparkSession
+            Tu sqlContext.
 
         Returns
         -------
-        List
-            All the vintages dates in pivot
+        List[Any]
+            Todas las fechas de vintage del pivot (orden descendente).
         """
         df_pivot = pivot
         df_pivot.createOrReplaceTempView("pivot_temporal_"+table_key)
@@ -188,23 +204,23 @@ class Extract():
         vintages.sort(reverse = True)
         return vintages
 
-    def _range_dates(self,vintages,retraso,n_mis) -> list[Any]:
-        """
-        Function that make the range of dates of all data
+    def _range_dates(self, vintages: List[Any], retraso: int,
+                     n_mis: int) -> List[str]:
+        """Construye el rango de fechas de todos los datos.
 
         Parameters
         ----------
-        vintages: list
-            List with all the vintages in datetime
-        retraso: int
-            Number of months of lag
-        n_mis: int
-            Number of months to obtain information
+        vintages : list
+            Lista con todos los vintages en datetime.
+        retraso : int
+            Número de meses de lag.
+        n_mis : int
+            Número de meses de información a obtener.
 
         Returns
         -------
-        List
-            List with the complete range of dates
+        List[str]
+            Lista con el rango completo de fechas (cada fin de mes).
         """
         min_vintage = min(vintages)
         max_vintage = max(vintages)
@@ -217,23 +233,23 @@ class Extract():
             list_dates.append(aux.strftime(self.FORMAT_TIME))
         return list_dates
 
-    def _range_vintages(self,vintages,retraso,n_mis) -> list[Any]:
-        """
-        Function that make the range of dates of distinct vintages
+    def _range_vintages(self, vintages: List[Any], retraso: int,
+                        n_mis: int) -> List[Tuple[str, str]]:
+        """Construye el rango de fechas por vintage.
 
         Parameters
         ----------
-        vintages: list
-            List with all the vintages in datetime
-        retraso: int
-            Number of months of lag
-        n_mis: int
-            Number of months to obtain information
+        vintages : list
+            Lista con todos los vintages en datetime.
+        retraso : int
+            Número de meses de lag.
+        n_mis : int
+            Número de meses de información a obtener.
 
         Returns
         -------
-        List
-            List with the range of dates for all te vintages
+        List[Tuple[str, str]]
+            Lista de tuplas ``(min_date, max_date)`` por vintage.
         """
         range_vin = []
         for vintage in vintages:
@@ -242,35 +258,34 @@ class Extract():
             range_vin.append((min_date.strftime(self.FORMAT_TIME), max_date.strftime(self.FORMAT_TIME)))
         return range_vin
 
-    def _write_parquet(self, df, path, file_name) -> tuple[()]:
-        """
-        Function to write a parquet
+    def _write_parquet(self, df: DataFrame, path: str,
+                       file_name: str) -> Tuple[()]:
+        """Escribe un parquet.
 
         Parameters
         ----------
-        df: pyspark DataFrame
-            Dataframe to write
-        path: string
-            Path where the parquet is going to be writed
-        file_name: string
-            Name of the parquet
+        df : DataFrame
+            Dataframe a escribir.
+        path : str
+            Path donde se va a escribir el parquet.
+        file_name : str
+            Nombre del parquet.
         """
         df.write.mode(self.mode).parquet(os.path.join(path,file_name))
         return()
 
-    def _evaluate_path(self, path) -> bool:
-        """
-        Function to evaluate if a path exists
+    def _evaluate_path(self, path: str) -> bool:
+        """Evalúa si ``path`` existe en Hadoop.
+
         Parameters
         ----------
-        path: string
-            Path to check if exist or not
+        path : str
+            Path a comprobar.
 
         Returns
-        ------
+        -------
         bool
-            True if path exist, false otherwise
-
+            ``True`` si el path existe; ``False`` si no.
         """
         args_list=['hdfs', 'dfs', '-test', '-d', path]
         proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,
@@ -279,50 +294,51 @@ class Extract():
         value = True if proc.returncode == 0 else False
         return value
 
-    def _delete_intermediate(self,path) -> None:
-        """
-        Function to delete paths using hadoop
+    def _delete_intermediate(self, path: str) -> None:
+        """Borra ``path`` con ``hdfs dfs -rm`` si existe.
 
         Parameters
         ----------
-        path: string
-            Paths to delete
-
+        path : str
+            Path a borrar.
         """
-
         if self._evaluate_path(path):
             args_list=['hdfs', 'dfs', '-rm', '-f', '-r','-skipTrash', path]
             proc=subprocess.Popen(args_list, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
             proc.communicate()
-    def _create_cohorts(self, vintages_dates, vintage_ranges, key_pivote, save_path, name_vintage, table_name, pivot, sqlContext) -> list[Any]:
-        """
-        Create the cohorts for the distinct vintages
+
+    def _create_cohorts(self, vintages_dates: List[Any],
+                        vintage_ranges: List[Tuple[str, str]],
+                        key_pivote: str, save_path: str, name_vintage: str,
+                        table_name: str, pivot: DataFrame,
+                        sqlContext: SparkSession) -> List[str]:
+        """Crea las cohortes por cada vintage.
 
         Parameters
         ----------
-        vintages_dates: list
-            All the vintages dates in pivot
-        vintage_ranges: list
-            List of tuple (min_date,max_date) of the range of vintages
-        key_pivote: string
-            Primary key of pivot table
-        save_path: string
-            Path were the results are saved
-        name_vintage:
-            Name of vintage in the pivot
-        table_name: strin
-            Name of table of source
-        pivot: pyspark dataframe
-            Pivot table
-        sqlContext:
-            Your sqlContext
-
+        vintages_dates : list
+            Todas las fechas de vintage del pivot.
+        vintage_ranges : list
+            Lista de tuplas ``(min_date, max_date)`` del rango de cada
+            vintage.
+        key_pivote : str
+            Clave primaria de la tabla pivot.
+        save_path : str
+            Path donde se guardan los resultados.
+        name_vintage : str
+            Nombre del vintage en el pivot.
+        table_name : str
+            Nombre de la tabla de la fuente.
+        pivot : DataFrame
+            Tabla pivot.
+        sqlContext : SparkSession
+            Tu sqlContext.
 
         Returns
-        ------
-        list:
-            Paths with all the cohorts created
-
+        -------
+        List[str]
+            Paths con todas las cohortes creadas
+            (``<table>_<YYYYMM>`` por vintage).
         """
         df_history = sqlContext.read.parquet(os.path.join(save_path, table_name + "_full"))
         path_aux_list=[]
@@ -337,28 +353,28 @@ class Extract():
             path_aux_list.append(os.path.join(save_path, table_name+ "_" + vintage.strftime("%Y%m")))
         return path_aux_list
 
-    def _join_full_cohorts(self, save_path, path_aux_list, table_name, name_vintage_pivote, sqlContext) -> Any:
-        """
-        Create the full cohort parquet
+    def _join_full_cohorts(self, save_path: str, path_aux_list: List[str],
+                           table_name: str, name_vintage_pivote: str,
+                           sqlContext: SparkSession) -> str:
+        """Crea el parquet ``<table>_historic`` uniendo todas las cohortes.
 
         Parameters
         ----------
-        save_path: str
-            Path were the results are saved
-        path_aux_list: list
-            List of path of all cohorts in string format
-        table_name: str
-            Name of the table used
-        name_vintage_pivote: str
-            Name of vintage column in pivot
-        sqlContext: pyspark sqlContext
-            Your sqlContext
+        save_path : str
+            Path donde se guardan los resultados.
+        path_aux_list : List[str]
+            Lista de paths de todas las cohortes en formato string.
+        table_name : str
+            Nombre de la tabla usada.
+        name_vintage_pivote : str
+            Nombre de la columna de vintage en el pivot.
+        sqlContext : SparkSession
+            Tu sqlContext.
 
         Returns
-        ------
-        String
-            Path were final cohort was writed
-
+        -------
+        str
+            Path donde se escribió la cohorte final.
         """
         df_final = sqlContext.read.parquet(*path_aux_list)
         if name_vintage_pivote in df_final.columns:
@@ -366,18 +382,18 @@ class Extract():
         self._write_parquet(df_final, save_path, table_name + "_historic")
         return(os.path.join(save_path, table_name + "_historic"))
 
-    def _append_pandas(self,*args) -> Any | DataFrame:
-        """
-        Function to append pandas for controls
+    def _append_pandas(self, *args: pd.DataFrame) -> pd.DataFrame:
+        """Concatena dataframes pandas para los controles.
 
         Parameters
         ----------
-        args: pandas dataframe
-            Pandas we want to append
+        *args : pd.DataFrame
+            Dataframes a concatenar.
 
         Returns
         -------
-        All dataframes appended
+        pd.DataFrame
+            Todos los dataframes concatenados.
         """
         df = args[0]
         if len(args)>0:
@@ -385,42 +401,47 @@ class Extract():
                 df = pd.concat([df,args[k]],ignore_index=True)
         return df
 
-    def _controls_output(self,path_output,sqlContext) -> Any:
-        """
-        Create controls for the output of extract
+    def _controls_output(self, path_output: str,
+                         sqlContext: SparkSession) -> pd.DataFrame:
+        """Crea los controles de salida del extract.
 
         Parameters
         ----------
-        path: string
-            Path were the final output was saved
+        path_output : str
+            Path donde se guardó la salida final.
+        sqlContext : SparkSession
+            Tu sqlContext.
 
         Returns
         -------
-        Pandas dataframe
-            dataframe with the controls of output
+        pd.DataFrame
+            Dataframe con los controles de salida (conteo por
+            ``vintage_date``/``tfrom_date``/``tfrom``).
         """
         df = sqlContext.read.parquet(path_output)
         controls = df.groupBy("vintage_date","tfrom_date","tfrom").count().orderBy(F.desc("vintage_date"),F.desc("tfrom_date")).toPandas()
         return controls
 
-    def _controls_notnull_output(self,key_pivote,path_output,sqlContext) -> Any:
-        """
-        Create controls for the output filtering null values.
-        It takes a random column of all columns (vintage_date, tfrom_date, tfrom dropped) and filter null values
+    def _controls_notnull_output(self, key_pivote: str, path_output: str,
+                                 sqlContext: SparkSession) -> pd.DataFrame:
+        """Controles de salida filtrando valores nulos.
+
+        Toma una columna aleatoria de todas las columnas (quitando
+        ``vintage_date``, ``tfrom_date``, ``tfrom``) y filtra los nulos.
 
         Parameters
         ----------
-        key_pivote: string
-            Key in pivot
-        path_output: string
-            Path were the final output was saved
-        sqlContext: spark sqlContext
-            Your sqlContext
+        key_pivote : str
+            Clave del pivot.
+        path_output : str
+            Path donde se guardó la salida final.
+        sqlContext : SparkSession
+            Tu sqlContext.
 
         Returns
         -------
-        Pandas dataframe
-            dataframe with the controls of output with nonnull values
+        pd.DataFrame
+            Dataframe con los controles de salida sin nulos.
         """
         df = sqlContext.read.parquet(path_output)
         columns = df.drop(key_pivote,"vintage_date", "tfrom_date", "tfrom").columns
@@ -429,25 +450,27 @@ class Extract():
         ("vintage_date"),F.desc("tfrom_date")).toPandas()
         return controls
 
-    def create_html_controls(self, message_start,message_style,message_end, table_id = "default") -> Any:
-        """
-        Create html with the pandas for sending an email with the controls
+    def create_html_controls(self, message_start: str, message_style: str,
+                             message_end: str,
+                             table_id: str = "default") -> str:
+        """Crea el HTML con los pandas para enviar un correo con los
+        controles.
 
         Parameters
         ----------
-        message_start: string
-            Innitial comment for title in the email
-        message_syle: string
-            Should contain the style you want to use for tables
-        message_end: string
-            Contains the final comment and the <\body>
-        table_id: string
-            Style in message_style you want to use, it has default value
+        message_start : str
+            Comentario inicial para el título del correo.
+        message_style : str
+            Debe contener el estilo a usar para las tablas.
+        message_end : str
+            Contiene el comentario final y el ``</body>``.
+        table_id : str
+            Estilo de ``message_style`` a usar; tiene valor por defecto.
 
         Returns
         -------
-        String
-            Contains the full html code for sending an email
+        str
+            El código HTML completo para enviar un correo.
         """
         mess_final = message_start + message_style
         for k in range(len(self.tables_in)):
@@ -457,31 +480,32 @@ class Extract():
         mess_final = mess_final + message_end
         return mess_final
 
-    def _create_month_cohort(self, master_list, df_pivot, name_mis, key_pivote, key_source, save_path) -> tuple[Any, DataFrameLike | Any]:
-        """
-        Create the month cohorts for all the information
+    def _create_month_cohort(self, master_list: List[Any], df_pivot: DataFrame,
+                             name_mis: str, key_pivote: str, key_source: str,
+                             save_path: str) -> Tuple[str, pd.DataFrame]:
+        """Crea las cohortes mensuales de toda la información.
 
         Parameters
         ----------
-        master_list: list
-            This list has elements in format [query,table_name,date], all used for the final query and filters
-        df_pivot: pyspark dataframe
-            Dataframe with pivot
-        name_mis: string
-            Name of date column in table
-        key_pivote: string
-            Name of key in pivot
-        key_source: string
-            Name of key in the source
-        save_path: string
-            Path to save
+        master_list : list
+            Lista con elementos ``[query, table_name, date]``, usados en la
+            query final y los filtros.
+        df_pivot : DataFrame
+            Dataframe con el pivot.
+        name_mis : str
+            Nombre de la columna de fecha en la tabla.
+        key_pivote : str
+            Nombre de la clave en el pivot.
+        key_source : str
+            Nombre de la clave en la fuente.
+        save_path : str
+            Path donde guardar.
 
         Returns
         -------
-        Tuple
-            A tuple of the form (path_parquet,controls), path_parquet contains the path were parquet was saved and
-            controls are the input controls for that month.
-
+        Tuple[str, pd.DataFrame]
+            Tupla ``(path_parquet, controls)``: el path donde se guardó el
+            parquet del mes y sus controles de entrada.
         """
         query = master_list[0]
         table_name = master_list[1]
@@ -505,10 +529,15 @@ class Extract():
         self._write_parquet(df_temp, save_path, table_name)
         return (os.path.join(save_path, table_name), controls)
 
-    def collect_history(self) -> tuple[()]:
-        """
-        Function that creates the collect history for a source (sources_cat) and for certain pivot in the specified path.
+    def collect_history(self) -> Tuple[()]:
+        """Crea el collect history de una fuente (``sources_cat``) para el
+        pivot en el path especificado.
 
+        Para cada tabla de la fuente: genera las queries mensuales, corre
+        :meth:`_create_month_cohort` en un ``ThreadPool``, une todo en
+        ``<table>_full``, crea las cohortes por vintage
+        (``<table>_historic``), borra los intermedios y calcula los
+        controles de entrada/salida.
         """
         pivot_table = self.pivot_table
         sources_cat = self.sources_cat

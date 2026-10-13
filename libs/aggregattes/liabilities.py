@@ -9,9 +9,11 @@ Class and Functions required to aggregate (general)
 
 import os
 import pandas as pd
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws
 from pyspark.sql.types import IntegerType, DoubleType
 from itertools import chain
+from typing import Any, Dict, List, Optional
 import logging
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
@@ -34,7 +36,8 @@ class LiabilitiesPullAggregate:
         Optional, parquet write mode, defaults to overwrite
     """
 
-    def __init__(self, previous_path, agg_dict, sqlContext, mode="overwrite") -> None:
+    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
+        sqlContext: SparkSession, mode: str = "overwrite") -> None:
         """
         Class constructor.
         """
@@ -43,7 +46,7 @@ class LiabilitiesPullAggregate:
         self.sqlContext = sqlContext
         self.mode = mode
 
-    def _create_groupby_query(self, agg_dict, liab, filter_col) -> Any:
+    def _create_groupby_query(self, agg_dict: Dict[str, Any], liab: str, filter_col: List[str]) -> str:
         """
         Creates the SQL aggregation sentence to group the liabilities data
 
@@ -69,7 +72,7 @@ class LiabilitiesPullAggregate:
             " FROM df_agg_temp_df_" + liab + " GROUP BY "+group_str
         return query_str
 
-    def _create_groupby_query_pagomatico(self, agg_dict, filter_col) -> str:
+    def _create_groupby_query_pagomatico(self, agg_dict: Dict[str, Any], filter_col: List[str]) -> str:
         """
         Creates the SQL aggregation sentence to group the liabilities data
 
@@ -95,7 +98,7 @@ class LiabilitiesPullAggregate:
             " FROM df_agg_temp_pgom" + " GROUP BY "+group_str
         return query_str
 
-    def _save_parquet(self, df_save, path) -> None:
+    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
         """
         Save data as parquet on desired location.
 
