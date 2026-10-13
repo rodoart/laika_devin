@@ -66,9 +66,24 @@ existen; si falta alguno elimina todas las combinaciones que lo usan:
   `max/mean`, `std/sum`, `std/mean`.
 - Deltas `df_mod = a−b`: `max−min`, `mean−min`, `max−mean`.
 
-Por eso en `lista_trans` suele ir al final: si corre antes que sus
-bases, produce un subconjunto. Al re-ejecutar, los parquets ya
-presentes se recargan (resume a mitad de etapa).
+Existe la variante **`ratiosmod_mt`** (mismo esquema sobre las bases
+`*_mt`: `min_mt/max_mt/mean_mt/std_mt/sum_mt`, ignorando
+`ignore_this_value_when_calculating_mt_features`). Escribe
+`r{a}{b}_features` / `d{a}{b}_features` con nombres `rmin_mtmax_mt`, etc.
+
+**Para activarla** basta añadirla a `lista_trans` de `config_custom`
+(el propio `run()` la ejecuta la última, después de sus bases). Si
+alguna base falta en `lista_trans`, esos pares se omiten en silencio —
+ej. para `ratiosmod_mt` hacen falta las 5 `*_mt` (incluida `min_mt`):
+
+```json
+"lista_trans": [ ..., "min_mt", "max_mt", "mean_mt", "std_mt",
+                 "sum_mt", "ratiosmod_mt" ]
+```
+
+Al re-ejecutar, los parquets ya presentes se recargan (resume a mitad
+de etapa): `_fe_performed` detecta los dirs `r*/d*_features` extra y
+no repite la transformación.
 
 ## Variantes MT (`_x_mtTransformation`)
 

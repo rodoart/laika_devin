@@ -49,7 +49,9 @@ class FeaturesVectorAssembler:
         self.save_path: str = save_path
         self.sqlContext: SparkSession = sqlContext
         self.raw_name: str = raw_name
-        self.transformations: List[str] = self._check_files(path_features)
+        # orden determinista: el orden de listdir (HDFS/FS local) no lo es,
+        # y de él depende el orden de las columnas del vector ensamblado
+        self.transformations: List[str] = sorted(self._check_files(path_features))
         self.transformations.remove(raw_name)
         if "assembled_features" in self.transformations:
             self.transformations.remove("assembled_features")
@@ -101,17 +103,13 @@ class FeaturesVectorAssembler:
         new_meta_dict = self._create_new_meta(colz)
         raw_path = os.path.join(self.path_features, self.raw_name)
         if self._evaluate_path(raw_path):
-            pivot = self.sqlContext.read.parquet(raw_path).select(id_column)
-            cont = 0
-            for feature in features_to_process:
-                df_join = feature[2]
-                if cont == 0:
-                    all_features_df = pivot.alias('a').join(df_join.alias('b'), col("a." + id_column) == col("b.id_msf_" + feature[1]), how='left')
-                    all_features_df = all_features_df.drop("id_msf_" + feature[1])
-                else:
-                    all_features_df = all_features_df.alias('a').join(df_join.alias('b'), col("a." + id_column) == col("b.id_msf_" + feature[1]), how='left')
-                    all_features_df = all_features_df.drop("id_msf_" + feature[1])
-            cont += 1
+            all_features_df = self.sqlContext.read.parquet(raw_path).select(id_column)
+            for _, feature_name, df_join in features_to_process:
+                all_features_df = all_features_df.alias('a')\
+                    .join(df_join.alias('b'),
+                          col("a." + id_column) == col("b.id_msf_" + feature_name),
+                          how='left')\
+                    .drop("id_msf_" + feature_name)
         colz_all_assemblers = [x for x in all_features_df.columns if x not in id_column]
         all_assemblers = VectorAssembler(inputCols=colz_all_assemblers, outputCol='features_vector')
         final_features_df = all_assemblers.transform(all_features_df)

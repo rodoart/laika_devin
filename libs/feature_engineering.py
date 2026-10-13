@@ -252,7 +252,9 @@ class FeatureEngineering:
                     cols_df.remove(variable)
             else:
                 cols_df.remove(variable)
-        variables = list(set(variables))
+        # orden determinista (set() no lo es) — el orden decide el orden de
+        # columnas del parquet de features
+        variables = sorted(set(variables))
         return variables
 
     def _list_mvars(self, variables: List[str], cols_df: List[str],
@@ -394,6 +396,10 @@ class FeatureEngineering:
         :transformations: list
             List with all the transformations
         """
+        # copia: `transformations` suele ser config_custom["lista_trans"] —
+        # quitar ratiosmod de la lista original corrompería el config para
+        # fuentes posteriores y para _fe_performed
+        transformations = list(transformations)
         self.transformations = transformations
         self.df.createOrReplaceTempView("df")
         thread_pool = ThreadPool(self.number_threads)
@@ -790,6 +796,10 @@ class FeatureEngineering:
             var_den = tran_rt[1] + var_name
             if var_den in list_den:
                 list_rnumden.append([var_num, var_den])
+        if not list_rnumden:
+            logging.info("ratiosmod %s: sin columnas comunes, se omite",
+                         name_ratio)
+            return
         df = df_num.join(df_den, df_num.id_msf_tools_v2_12315 == df_den.id_msf_tools_v2_12315).drop(df_den.id_msf_tools_v2_12315)
         app_rt_mod_rnumden = self.SELECT_ID + ', '.join(["rt_mod(array(" + ','.join(inner_rnumden) + self.CLOSE_AS + f"r{name_ratio}_" + inner_rnumden[0][inner_rnumden[0].index("_")+1:] for inner_rnumden in list_rnumden]) + " from df_aux_r" + name_ratio
         df.createOrReplaceTempView("df_aux_r" + name_ratio)
@@ -817,6 +827,10 @@ class FeatureEngineering:
             var_m = tran_d[1] + var_name
             if var_m in list_m:
                 list_dpm.append([var_p, var_m])
+        if not list_dpm:
+            logging.info("ratiosmod deltas %s: sin columnas comunes, se omite",
+                         name_d)
+            return
         df = df_num.join(df_den, df_num.id_msf_tools_v2_12315 == df_den.id_msf_tools_v2_12315).drop(df_den.id_msf_tools_v2_12315)
         app_d_mod_dpm = self.SELECT_ID + ', '.join(["df_mod(array(" + ','.join(inner_dpm) + self.CLOSE_AS + f"d{name_d}_" +\
             inner_dpm[0][inner_dpm[0].index("_")+1:] for inner_dpm in list_dpm]) + " from df_aux_d" + name_d
@@ -1381,13 +1395,20 @@ class StandardMethodsMT(ExternalTransformations):
         list_num = df_num.drop("id_msf_tools_v2_12315").columns
         list_den = df_den.drop("id_msf_tools_v2_12315").columns
         list_rnumden = list()
+        # el prefijo es `max_mt`/`min_mt`...: hay que cortar por su longitud
+        # (index("_") cortaría tras "max" dejando "_mt_...")
+        prefix_len = len(tran_rt_mt[0])
         for var_num in list_num:
-            var_name = var_num[var_num.index("_"):]
+            var_name = var_num[prefix_len:]
             var_den = tran_rt_mt[1] + var_name
             if var_den in list_den:
                 list_rnumden.append([var_num, var_den])
+        if not list_rnumden:
+            logging.info("ratiosmod_mt %s: sin columnas comunes, se omite",
+                         name_ratio)
+            return
         df = df_num.join(df_den, df_num.id_msf_tools_v2_12315 == df_den.id_msf_tools_v2_12315).drop(df_den.id_msf_tools_v2_12315)
-        app_rt_mt_mod_rnumden = self.parent.SELECT_ID + ', '.join(["rt_mt_mod(array(" + ','.join(inner_rnumden) + self.parent.CLOSE_AS + f"r{name_ratio}_" + inner_rnumden[0][inner_rnumden[0].index("_")+1:] for inner_rnumden in list_rnumden]) + " from df_aux_r" + name_ratio
+        app_rt_mt_mod_rnumden = self.parent.SELECT_ID + ', '.join(["rt_mt_mod(array(" + ','.join(inner_rnumden) + self.parent.CLOSE_AS + f"r{name_ratio}_" + inner_rnumden[0][prefix_len+1:] for inner_rnumden in list_rnumden]) + " from df_aux_r" + name_ratio
         #self.sqlContext.registerDataFrameAsTable(df, "df_aux_r" + name_ratio)
         df.createOrReplaceTempView("df_aux_r" + name_ratio)
         df_aux = self.sqlContext.sql(app_rt_mt_mod_rnumden)
@@ -1407,14 +1428,20 @@ class StandardMethodsMT(ExternalTransformations):
         list_p = df_num.drop("id_msf_tools_v2_12315").columns
         list_m = df_den.drop("id_msf_tools_v2_12315").columns
         list_dpm = list()
+        # corte por longitud de prefijo (`max_mt`, no `max`)
+        prefix_len = len(tran_d[0])
         for var_p in list_p:
-            var_name = var_p[var_p.index("_"):]
+            var_name = var_p[prefix_len:]
             var_m = tran_d[1] + var_name
             if var_m in list_m:
                 list_dpm.append([var_p, var_m])
+        if not list_dpm:
+            logging.info("ratiosmod_mt deltas %s: sin columnas comunes, se omite",
+                         name_d)
+            return
         df = df_num.join(df_den, df_num.id_msf_tools_v2_12315 == df_den.id_msf_tools_v2_12315).drop(df_den.id_msf_tools_v2_12315)
         app_d_mod_dpm = self.SELECT_ID + ', '.join(["df_mt_mod(array(" + ','.join(inner_dpm) + self.CLOSE_AS + f"d{name_d}_" +\
-            inner_dpm[0][inner_dpm[0].index("_")+1:] for inner_dpm in list_dpm]) + " from df_aux_d" + name_d
+            inner_dpm[0][prefix_len+1:] for inner_dpm in list_dpm]) + " from df_aux_d" + name_d
         #self.sqlContext.registerDataFrameAsTable(df, "df_aux_d" + name_d)
         df.createOrReplaceTempView("df_aux_d" + name_d)
         df_aux = self.sqlContext.sql(app_d_mod_dpm)
@@ -1429,7 +1456,7 @@ class StandardMethodsMT(ExternalTransformations):
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
         def rt_mt_mod(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
-            if len(x) == 0:
+            if len(x) < 2:
                 return -99999.0
             if x[1] != 0.0:
                 rt_mt=float((x[0] / x[1]))
@@ -1438,6 +1465,8 @@ class StandardMethodsMT(ExternalTransformations):
             return rt_mt
         def df_mt_mod(x: Sequence[float]) -> float:
             x = [val for val in x if val != ignore_value]
+            if len(x) < 2:
+                return -99999.0
             dif = float((x[0] - x[1]))
             return dif
         #print("Running ratiosmod_mt transformation")

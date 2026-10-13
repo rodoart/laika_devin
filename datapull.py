@@ -235,22 +235,28 @@ class DataPull():
         for step in steps_list:
             time_start = time.time()
             if step == 'extract':
-                # Special nmis cases
-                if source == "payroll_income":
-                    self.config_custom["n_mis"] = self.config_custom["n_mis"] + 2
-                if "weeks" in source_dict["steps_list"]:
-                    self.config_custom["n_mis"] = self.config_custom["n_mis"] + 1
-                #
-                # Start extract
-                self._perform_extract(source_dict, write_path, number_threads, write_mode, source)
+                # Special nmis cases: extract/weeks necesitan meses extra de
+                # historia (+1 si hay weeks, +2 si payroll_income). El ajuste
+                # es local a la llamada — n_mis no depende de qué etapas se
+                # ejecutaron o recargaron.
+                n_mis_bump = (2 if source == "payroll_income" else 0) + \
+                             (1 if "weeks" in source_dict["steps_list"] else 0)
+                self.config_custom["n_mis"] += n_mis_bump
+                try:
+                    self._perform_extract(source_dict, write_path, number_threads, write_mode, source)
+                finally:
+                    self.config_custom["n_mis"] -= n_mis_bump
                 previous_step = "extract"
                 previous_path = os.path.join(write_path,"extract")
             elif step == "weeks":
                 path_weeks = previous_path
                 tables_weeks = [table + "_historic" for table in source_dict["extract"]["table_name"]]
-                self._perform_weeks(path_weeks, tables_weeks, source)
-                # restore n_mis
-                self.config_custom["n_mis"] = self.config_custom["n_mis"] - 1
+                n_mis_bump = (2 if source == "payroll_income" else 0) + 1
+                self.config_custom["n_mis"] += n_mis_bump
+                try:
+                    self._perform_weeks(path_weeks, tables_weeks, source)
+                finally:
+                    self.config_custom["n_mis"] -= n_mis_bump
                 previous_step = "weekly_extract"
                 previous_path = os.path.join(write_path,"weekly_extract")
             elif step == "mt":
@@ -269,15 +275,12 @@ class DataPull():
                     source=source,
                     previous_path=previous_path,
                     agg_dict=agg_dict,
-                    n_mis=self.config_custom["n_mis"],
+                    n_mis=self.config_custom["n_mis"] + (2 if source == "payroll_income" else 0),
                     period=self.config_custom["period"],
                     tables=[table + "_historic" for table in source_dict["extract"]["table_name"]]
                 )
                 previous_step = "groupby"
                 previous_path = os.path.join(write_path,"groupby")
-                # Restore n_mis
-                if source == "payroll_income":
-                    self.config_custom["n_mis"] = self.config_custom["n_mis"] - 2
             elif step == "pivoting":
                 path_pivoting = os.path.join(write_path,"pivot")
                 pivot_dict = source_dict["pivoting"]
@@ -804,19 +807,23 @@ class DataPull():
         List[str]
             Transformaciones pendientes (``[]`` si no queda ninguna).
         """
-        trans_list_aux = trans_list.copy()
-        files = self._check_files(path_fe)
-        for fil in files:
-            if fil[:fil.index("_")] in trans_list_aux:
-                trans_list_aux.remove(fil[:fil.index("_")])
-        #The condition below is to check if another transformation excluding ratios mod was not performed
-        if len(trans_list_aux) > 1:
-            return trans_list_aux
-        else:
-            if len(files)-len(trans_list) <= 0:
-                return []
-            else:
-                return ["ratiosmod"]
+        files = set(self._check_files(path_fe))
+        remaining = [t for t in trans_list
+                     if f"{t}_features" not in files]
+        # ``ratiosmod``/``ratiosmod_mt`` no escriben ``ratiosmod_features``
+        # sino dirs ``d{a}{b}_features``/``r{a}{b}_features``: se dan por
+        # hechas si hay algún dir extra más allá de ``{t}_features`` y
+        # ``raw_features``.
+        expected = {f"{t}_features" for t in trans_list}
+        expected.add("raw_features")
+        extras = [d for d in files if d not in expected]
+        # los dirs de ratiosmod_mt llevan "_mt" (r{min_mt}{max_mt}_features);
+        # los de ratiosmod estándar no (r{min}{max}_features)
+        if "ratiosmod" in remaining and any("_mt" not in d for d in extras):
+            remaining.remove("ratiosmod")
+        if "ratiosmod_mt" in remaining and any("_mt" in d for d in extras):
+            remaining.remove("ratiosmod_mt")
+        return remaining
 
     def _check_mobs(self, path_mobs: str, files_fe: List[str]) -> bool:
         """Comprueba si los mobs ya se ejecutaron.

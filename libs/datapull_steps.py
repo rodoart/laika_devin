@@ -188,14 +188,20 @@ class ExtractStep(DatapullStageStep):
 
     def _run(self, previous_path: Optional[str]) -> None:
         cc = self.datapull.config_custom
-        # Ajustes especiales de n_mis (como en _pipeline)
-        if self.source == "payroll_income":
-            cc["n_mis"] = cc["n_mis"] + 2
-        if "weeks" in self.source_dict["steps_list"]:
-            cc["n_mis"] = cc["n_mis"] + 1
-        self.datapull._perform_extract(
-            self.source_dict, self.write_path, cc["n_threads"],
-            cc["write_mode"], self.source)
+        # Ajustes especiales de n_mis (como en _pipeline): +2 para
+        # payroll_income, +1 si la fuente tiene weeks. El ajuste es local a
+        # la llamada — si este step se recarga en vez de ejecutarse, los
+        # steps posteriores siguen viendo el n_mis base (determinismo al
+        # reanudar).
+        n_mis_bump = (2 if self.source == "payroll_income" else 0) + \
+                     (1 if "weeks" in self.source_dict["steps_list"] else 0)
+        cc["n_mis"] += n_mis_bump
+        try:
+            self.datapull._perform_extract(
+                self.source_dict, self.write_path, cc["n_threads"],
+                cc["write_mode"], self.source)
+        finally:
+            cc["n_mis"] -= n_mis_bump
 
 
 class WeeksStep(DatapullStageStep):
@@ -209,11 +215,16 @@ class WeeksStep(DatapullStageStep):
             self.output_path, self._historic_tables)
 
     def _run(self, previous_path: Optional[str]) -> None:
-        self.datapull._perform_weeks(
-            previous_path, self._historic_tables, self.source)
-        # restaura n_mis (se había subido +1 antes del extract)
+        # weeks consume el mismo n_mis ampliado que extract (+1 por el mes
+        # extra de historia, +2 si payroll_income); ajuste local a la llamada
         cc = self.datapull.config_custom
-        cc["n_mis"] = cc["n_mis"] - 1
+        n_mis_bump = (2 if self.source == "payroll_income" else 0) + 1
+        cc["n_mis"] += n_mis_bump
+        try:
+            self.datapull._perform_weeks(
+                previous_path, self._historic_tables, self.source)
+        finally:
+            cc["n_mis"] -= n_mis_bump
 
 
 class MtStep(DatapullStageStep):
@@ -250,12 +261,10 @@ class GroupByStep(DatapullStageStep):
             previous_path=previous_path,
             pivot_path=cc["pivot_path"],
             agg_dict=self.source_dict["group_by"],
-            n_mis=cc["n_mis"],
+            # payroll_income agrega con el n_mis ampliado (+2)
+            n_mis=cc["n_mis"] + (2 if self.source == "payroll_income" else 0),
             period=cc["period"],
             tables=self._historic_tables)
-        # restaura n_mis (payroll_income tenía +2 desde el extract)
-        if self.source == "payroll_income":
-            cc["n_mis"] = cc["n_mis"] - 2
 
 
 class PivotingStep(DatapullStageStep):

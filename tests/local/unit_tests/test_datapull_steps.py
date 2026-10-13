@@ -227,13 +227,21 @@ class TestChainExecution:
 # Comportamientos específicos de etapas
 # ---------------------------------------------------------------------------
 class TestStageSpecifics:
-    def test_extract_n_mis_plus_one_with_weeks(self, tmp_path, paths_config):
-        """Extract con 'weeks' en steps_list sube n_mis +1."""
+    def test_extract_n_mis_bump_is_scoped(self, tmp_path, paths_config):
+        """Extract con 'weeks' en steps_list usa n_mis+1 durante la llamada
+        y lo restaura después (determinismo al reanudar)."""
         dp = FakeDataPull(tmp_path.as_posix(), ["extract", "weeks"])
+        seen = []
+        orig = dp._perform_extract
+        def spy(*a, **kw):
+            seen.append(dp.config_custom["n_mis"])
+            return orig(*a, **kw)
+        dp._perform_extract = spy
         step = ExtractStep(datapull=dp, source="payroll_streaks",
                            paths=paths_config, is_dynamic=False)
         step._run(None)
-        assert dp.config_custom["n_mis"] == 5
+        assert seen == [5]                      # bump aplicado dentro
+        assert dp.config_custom["n_mis"] == 4   # restaurado fuera
 
     def test_extract_n_mis_unchanged_without_weeks(self, tmp_path,
                                                    paths_config):
@@ -241,6 +249,37 @@ class TestStageSpecifics:
         step = ExtractStep(datapull=dp, source="payroll_streaks",
                            paths=paths_config, is_dynamic=False)
         step._run(None)
+        assert dp.config_custom["n_mis"] == 4
+
+    def test_weeks_n_mis_bump_is_scoped(self, tmp_path, paths_config):
+        """Weeks usa n_mis+1 durante la llamada y lo restaura después."""
+        dp = FakeDataPull(tmp_path.as_posix(), ["extract", "weeks"])
+        seen = []
+        orig = dp._perform_weeks
+        def spy(*a, **kw):
+            seen.append(dp.config_custom["n_mis"])
+            return orig(*a, **kw)
+        dp._perform_weeks = spy
+        step = WeeksStep(datapull=dp, source="payroll_streaks",
+                         paths=paths_config, is_dynamic=False)
+        step._run("/x/extract")
+        assert seen == [5]
+        assert dp.config_custom["n_mis"] == 4
+
+    def test_groupby_payroll_income_n_mis_plus_two(self, tmp_path,
+                                                   paths_config):
+        """Groupby de payroll_income recibe n_mis+2 sin mutar el config."""
+        dp = FakeDataPull(tmp_path.as_posix(), ["groupby"])
+        dp.config_rigid["payroll_income"] = dict(
+            dp.config_rigid["payroll_streaks"])
+        captured = {}
+        def spy(**kw):
+            captured.update(kw)
+        dp._perform_groupby = spy
+        step = GroupByStep(datapull=dp, source="payroll_income",
+                           paths=paths_config, is_dynamic=False)
+        step._run("/x/missing_treatment")
+        assert captured["n_mis"] == 6
         assert dp.config_custom["n_mis"] == 4
 
     def test_ratios_corporate_next_path_is_features(self, tmp_path,

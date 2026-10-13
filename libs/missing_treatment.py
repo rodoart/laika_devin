@@ -377,8 +377,9 @@ class MissingTreatment:
         aux_exc = exclusiones[:]
         aux_exc = [el for el in aux_exc if el in df.columns]
         aux_exc.extend(grouped)
-        aux_exc = list(set(aux_exc))
-        lista_fin = list(set(df.columns)-set(aux_exc))
+        # orden determinista (el esquema de df) — set() daría orden aleatorio
+        aux_exc = set(aux_exc)
+        lista_fin = [c for c in df.columns if c not in aux_exc]
         paso1.createOrReplaceTempView("df_aux_flags")
         # Fill 0 para bandera=0
         text_fill = "select *,"+",".join(["case when MFlg_SDO=0 and "+item+" is null then 0 else "+item+" end as "+item for item in lista_fin])+\

@@ -11,6 +11,10 @@ __pycache__/
 tests/local/workdir/
 tests/local/workdir_dyn/
 tests/local/__pycache__/
+# Snapshots y artefactos del harness de reanudación / depuración local
+tests/local/snap_*/
+tests/local/resume_baseline.json
+tests/local/_dbg*.py
 
 # Local Hadoop binaries for Windows Spark (re-downloadable, see
 # tests/local/README.md)
@@ -24,3 +28,8 @@ tests/local/hadoop/bin/*.exe
 *.log
 .DS_Store
 Thumbs.db
+
+# Artefactos locales de Spark/Hive (warehouse, metastore derby)
+spark-warehouse/
+metastore_db/
+derby.log

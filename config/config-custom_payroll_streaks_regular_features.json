@@ -32,7 +32,9 @@
         "rt_mt",
         "so_mt",
         "avgmov_mt",
-        "rms_mt"
+        "rms_mt",
+        "min_mt",
+        "ratiosmod_mt"
     ],
     "email_sender": "rg49392",
     "email_receivers": [
