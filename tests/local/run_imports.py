@@ -2,9 +2,6 @@
 import sys
 sys.path.insert(0, 'tests/local')
 import bootstrap
-bootstrap.install_aggregates_alias()
-bootstrap.install_numpy_shims()
-bootstrap.install_typing_shims()
 import importlib, pathlib, traceback
 
 mods = []

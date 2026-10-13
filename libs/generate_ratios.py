@@ -16,8 +16,9 @@ from typing import Any, Dict, List
 import pandas as pd
 import os
 import re
-import subprocess
 import logging
+
+from .steps import path_exists
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -237,21 +238,5 @@ class GenerateRatios:
         return (pivot)
 
     def _evaluate_path(self, path: str) -> bool:
-        """Comprueba si ``path`` existe en Hadoop.
-
-        Parameters
-        ----------
-        path : str
-            Path a comprobar.
-
-        Returns
-        -------
-        bool
-            ``True`` si el path existe; ``False`` si no.
-        """
-        args_list = ['hdfs', 'dfs', '-test', '-d', path]
-        proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
-        proc.communicate()
-        value = proc.returncode == 0 and True or False
-        return value
+        """Comprueba si ``path`` existe (ver :func:`libs.steps.path_exists`)."""
+        return path_exists(path)

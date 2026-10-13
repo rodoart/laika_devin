@@ -7,20 +7,10 @@ Version: 0.1
 Class and Functions required to aggregate (general)
 """
 
-import os
-import pandas as pd
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws
-from pyspark.sql.types import IntegerType, DoubleType
-from itertools import chain
-from typing import Any, Dict, List
-import logging
+from pyspark.sql.functions import greatest, expr
+from .base import BaseAggregate
 
-logging.basicConfig(format='%(asctime)s | %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
-
-
-class ChannelsAggregate:
+class ChannelsAggregate(BaseAggregate):
     """
     Class to aggregate Channels Data
 
@@ -36,33 +26,6 @@ class ChannelsAggregate:
         Optional, parquet write mode, defaults to overwrite
     """
 
-    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
-        sqlContext: SparkSession, mode: str = "overwrite") -> None:
-        """
-        Class constructor.
-        """
-        self.previous_path = previous_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
-
-    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """
-        Save data as parquet on desired location.
-
-        Parameters
-        ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-        """
-        df_save.write.mode(self.mode).parquet(path)
-
     def aggregate(self) -> None:
         """
         Process to aggregate bureau pull data.
@@ -75,8 +38,7 @@ class ChannelsAggregate:
         -------
         None
         """
-        reading_path = os.path.join(
-            self.previous_path, self.agg_dict['table_name'])
+        reading_path = self._table_path()
         channels_df = self.sqlContext.read.parquet(reading_path)
         channels_df.createOrReplaceTempView("channels")
         total = self.sqlContext.sql(self.agg_dict["query_str"])
@@ -91,6 +53,4 @@ class ChannelsAggregate:
                 if op == "sums":
                     total = total.withColumn(new_column, expr(
                     "+".join(aggregate_dict[op][new_column])))
-
-        head, _ = os.path.split(self.previous_path)
-        self._save_parquet(total, os.path.join(head, "groupby"))
+        self._save_parquet(total, self._sibling_path("groupby"))

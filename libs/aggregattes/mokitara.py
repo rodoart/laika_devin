@@ -7,20 +7,11 @@ Version: 0.1
 Class and Functions required to aggregate (general)
 """
 
-import os
-import pandas as pd
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws, sum, max, min, when, col, count
-from pyspark.sql.types import IntegerType, DoubleType
-from itertools import chain
-from typing import Any, Dict, List
+from pyspark.sql.functions import col, when, sum, max, min, count
+from .base import BaseAggregate
 import logging
 
-logging.basicConfig(format='%(asctime)s | %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
-
-
-class MorkitaraAggregate:
+class MorkitaraAggregate(BaseAggregate):
     """
     Class to aggregate PNL Data
 
@@ -36,33 +27,6 @@ class MorkitaraAggregate:
         Optional, parquet write mode, defaults to overwrite
     """
 
-    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
-        sqlContext: SparkSession, mode: str = "overwrite") -> None:
-        """
-        Class constructor.
-        """
-        self.previous_path = previous_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
-
-    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """
-        Save data as parquet on desired location.
-
-        Parameters
-        ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-        """
-        df_save.write.mode(self.mode).parquet(path)
-
     def aggregate(self) -> None:
         """
         Process to aggregate bureau pull data.
@@ -75,8 +39,7 @@ class MorkitaraAggregate:
         -------
         None
         """
-        reading_path = os.path.join(
-            self.previous_path, self.agg_dict['table_name'])
+        reading_path = self._table_path()
         historic = self.sqlContext.read.parquet(reading_path).drop("inf_dt","tfrom_date")
         columns_to_sum = self.agg_dict['columns_to_sum']
         columns_pivot = self.agg_dict['columns_pivot']
@@ -107,5 +70,4 @@ class MorkitaraAggregate:
             (-1))
 
         df_out = grouped_data.fillna(0).drop("snapshot")
-        head, _ = os.path.split(self.previous_path)
-        self._save_parquet(df_out, os.path.join(head, "groupby"))
+        self._save_parquet(df_out, self._sibling_path("groupby"))

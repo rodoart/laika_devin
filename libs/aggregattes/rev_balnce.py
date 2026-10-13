@@ -7,20 +7,13 @@ Version: 0.1
 Class and Functions required to aggregate (general)
 """
 
-import os
-import pandas as pd
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws
-from pyspark.sql.types import IntegerType, DoubleType
-from itertools import chain
-from typing import Any, Dict, Optional
-import logging
+from pyspark.sql.functions import expr, col, broadcast, month, when, lit
+from pyspark.sql.types import DoubleType
+from typing import Any, Dict
+from .base import BaseAggregate
 
-logging.basicConfig(format='%(asctime)s | %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
-
-
-class RevBalanceAggregate:
+class RevBalanceAggregate(BaseAggregate):
     """
     Class to aggregate Revolving Balance Data
 
@@ -35,33 +28,6 @@ class RevBalanceAggregate:
     mode: string
         Optional, parquet write mode, defaults to overwrite
     """
-
-    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
-        sqlContext: SparkSession, mode: str = "overwrite") -> None:
-        """
-        Class constructor.
-        """
-        self.previous_path = previous_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
-
-    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """
-        Save data as parquet on desired location.
-
-        Parameters
-        ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-        """
-        df_save.write.mode(self.mode).parquet(path)
 
     def epp_aggregate(self, sqlContext: SparkSession, epp_path: str, agg_dict: Dict[str, Any], epp_dict: Dict[str, Any]) -> DataFrame:
         """
@@ -215,7 +181,6 @@ class RevBalanceAggregate:
         Spark Dataframe
             Dataframe with aggregated data.
         """
-        from pyspark.sql.functions import col, sum, when, count, round
         cpp_df = self.sqlContext.read.parquet(ccp_path)
         ccpAgg = cpp_df.select(
             agg_dict['primaryKey']+["eir", "monthsonbooks", "numcliente"])
@@ -269,21 +234,17 @@ class RevBalanceAggregate:
         -------
         None
         """
-        reading_path_epp = os.path.join(
-            self.previous_path, self.agg_dict['table_names']["epp"])
+        reading_path_epp = self._table_path('table_names', 'epp')
         epp_dict = self.agg_dict['querys_dict']["epp_dict"]
         epp_agg = self.epp_aggregate(
             self.sqlContext, reading_path_epp, self.agg_dict, epp_dict)
 
-        reading_path_plan = os.path.join(
-            self.previous_path, self.agg_dict['table_names']["plan"])
+        reading_path_plan = self._table_path('table_names', 'plan')
         plan_agg = self.plan_aggregate(self.sqlContext, reading_path_plan)
 
-        reading_path_cpp = os.path.join(
-            self.previous_path, self.agg_dict['table_names']["cpp"])
+        reading_path_cpp = self._table_path('table_names', 'cpp')
         revbal_agg = self.revbalance_aggregate(
             reading_path_cpp, self.agg_dict, epp_agg, plan_agg)
         revbal_agg = revbal_agg.withColumn("has_ccp", when(col("numcliente").isNotNull(),1).otherwise(0))
         # revbal_agg.withColumn("has_ccp", when(col("numcliente").isNotNull(),1).otherwise(0))
-        head, _ = os.path.split(self.previous_path)
-        self._save_parquet(revbal_agg, os.path.join(head, "groupby"))
+        self._save_parquet(revbal_agg, self._sibling_path("groupby"))

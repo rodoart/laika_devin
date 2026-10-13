@@ -32,6 +32,7 @@ from libs.steps import Step, collect_step_output, path_exists
 from libs.hive_path import HivePath
 from libs.paths import PathsConfig
 from libs.missing_treatment import MissingTreatment
+from libs.mobs.mobs import Mobs
 from libs.generate_ratios import GenerateRatios
 
 logger = logging.getLogger(__name__)
@@ -54,8 +55,9 @@ class DatapullStageStep(Step):
     is_dynamic:
         ``True`` para recargar salidas persistidas.
     mt:
-        ``MissingTreatment`` compartido entre ``mt`` y ``mobs``
-        (como en ``_pipeline``).
+        ``MissingTreatment`` de la etapa ``mt``.
+    mobs:
+        ``Mobs`` de la etapa ``mobs``.
 
     Attributes
     ----------
@@ -75,11 +77,13 @@ class DatapullStageStep(Step):
     def __init__(self, datapull: Any, source: str, paths: PathsConfig,
                  previous_step: Optional["Step"] = None,
                  is_dynamic: bool = True,
-                 mt: Optional[MissingTreatment] = None) -> None:
+                 mt: Optional[MissingTreatment] = None,
+                 mobs: Optional[Mobs] = None) -> None:
         self.datapull = datapull
         self.source: str = source
         self.paths: PathsConfig = paths
         self.mt: Optional[MissingTreatment] = mt
+        self.mobs: Optional[Mobs] = mobs
         cc = datapull.config_custom
         cfg = paths.stage_config(cc["working_path"], cc["year_id"], source,
                                  self.stage)
@@ -347,7 +351,7 @@ class MobsStep(DatapullStageStep):
         cc = self.datapull.config_custom
         path_mobs = os.path.join(self.write_path, "mobs")
         self.datapull._perform_mobs(
-            cc["working_path"], previous_path, self.mt, path_mobs, self.source)
+            cc["working_path"], previous_path, self.mobs, path_mobs, self.source)
 
 
 class VaStep(DatapullStageStep):
@@ -436,14 +440,17 @@ def build_source_chain(datapull: Any, source: str,
         steps_list = [s for s in steps_list if s in step_filter]
     assert steps_list, f"No stages selected for source {source}"
 
-    # MissingTreatment compartido (etapas mt + mobs), como en _pipeline
+    # MissingTreatment (mt) y Mobs (mobs), como en _pipeline
     cc = datapull.config_custom
     mt = MissingTreatment(cc["year_id"], datapull.config_rigid[source],
                           source, cc["n_mis"], cc["n_threads"])
+    mobs = Mobs(cc["year_id"], datapull.config_rigid[source],
+                source, cc["n_mis"], cc["n_threads"])
 
     previous: Optional[Step] = None
     for stage in steps_list:
         cls = STAGE_STEP_CLASSES[stage]
         previous = cls(datapull=datapull, source=source, paths=paths,
-                       previous_step=previous, is_dynamic=is_dynamic, mt=mt)
+                       previous_step=previous, is_dynamic=is_dynamic,
+                       mt=mt, mobs=mobs)
     return previous

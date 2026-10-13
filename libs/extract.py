@@ -19,7 +19,6 @@ except ImportError:
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 import pyspark.sql.functions as F
-import subprocess
 from random import randint
 from multiprocessing.pool import ThreadPool
 from cytoolz.functoolz import partial
@@ -28,6 +27,7 @@ import re
 
 from .extract_special_treatments.default import ExtractSpecialTreatment
 from .extract_special_treatments.payroll_streaks import PayrollStreaksExtractSpecialTreatment
+from .steps import path_exists, path_delete
 
 class Extract():
     #: Fuentes a las que se aplica tratamiento especial en la extracción.
@@ -125,16 +125,17 @@ class Extract():
             11:"nov",
             12:"dic"
             }
-            if type_date == "YYYYMM":
-                tables = [table_name.replace("XXXX", list_dates[k][0:4] + list_dates[k][5:7]) for k in range(n)]
-            elif type_date == "YYYYM":
-                tables = [table_name.replace("XXXX", list_dates[k][0:4] + str(int(list_dates[k][5:7]))) for k in range(n)]
-            elif type_date == "YYMM":
-                tables = [table_name.replace("XXXX", list_dates[k][2:4] + list_dates[k][5:7]) for k in range(n)]
-            elif type_date == "mmmYY":
-                tables = [table_name.replace("XXXX", meses[int(list_dates[k][5:7])] + list_dates[k][0:4]) for k in range(n)]
-            elif type_date == "MM_YYYY":
-                tables = [table_name.replace("XXXX", list_dates[k][5:7] + "_" + list_dates[k][0:4]) for k in range(n)]
+            # type_date -> formato del sufijo de tabla para una fecha
+            # 'YYYY-MM-DD'
+            date_formats = {
+                "YYYYMM": lambda d: d[0:4] + d[5:7],
+                "YYYYM": lambda d: d[0:4] + str(int(d[5:7])),
+                "YYMM": lambda d: d[2:4] + d[5:7],
+                "mmmYY": lambda d: meses[int(d[5:7])] + d[0:4],
+                "MM_YYYY": lambda d: d[5:7] + "_" + d[0:4],
+            }
+            tables = [table_name.replace("XXXX", date_formats[type_date](list_dates[k]))
+                      for k in range(n)]
             for table in tables:
                 query = f"SELECT {select_variables} FROM {database}.{table}"
                 tables_list.append(table)
@@ -275,37 +276,12 @@ class Extract():
         return()
 
     def _evaluate_path(self, path: str) -> bool:
-        """Evalúa si ``path`` existe en Hadoop.
-
-        Parameters
-        ----------
-        path : str
-            Path a comprobar.
-
-        Returns
-        -------
-        bool
-            ``True`` si el path existe; ``False`` si no.
-        """
-        args_list=['hdfs', 'dfs', '-test', '-d', path]
-        proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-        proc.communicate()
-        value = True if proc.returncode == 0 else False
-        return value
+        """Evalúa si ``path`` existe (ver :func:`libs.steps.path_exists`)."""
+        return path_exists(path)
 
     def _delete_intermediate(self, path: str) -> None:
-        """Borra ``path`` con ``hdfs dfs -rm`` si existe.
-
-        Parameters
-        ----------
-        path : str
-            Path a borrar.
-        """
-        if self._evaluate_path(path):
-            args_list=['hdfs', 'dfs', '-rm', '-f', '-r','-skipTrash', path]
-            proc=subprocess.Popen(args_list, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-            proc.communicate()
+        """Borra ``path`` si existe (ver :func:`libs.steps.path_delete`)."""
+        path_delete(path)
 
     def _create_cohorts(self, vintages_dates: List[Any],
                         vintage_ranges: List[Tuple[str, str]],

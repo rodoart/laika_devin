@@ -9,12 +9,13 @@ para que cada slot del vector conserve el nombre de su feature.
 """
 from pyspark.sql.functions import col
 from pyspark.sql import DataFrame, SparkSession
-import subprocess
 from pyspark.ml.feature import VectorAssembler
 from typing import Any, Dict, List, Tuple
 import os
 import re
 import logging
+
+from .steps import path_exists, path_listdir, path_delete
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -56,61 +57,20 @@ class FeaturesVectorAssembler:
         self.id_column: str = id_column
 
     def _check_files(self, path: str) -> List[str]:
-        """Lista los ficheros/directorios de ``path`` en Hadoop.
+        """Lista los ficheros/directorios de ``path``.
 
-        En ejecuciones locales se sustituye por
-        ``libs.steps.path_listdir`` (ver ``patch_filesystem``).
-
-        Parameters
-        ----------
-        path : str
-            Path a listar.
-
-        Returns
-        -------
-        List[str]
-            Lista con todos los ficheros del path.
+        Delega en :func:`libs.steps.path_listdir` (CLI ``hdfs`` en el
+        clúster, FS local si la ruta no parece HDFS).
         """
-        args_list=['hdfs', 'dfs', '-ls', path]
-        proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        stdout, stderr = proc.communicate()
-        proc.wait()
-        return [elem[re.search(path, elem).end():].replace("/","") for elem in stdout.decode('ascii','ignore').splitlines() if path
-        in elem]
+        return path_listdir(path)
 
     def _evaluate_path(self, path: str) -> bool:
-        """Evalúa si ``path`` existe en Hadoop.
-
-        Parameters
-        ----------
-        path : str
-            Path a comprobar.
-
-        Returns
-        -------
-        bool
-            ``True`` si el path existe; ``False`` si no.
-        """
-        args_list=['hdfs', 'dfs', '-test', '-d', path]
-        proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
-        proc.communicate()
-        value=proc.returncode==0 and True or False
-        return value
+        """Evalúa si ``path`` existe (ver :func:`libs.steps.path_exists`)."""
+        return path_exists(path)
 
     def _delete_intermediate(self, path: str) -> None:
-        """Borra ``path`` con ``hdfs dfs -rm`` si existe.
-
-        Parameters
-        ----------
-        path : str
-            Path a borrar.
-        """
-        if (self._evaluate_path(path)):
-            args_list = ['hdfs', 'dfs', '-rm', '-f', '-r', '-skipTrash', path]
-            proc = subprocess.Popen(
-                args_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            proc.communicate()
+        """Borra ``path`` si existe (ver :func:`libs.steps.path_delete`)."""
+        path_delete(path)
 
     def _features_vec_assemb(self) -> Tuple[()]:
         """Crea el vector final con ``VectorAssembler`` de Spark.

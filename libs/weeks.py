@@ -8,8 +8,6 @@ Changes tfrom column to weeks, in order to use DataPull as Weeks
 """
 
 # Libraries
-from os import stat
-import subprocess
 from collections import namedtuple
 from datetime import date, datetime, timedelta
 from pathlib import PosixPath
@@ -23,6 +21,7 @@ from pyspark.sql.functions import (
 )
 
 from .aggregattes.payroll_income import cached_property, dynamic
+from .steps import path_delete
 
 # Functions
 
@@ -1289,11 +1288,14 @@ class WeeklyTFromParquetReTagger:
         Returns:
             int: El número de semanas por año.
         """
-        if self.tfrom_method == "standard":
-            return self.standard_weeks_per_year
-        elif self.tfrom_method in ["force_4_weeks", "payroll"]:
-            return self.forced_weeks_per_year
-        else:
+        weeks_per_year = {
+            "standard": self.standard_weeks_per_year,
+            "force_4_weeks": self.forced_weeks_per_year,
+            "payroll": self.forced_weeks_per_year,
+        }
+        try:
+            return weeks_per_year[self.tfrom_method]
+        except KeyError:
             raise ValueError("tfrom_method must be 'force_4_weeks', 'standard' or 'payroll'")
     #
     # METHODS WITH DECISIONS
@@ -1312,13 +1314,14 @@ class WeeklyTFromParquetReTagger:
         Returns:
             DataFrame: El DataFrame con las nuevas columnas.
         """
-        if self.tfrom_method == "standard":
-            function_ = self._get_new_week_of_year_day_of_month_standard
-        elif self.tfrom_method == "force_4_weeks":
-            function_ = self._get_new_week_of_year_day_of_month_force_4_weeks
-        elif self.tfrom_method == "payroll":
-            function_ = self._get_new_week_of_year_day_of_month_payroll
-        else:
+        functions = {
+            "standard": self._get_new_week_of_year_day_of_month_standard,
+            "force_4_weeks": self._get_new_week_of_year_day_of_month_force_4_weeks,
+            "payroll": self._get_new_week_of_year_day_of_month_payroll,
+        }
+        try:
+            function_ = functions[self.tfrom_method]
+        except KeyError:
             raise ValueError("tfrom_method must be 'force_4_weeks', 'standard' or 'payroll'")
         return function_(df, date_column, week_of_year_column, day_of_week_column)
     #
@@ -1336,11 +1339,14 @@ class WeeklyTFromParquetReTagger:
         Returns:
             DataFrame: El DataFrame con las fechas cambiadas.
         """
-        if self.type_of_date_column == "monthly":
-            change_date_to_first_monday = change_date_to_first_monday_of_the_month_column
-        elif (self.type_of_date_column == "daily") or (self.type_of_date_column == "weekly"):
-            change_date_to_first_monday = change_date_first_monday_of_the_week_column
-        else:
+        functions = {
+            "monthly": change_date_to_first_monday_of_the_month_column,
+            "daily": change_date_first_monday_of_the_week_column,
+            "weekly": change_date_first_monday_of_the_week_column,
+        }
+        try:
+            change_date_to_first_monday = functions[self.type_of_date_column]
+        except KeyError:
             raise ValueError("type_of_date_column must be either 'monthly' or 'daily' or 'weekly'")
         #
         return change_date_to_first_monday(df=df, date_column=date_column, day_of_week_column=day_of_week_column)
@@ -1452,21 +1458,8 @@ class WeeklyTFromParquetReTagger:
 
     @staticmethod
     def _delete_intermediate(path:str) -> None:
-        """
-        Elimina rutas utilizando Hadoop.
-
-        La corrección específica se realiza utilizando el comando `hdfs dfs -rm -f -r -skipTrash`,
-        que elimina las rutas especificadas de Hadoop.
-
-        Args:
-            path (str): Ruta a eliminar.
-
-        Returns:
-            None
-        """
-        args_list=['hdfs', 'dfs', '-rm', '-f', '-r','-skipTrash', path]
-        proc=subprocess.Popen(args_list, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        proc.communicate()
+        """Borra ``path`` si existe (ver :func:`libs.steps.path_delete`)."""
+        path_delete(path)
 
     def _clean(self) -> None:
         """

@@ -12,11 +12,10 @@ Outputs land in LAIKA_TEST_WORKDIR (parquet + summary.txt).
 import json
 from pathlib import Path
 
-from bootstrap import PROJECT_ROOT, WORKDIR, POSIX_WORKDIR, get_spark, install_aggregates_alias
+from bootstrap import PROJECT_ROOT, WORKDIR, POSIX_WORKDIR, get_spark
 
 
 def main() -> None:
-    install_aggregates_alias()
     from libs.aggregattes.payroll_streaks import PayrollStreaksAggregate
 
     config_rigid = json.loads((PROJECT_ROOT / "config" / "configuration.json").read_text(encoding="utf-8"))

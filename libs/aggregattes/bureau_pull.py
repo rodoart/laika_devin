@@ -7,20 +7,14 @@ Version: 0.1
 Class and Functions required to aggregate (general)
 """
 
-import os
 import pandas as pd
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws
-from pyspark.sql.types import IntegerType, DoubleType
-from itertools import chain
-from typing import Any, Dict, List, Optional
+from pyspark.sql.functions import col
+from typing import Any, Dict, List
+from .base import BaseAggregate
 import logging
 
-logging.basicConfig(format='%(asctime)s | %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
-
-
-class BureauPullAggregate:
+class BureauPullAggregate(BaseAggregate):
     """
     Class to aggregate Bureau Pull Data
 
@@ -35,16 +29,6 @@ class BureauPullAggregate:
     mode: string
         Optional, parquet write mode, defaults to overwrite
     """
-
-    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
-        sqlContext: SparkSession, mode: str = "overwrite") -> None:
-        """
-        Class constructor.
-        """
-        self.previous_path = previous_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
 
     def _create_groupby_query(self, query_dict: Dict[str, Any], group_by: List[str], filter_columns: List[str]) -> str:
         """
@@ -73,93 +57,6 @@ class BureauPullAggregate:
             " FROM tempBureau GROUP BY "+group_str
         return query_str
 
-    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """
-        Save data as parquet on desired location.
-
-        Parameters
-        ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-        """
-        df_save.write.mode(self.mode).parquet(path)
-
-    def getCostumerBureau(self, df: DataFrame, aggs: Dict[str, Any], sqlContext: SparkSession) -> DataFrame:
-        """
-        Calculate new bureau variables.
-
-        Parameters
-        ----------
-        df: Spark Dataframe
-            Data to work with
-        aggs: Dictionary
-            All parameters needed by the class(key, group_by, querys)
-        sqlContext: Spark context
-            Context working with
-
-        Returns
-        -------
-        Spark Dataframe
-            Dataframe with new calculated columns
-        """
-        group_by = ["numcliente", "vintage_date"]
-        tfrom = "tfrom"
-        timeWindow = 6
-        groupBy = ",".join(group_by)
-
-        aux_features = [item for item in df.columns if item not in ["numcliente", "vintage_date","tfrom"]]
-        # print(aux_features)
-        logging.debug("Customer Bureau Aux Columns: %s", aux_features)
-        # Get Months on Bureau and Hit bureau
-        df.createOrReplaceTempView("dfTempFlag")
-        mob = "max(a5+{0}) over (partition by {1}) as mob".format(tfrom, groupBy)
-        hit_adv = "case when sum((case when a5 is null then 0 else 1 end)) over (partition by {0})>0 then 1 else 0 end as hit_adv ".format(
-        groupBy)
-        nmiss = "sum((case when a5 is null then 1 else 0 end)) over (partition by {0}) as nmiss".format(
-        groupBy)
-        flags = ",".join([mob, hit_adv, nmiss])
-        query = "select *,{0} from dfTempFlag order by {1} ".format(
-            flags, groupBy)
-        dfBureau = sqlContext.sql(query)
-        # Get flags missings
-        dfBureau.createOrReplaceTempView("dfTempMiss")
-        fmiss = "case when (hit_adv=1) and (a5 is null) and mob>tfrom then 1 else 0 end as fmiss"
-        flagNews = "case when (hit_adv=1) and mob<=12 then 1 else 0 end as flag_new"
-        cumulative_miss = "sum((case when a5 is null then 1 else 0 end)) over (partition by {0} order by tfrom rows between 12 preceding and current row ) as cumulative".format(
-        groupBy)
-        flag = ",".join([fmiss, flagNews, cumulative_miss])
-        query = "select *,{0} from dfTempMiss order by {1}".format(
-            flag, groupBy)
-        dfBureauMiss = sqlContext.sql(query)
-        # get flag missing
-        dfBureauMiss.createOrReplaceTempView("dFlags")
-        flag_6m = "case when max(cumulative*(case when tfrom<={0} then 1 else 0 end)) over (partition by {1})>={2} then 1 else 0 end as flagMissing".format(
-        timeWindow-1, groupBy, timeWindow)
-        flag_7m = "case when max(cumulative) over (partition by {0}) >=7 then 1 else 0 end as flag_cum".format(
-        groupBy)
-        cumulativef = ",".join(["case when sum(case when cumulative<={0} then 1 else 0 end) over (partition by {1})>0 then 1 else 0 end as f{0}".format(
-        item, groupBy) for item in range(12)])
-        fillNew = "case when (hit_adv=0) or ((flag_new=1) and (fmiss=0) and (a5 is null)) then 1 else 0 end as fill0"
-        flag = ",".join([flag_6m, flag_7m, fillNew])
-        query = "select *,{0} from dFlags order by {1}".format(flag, groupBy)
-        dfBureauMiss2 = sqlContext.sql(query)
-        #print(dfBureauMiss2.columns)
-        # Fill sistem
-        dfBureauMiss2.createOrReplaceTempView("dfFill")
-        hitBureau = "case when (hit_adv=1) and (flagMissing=0) and (flag_cum=0) and (flag_new=0) then 1 else 0 end as hitBureau"
-        fill = ",".join(["case when fill0=1 then 0 else {0} end as {0}".format(
-        item) for item in aux_features])
-        flag = ",".join([groupBy, tfrom, hitBureau, fill])
-        query = "select {0} from dfFill order by {1}".format(flag, groupBy)
-        dfBureauMiss3 = sqlContext.sql(query)
-        return dfBureauMiss3
-
     def aggregate(self) -> None:
         """
         Process to aggregate bureau pull data.
@@ -173,8 +70,7 @@ class BureauPullAggregate:
         None
         """
 
-        reading_path = os.path.join(
-            self.previous_path, self.agg_dict['table_name'])
+        reading_path = self._table_path()
         df_in = self.sqlContext.read.parquet(reading_path)
         df_in.createOrReplaceTempView("tempBureau")
         filter_columns = df_in.columns
@@ -185,6 +81,5 @@ class BureauPullAggregate:
         df_out = self.sqlContext.sql(query_str)
         df_gcb = self.getCostumerBureau(
             df_out, self.agg_dict['query_dict'], self.sqlContext)
-        head, _ = os.path.split(self.previous_path)
-        self._save_parquet(df_gcb, os.path.join(
-            head, "groupby", self.agg_dict['table_name']))
+        self._save_parquet(df_gcb, self._sibling_path(
+            "groupby", self.agg_dict['table_name']))

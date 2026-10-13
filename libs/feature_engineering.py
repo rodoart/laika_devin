@@ -19,10 +19,11 @@ from numpy.typing import NDArray
 from pyspark.sql.types import IntegerType,DoubleType,ArrayType,StringType
 from multiprocessing.pool import ThreadPool
 from cytoolz.functoolz import partial
-import subprocess
 import logging
 import types
 from itertools import groupby as it_groupby
+
+from .steps import path_exists
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -372,15 +373,17 @@ class FeatureEngineering:
         transformations: list
             List with all the transformations
         """
-        if transformation.endswith("_mt"):
-            if transformation.endswith("onz_mt"):
-                exec("""self.onz_transformations_mt()._"""+transformation+"""Transformation()""")
-            else:
-                exec("""self.mt_transformations()._"""+transformation+"""Transformation()""")
-        elif transformation.endswith("onz"):
-            exec("""self.onz_transformations()._"""+transformation+"""Transformation()""")
-        else:
-            exec("""self._"""+transformation+"""Transformation()""")
+        # El orden importa: "onz_mt" termina en "_mt"; "onz_mt" termina
+        # en "mt" pero no en "onz" al revés. Sufijo -> fábrica del objeto
+        # que define el método `_<trans>Transformation`.
+        owner = self
+        for suffix, factory in (("onz_mt", self.onz_transformations_mt),
+                                ("_mt", self.mt_transformations),
+                                ("onz", self.onz_transformations)):
+            if transformation.endswith(suffix):
+                owner = factory()
+                break
+        getattr(owner, f"_{transformation}Transformation")()
 
     def run(self, transformations: List[str]) -> None:
         """
@@ -424,31 +427,25 @@ class FeatureEngineering:
             query used to make the transformation
         """
         if list_vars == "list_mvars":
-            aux = ""
-            for k in range(len(key)):
-                name_var = key[k]
-                if "_fe" in key[k]:
-                    name_var = name_var.replace("_fe", "")
-                if k == 0:
-                    aux = ','.join([key[k]+"(array(" + ','.join(inner_list) + self.CLOSE_AS + name_var +"_" + inner_list[0]
-                    [:inner_list[0].rindex("_")] +\
-                    "_" + str(len(inner_list)) +  self.frequency_sufix for inner_list in self.list_mvars])
-                else:
-                    aux = aux + ', ' + ','.join([key[k]+"(array(" + ','.join(inner_list) + self.CLOSE_AS + name_var +"_" +
-                    inner_list[0][:inner_list[0].rindex("_")] +\
-                    "_" + str(len(inner_list)) +  self.frequency_sufix for inner_list in self.list_mvars])
-            app_transformation = self.SELECT_ID + aux + self.FROM_DF
+            var_lists = self.list_mvars
+            def name_of(k: int, inner: List[str]) -> str:
+                base = key[k].replace("_fe", "")
+                stem = inner[0][:inner[0].rindex("_")]
+                return f"{base}_{stem}_{len(inner)}{self.frequency_sufix}"
         elif list_vars == "lista_metodo":
-            for k in range(len(key)):
-                if k == 0:
-                    aux = ','.join([f"{key[k]}(array(" + ','.join(inner) + self.CLOSE_AS + f"{key[k]}_" + str(inner[0][:inner[0].
-                    rindex("_")]) for inner in self.lista_metodo])
-                else:
-                    aux = aux + ', ' + ','.join([f"{key[k]}(array(" + ','.join(inner) + self.CLOSE_AS + f"{key[k]}_" + str(inner[0]
-                    [:inner[0].rindex("_")]) for inner in self.lista_metodo])
-            app_transformation = self.SELECT_ID + aux + self.FROM_DF
-
-        return app_transformation
+            var_lists = self.lista_metodo
+            def name_of(k: int, inner: List[str]) -> str:
+                stem = inner[0][:inner[0].rindex("_")]
+                return f"{key[k]}_{stem}"
+        else:
+            raise ValueError(f"Invalid list_vars: {list_vars}")
+        per_key = [
+            ','.join(key[k] + "(array(" + ','.join(inner) + self.CLOSE_AS
+                     + name_of(k, inner) for inner in var_lists)
+            for k in range(len(key))
+        ]
+        aux = ', '.join(per_key)
+        return self.SELECT_ID + aux + self.FROM_DF
 
     def _defineUdfTransformation(self, key: List[str],
                                  transformation: List[Any], list_vars: str,
@@ -935,23 +932,8 @@ class FeatureEngineering:
         return weights
     #
     def _evaluate_path(self, path: str) -> bool:
-        """
-        Evaluate if certain path exists in hadoop
-        Parameters
-        ----------
-        :path: string
-            path to check if exists
-        :Returns:
-        --------
-        Boolean
-            True if path exist false if not
-        """
-        args_list=['hdfs', 'dfs', '-test', '-d', path]
-        proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        proc.communicate()
-        value=proc.returncode==0 and True or False
-        return value
+        """Evalúa si ``path`` existe (ver :func:`libs.steps.path_exists`)."""
+        return path_exists(path)
     #
 
 class ExternalTransformations:

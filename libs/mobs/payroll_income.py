@@ -14,7 +14,7 @@ import os
 import re
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
-from typing import List, NoReturn, Optional, Union
+from typing import List, Optional, Union
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, when
@@ -26,24 +26,59 @@ logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
 
 
+def get_months(periodo: Union[str, int], n_mis: Union[str, int]) -> List[int]:
+    """Months period list ``[3,6,9,12]``, ``[2,4,6,...]``, etc.
+
+    Multiples of ``periodo`` up to ``n_mis`` (always ending exactly at
+    ``n_mis`` even when it is not a multiple).
+    """
+    periodo = int(periodo)
+    n_mis = int(n_mis)
+    months_list = []
+    for month in range(0, n_mis, periodo):
+        if (month+periodo) < n_mis:
+            months_list.append(month+periodo)
+        else:
+            months_list.append(n_mis)
+    return months_list
+
+
 class PreviousFixerPayroll:
+    """Base de los imputadores de features por MOBs de las fuentes payroll.
+
+    Las subclases solo necesitan sobreescribir:
+
+    - :attr:`DEFAULT_MB_TY` — columnas de mobs que se leen del parquet
+      ``calculate_mobs``.
+    - :attr:`N_MIS_FACTOR` — multiplicador de ``n_mis`` (``4`` en streaks
+      porque sus meses están forzados a 4 semanas).
+    - :meth:`payroll_mob_imputation` — las reglas de imputación.
+    """
     auxiliar_id = "id_msf_tools_v2_12315"
     id_column = "numcliente"
     vintage_column = "vintage_date"
     month_suffix_pattern = r"_\d+m$"
+
+    #: Columnas de mobs por defecto del parquet ``calculate_mobs``.
+    DEFAULT_MB_TY = ["mobs_tef_1", "mobs_tef_2", "mobs_tefs"]
+    #: Multiplicador de ``n_mis`` (4 en streaks: meses de 4 semanas).
+    N_MIS_FACTOR = 1
+    #: Columnas de mobs que se eliminan del DataFrame de salida.
+    MOBS_DROP_COLUMNS = DEFAULT_MB_TY
+
     def __init__(
         self,
-        path_mobs_fe:str,
-        features_path:str,
-        write_mobs:str,
-        feat_list:List[List[str]],
-        periodo:int,
-        n_mis:int,
-        n_threads:int,
-        sql_context:SparkSession,
-        mb_ty:Optional[List[str]] = ["mobs_tef_1", "mobs_tef_2", "mobs_tefs"],
-        is_dynamic:Optional[bool] = False,
-        mode:Optional[str] = "overwrite"
+        path_mobs_fe: str,
+        features_path: str,
+        write_mobs: str,
+        feat_list: List[List[str]],
+        periodo: int,
+        n_mis: int,
+        n_threads: int,
+        sql_context: SparkSession,
+        mb_ty: Optional[List[str]] = None,
+        is_dynamic: Optional[bool] = False,
+        mode: Optional[str] = "overwrite"
     ) -> None:
         """
         Inicializa una instancia de la clase con los parámetros proporcionados.
@@ -57,7 +92,8 @@ class PreviousFixerPayroll:
             n_mis (int): Número de meses de información.
             n_threads (int): Número de hilos para la ejecución en paralelo.
             sql_context (SparkSession): Contexto de Spark para la lectura y escritura de datos.
-            mb_ty (Optional[List[str]], optional): Lista de tipos de mobs. Por defecto es ["mobs_tef_1", "mobs_tef_2", "mobs_tefs"].
+            mb_ty (Optional[List[str]], optional): Lista de tipos de mobs. Por defecto
+                es ``DEFAULT_MB_TY`` de la clase.
             is_dynamic (Optional[bool], optional): Indicador de si el cálculo es dinámico. Por defecto es False.
             mode (Optional[str], optional): Modo de escritura de los archivos. Por defecto es "overwrite".
 
@@ -70,24 +106,13 @@ class PreviousFixerPayroll:
         self.write_mobs = write_mobs
         self.feat_list = feat_list
         self.periodo = int(periodo)
-        self.n_mis = int(n_mis)
+        self.n_mis = int(n_mis) * self.N_MIS_FACTOR
         self.n_threads = int(n_threads)
         self.sql_context = sql_context
-        # Default values for optional attributes
-        if mb_ty is None:
-            self.mb_ty = ["mobs_tef_1", "mobs_tef_2", "mobs_tefs"]
-        else:
-            self.mb_ty = mb_ty
-        #
-        if is_dynamic is None:
-            self.is_dynamic = False
-        else:
-            self.is_dynamic = is_dynamic
-        #
-        if mode is None:
-            self.mode = "overwrite"
-        else:
-            self.mode = mode
+        # Optional attributes (class-level defaults)
+        self.mb_ty = mb_ty or list(self.DEFAULT_MB_TY)
+        self.is_dynamic = bool(is_dynamic)
+        self.mode = mode or "overwrite"
         # Create the parquets paths dictionary
         self.hdfs = {
             "mobs": os.path.join(self.path_mobs_fe, "calculate_mobs"), # path_mobs
@@ -163,7 +188,7 @@ class PreviousFixerPayroll:
         # Read one feature datframe
         feature_df = self.sql_context.read.parquet(os.path.join(self.hdfs["features"], feature))
         # Get variables
-        columns_without_id = [col for col in feature_df.columns if col != self.auxiliar_id]
+        columns_without_id = [c for c in feature_df.columns if c != self.auxiliar_id]
         variables = list(set(self.remove_suffix(columns_without_id)))
         #
         # join with mobs
@@ -221,10 +246,11 @@ class PreviousFixerPayroll:
         self.save_raw_feature_to_output_path()
     #
     @staticmethod
-    def _get_months(periodo:Union[str,int], n_mis:Union[str,int]) -> List[int]:
+    def _get_months(periodo: Union[str, int], n_mis: Union[str, int]) -> List[int]:
         """
         Description:
         Method to create the months period ([3,6,9,12],[2,4,6,...])
+        (delega en :func:`get_months`).
 
         Parameters
         ---------
@@ -236,18 +262,24 @@ class PreviousFixerPayroll:
         list of integers
             List with the months [3,6,9,12]
         """
-        periodo = int(periodo)
-        n_mis = int(n_mis)
-        months_list = []
-        for month in range(0, n_mis, periodo):
-            if (month+periodo) < n_mis:
-                months_list.append(month+periodo)
-            else:
-                months_list.append(n_mis)
-        return (months_list)
+        return get_months(periodo, n_mis)
     #
     @staticmethod
-    def payroll_mob_imputation(df: DataFrame, features: List[str], lista_meses:List[int], reverse:Optional[bool]=False) -> NoReturn:#
+    def _mobs_key(feature: str) -> str:
+        """Clave de mobs de una feature: ``'tefs'``, ``'tef_1'`` o ``'tef_2'``
+        (``'tefs'`` por defecto)."""
+        for key in ("tefs", "tef_1", "tef_2"):
+            if key in feature:
+                return key
+        return "tefs"
+    #
+    @staticmethod
+    def _sorted_meses(lista_meses: List[int], reverse: bool) -> List[int]:
+        """Meses ordenados: de mayor a menor salvo ``reverse=True``."""
+        return sorted(lista_meses, reverse=not reverse)
+    #
+    @staticmethod
+    def payroll_mob_imputation(df: DataFrame, features: List[str], lista_meses:List[int], reverse:Optional[bool]=False) -> DataFrame:#
         """
         Imputa valores de mobs en el DataFrame dado para las características especificadas y los meses proporcionados.
 
@@ -302,52 +334,12 @@ class PreviousFixerPayroll:
 
 
 class PreviousFixerPayrollIncome(PreviousFixerPayroll):
-    def __init__(
-        self,
-        path_mobs_fe:str,
-        features_path:str,
-        write_mobs:str,
-        feat_list:List[List[str]],
-        periodo:int,
-        n_mis:int,
-        n_threads:int,
-        sql_context:SparkSession,
-        mb_ty:Optional[List[str]] = ["mobs_tef_1", "mobs_tef_2", "mobs_tefs"],
-        is_dynamic:Optional[bool] = False,
-        mode:Optional[str] = "overwrite"
-    ) -> None:
-        """
-        Inicializa una instancia de la clase con los parámetros proporcionados.
+    """Imputador de MOBs para ``payroll_income``.
 
-        Args:
-            path_mobs_fe (str): Ruta para los archivos de mobs.
-            features_path (str): Ruta para los archivos de características.
-            write_mobs (str): Ruta para escribir los archivos de mobs imputados.
-            feat_list (List[List[str]]): Lista de listas de características.
-            periodo (int): Periodo para el cálculo de mobs.
-            n_mis (int): Número de meses de información.
-            n_threads (int): Número de hilos para la ejecución en paralelo.
-            sql_context (SparkSession): Contexto de Spark para la lectura y escritura de datos.
-            mb_ty (Optional[List[str]], optional): Lista de tipos de mobs. Por defecto es ["mobs_tef_1", "mobs_tef_2", "mobs_tefs"].
-            is_dynamic (Optional[bool], optional): Indicador de si el cálculo es dinámico. Por defecto es False.
-            mode (Optional[str], optional): Modo de escritura de los archivos. Por defecto es "overwrite".
-
-        Returns:
-            None
-        """
-        super().__init__(
-            path_mobs_fe=path_mobs_fe,
-            features_path=features_path,
-            write_mobs=write_mobs,
-            feat_list=feat_list,
-            periodo=periodo,
-            n_mis=n_mis,
-            n_threads=n_threads,
-            sql_context=sql_context,
-            mb_ty=mb_ty,
-            is_dynamic=is_dynamic,
-            mode=mode
-        )
+    Hereda toda la orquestación de :class:`PreviousFixerPayroll` y solo
+    redefine las reglas de imputación: ``mobs_* <= 2`` -> ``-99999`` y,
+    si el valor queda en 0, se toma el del mes anterior.
+    """
 
     @staticmethod
     def payroll_mob_imputation(df: DataFrame, features: List[str], lista_meses:List[int], reverse:Optional[bool]=False) -> DataFrame:#
@@ -367,23 +359,13 @@ class PreviousFixerPayrollIncome(PreviousFixerPayroll):
         Returns:
             DataFrame: El DataFrame procesado.
         """
-        if reverse:
-            lista_meses = sorted(lista_meses)
-        else:
-            lista_meses = sorted(lista_meses, reverse=True)
+        lista_meses = PreviousFixerPayroll._sorted_meses(lista_meses, reverse)
         #
         for feature in features:
+            mobs_col = f"mobs_{PreviousFixerPayroll._mobs_key(feature)}"
             for mes in lista_meses:
                 column_name = f"{feature}_{mes}m"
-                if 'tefs' in feature:
-                    df = df.withColumn(column_name, when(col('mobs_tefs') <= 2, -99999).otherwise(col(column_name)))
-                elif 'tef_1' in feature:
-                    df = df.withColumn(column_name, when(col('mobs_tef_1') <= 2, -99999).otherwise(col(column_name)))
-                elif 'tef_2' in feature:
-                    df = df.withColumn(column_name, when(col('mobs_tef_2') <= 2, -99999).otherwise(col(column_name)))
-                else:
-                    df = df.withColumn(column_name, when(col('mobs_tefs') <= 2, -99999).otherwise(col(column_name)))
-                #
+                df = df.withColumn(column_name, when(col(mobs_col) <= 2, -99999).otherwise(col(column_name)))
             for i in range(1, len(lista_meses)):
                 current_col = f"{feature}_{lista_meses[i]}m"
                 previous_col = f"{feature}_{lista_meses[i-1]}m"

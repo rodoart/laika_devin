@@ -23,53 +23,26 @@ logging.basicConfig(format='%(asctime)s | %(message)s',
 
 
 class PreviousFixerPayrollStreaks(PreviousFixerPayroll):
-    def __init__(
-        self,
-        path_mobs_fe:str,
-        features_path:str,
-        write_mobs:str,
-        feat_list:List[List[str]],
-        periodo:int,
-        n_mis:int,
-        n_threads:int,
-        sql_context:SparkSession,
-        mb_ty:Optional[List[str]] = ["contiguous_mobs_tefs", "discontiguous_mobs_tefs", "contiguous_mobs_tef_1",
-        "discontiguous_mobs_tef_1", "contiguous_mobs_tef_2", "discontiguous_mobs_tef_2"],
-        is_dynamic:Optional[bool] = False,
-        mode:Optional[str] = "overwrite"
-    ) -> None:
-        """
-        Inicializa una instancia de la clase con los parámetros proporcionados.
+    """Imputador de MOBs para ``payroll_streaks``.
 
-        Args:
-            path_mobs_fe (str): Ruta para los archivos de mobs.
-            features_path (str): Ruta para los archivos de características.
-            write_mobs (str): Ruta para escribir los archivos de mobs imputados.
-            feat_list (List[List[str]]): Lista de listas de características.
-            periodo (int): Periodo para el cálculo de mobs.
-            n_mis (int): Número de meses de información.
-            n_threads (int): Número de hilos para la ejecución en paralelo.
-            sql_context (SparkSession): Contexto de Spark para la lectura y escritura de datos.
-            mb_ty (Optional[List[str]], optional): Lista de tipos de mobs. Por defecto es ["mobs_tef_1", "mobs_tef_2", "mobs_tefs"].
-            is_dynamic (Optional[bool], optional): Indicador de si el cálculo es dinámico. Por defecto es False.
-            mode (Optional[str], optional): Modo de escritura de los archivos. Por defecto es "overwrite".
+    Solo difiere de la base en:
 
-        Returns:
-            None
-        """
-        super().__init__(
-            path_mobs_fe=path_mobs_fe,
-            features_path=features_path,
-            write_mobs=write_mobs,
-            feat_list=feat_list,
-            periodo=periodo,
-            n_mis=int(n_mis)*4,
-            n_threads=n_threads,
-            sql_context=sql_context,
-            mb_ty=mb_ty,
-            is_dynamic=is_dynamic,
-            mode=mode
-        )
+    - :attr:`DEFAULT_MB_TY` — usa las columnas contiguas/discontiguas del
+      parquet ``calculate_mobs``.
+    - :attr:`N_MIS_FACTOR = 4` — sus meses están forzados a 4 semanas, así
+      que ``n_mis`` se multiplica por 4.
+    - :meth:`payroll_mob_imputation` — regla ``discontiguous_mobs_* == 0``
+      -> ``-99999``.
+    """
+
+    #: Columnas de mobs por defecto del parquet ``calculate_mobs``.
+    DEFAULT_MB_TY = ["contiguous_mobs_tefs", "discontiguous_mobs_tefs",
+                     "contiguous_mobs_tef_1", "discontiguous_mobs_tef_1",
+                     "contiguous_mobs_tef_2", "discontiguous_mobs_tef_2"]
+    #: Meses forzados a 4 semanas -> ``n_mis`` se multiplica por 4.
+    N_MIS_FACTOR = 4
+    #: Columnas de mobs que se eliminan del DataFrame de salida.
+    MOBS_DROP_COLUMNS = DEFAULT_MB_TY
 
     @staticmethod
     def payroll_mob_imputation(df: DataFrame, features: List[str], lista_meses:List[int], reverse:Optional[bool]=False) -> DataFrame:#
@@ -86,24 +59,14 @@ class PreviousFixerPayrollStreaks(PreviousFixerPayroll):
         Returns:
             DataFrame: El DataFrame procesado.
         """
-        if reverse:
-            lista_meses = sorted(lista_meses)
-        else:
-            lista_meses = sorted(lista_meses, reverse=True)
+        lista_meses = PreviousFixerPayroll._sorted_meses(lista_meses, reverse)
         #
         for feature in features:
+            mobs_col = f"discontiguous_mobs_{PreviousFixerPayroll._mobs_key(feature)}"
             for mes in lista_meses:
                 column_name = f"{feature}_{mes}m"
-                if 'tefs' in feature:
-                    df = df.withColumn(column_name, when(col('discontiguous_mobs_tefs') == 0, -99999).otherwise(col(column_name)))
-                elif 'tef_1' in feature:
-                    df = df.withColumn(column_name, when(col('discontiguous_mobs_tef_1') == 0, -99999).otherwise(col(column_name)))
-                elif 'tef_2' in feature:
-                    df = df.withColumn(column_name, when(col('discontiguous_mobs_tef_2') == 0, -99999).otherwise(col(column_name)))
-                else:
-                    df = df.withColumn(column_name, when(col('discontiguous_mobs_tefs') == 0, -99999).otherwise(col(column_name)))
-                #
+                df = df.withColumn(column_name, when(col(mobs_col) == 0, -99999).otherwise(col(column_name)))
         #
-        df.drop("contiguous_mobs_tefs", "discontiguous_mobs_tefs", "contiguous_mobs_tef_1", "discontiguous_mobs_tef_1",
+        df = df.drop("contiguous_mobs_tefs", "discontiguous_mobs_tefs", "contiguous_mobs_tef_1", "discontiguous_mobs_tef_1",
         "contiguous_mobs_tef_2", "discontiguous_mobs_tef_2")
         return df

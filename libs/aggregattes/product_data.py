@@ -7,19 +7,14 @@ Version: 0.1
 Class and Functions required to aggregate (general)
 """
 
-import os
 import pandas as pd
-from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql import SparkSession
 from pyspark.sql.types import IntegerType
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from ..generate_pivot import GeneratePivot
-import logging
+from .base import BaseAggregate
 
-logging.basicConfig(format='%(asctime)s | %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
-
-
-class ProductDataAggregate:
+class ProductDataAggregate(BaseAggregate):
     """
     Class to aggregate Product Data Data
 
@@ -40,12 +35,9 @@ class ProductDataAggregate:
         """
         Class constructor.
         """
-        self.previous_path = previous_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
+        super().__init__(previous_path, agg_dict, sqlContext, mode)
         self.n_mis = n_mis
         self.period = period
-        self.mode = mode
 
     def _create_groupby_query(self, query_dict: Dict[str, Any], group_by: List[str], tempview: str) -> str:
         """
@@ -74,23 +66,6 @@ class ProductDataAggregate:
             " FROM "+tempview+" GROUP BY "+group_str
         return query_str
 
-    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """
-        Save data as parquet on desired location.
-
-        Parameters
-        ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-        """
-        df_save.write.mode(self.mode).parquet(path)
-
     def aggregate(self) -> None:
         """
         Process to aggregate bureau pull data.
@@ -103,11 +78,9 @@ class ProductDataAggregate:
         -------
         None
         """
-        reading_path_baseline = os.path.join(
-            self.previous_path, self.agg_dict['table_names']["baseline"])
+        reading_path_baseline = self._table_path('table_names', 'baseline')
         baseline_df = self.sqlContext.read.parquet(reading_path_baseline)
-        reading_path_ccp = os.path.join(
-            self.previous_path, self.agg_dict['table_names']["ccp"])
+        reading_path_ccp = self._table_path('table_names', 'ccp')
         ccp_df = self.sqlContext.read.parquet(reading_path_ccp)
 
         query_baseline = self._create_groupby_query(
@@ -127,16 +100,14 @@ class ProductDataAggregate:
         df_product = df_product.withColumn(
             "tfrom", df_product["tfrom"].cast(IntegerType()))
         df_product = df_product.na.fill(0)
-
-        head, _ = os.path.split(self.previous_path)
-        self._save_parquet(df_product, os.path.join(head, "groupby"))
+        self._save_parquet(df_product, self._sibling_path("groupby"))
 
         pivot_product_data = GeneratePivot(None, None, self.sqlContext)
-        pivot_product_data.pivot_data_aux(os.path.join(head, "groupby"), [
+        pivot_product_data.pivot_data_aux(self._sibling_path("groupby"), [
             "numcliente", "vintage_date", "tfrom"])
 
         product_data = self.sqlContext.read.parquet(
-            os.path.join(head, "pivot"))
+            self._sibling_path("pivot"))
         product_data.createOrReplaceTempView("data_flags1")
 
         features = ["ind_cnb", "ind_cpb", "ind_mor", "ind_disp", "ind_effec"]
@@ -161,4 +132,4 @@ class ProductDataAggregate:
             meses[i]) + "m " for i, ind in enumerate(totl_1))+" from data_flags2"
 
         df2 = self.sqlContext.sql(testStr2)
-        self._save_parquet(df2, os.path.join(head, "features"))
+        self._save_parquet(df2, self._sibling_path("features"))

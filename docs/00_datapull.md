@@ -63,7 +63,7 @@ extract → weeks → mt → groupby → pivoting → ratios → fe → mobs →
 | `pivoting` | `_perform_pivoting` | `pivot/` | `libs/group_by.py` (`GeneratePivot`) |
 | `ratios` | (inline) `GenerateRatios` | `ratios/` (o `features/` en corporate) | `libs/generate_ratios.py` |
 | `fe` | `_perform_fe` | `features/` | `libs/feature_engineering.py` |
-| `mobs` | `_perform_mobs` | `mobs/imputate_mobs/` | `libs/mobs/` + `MissingTreatment.run_mobs` |
+| `mobs` | `_perform_mobs` | `mobs/imputate_mobs/` | `libs/mobs/mobs.py` (`Mobs.run_mobs`) |
 | `va` | `_perform_va` | `features` ensambladas | `libs/vector_assembler.py` |
 | `cols2vec` | `_perform_cols2vec` | salida final vectorizada | `libs/colums_2_vector.py` |
 

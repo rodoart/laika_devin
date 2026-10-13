@@ -7,20 +7,9 @@ Version: 0.1
 Class and Functions required to aggregate (general)
 """
 
-import os
-import pandas as pd
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws
-from pyspark.sql.types import IntegerType, DoubleType
-from itertools import chain
-from typing import Any, Dict, List
-import logging
+from .base import BaseAggregate
 
-logging.basicConfig(format='%(asctime)s | %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
-
-
-class PNLCohortAggregate:
+class PNLCohortAggregate(BaseAggregate):
     """
     Class to aggregate PNL cohort data
 
@@ -36,58 +25,6 @@ class PNLCohortAggregate:
         Optional, parquet write mode, defaults to overwrite
     """
 
-    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
-        sqlContext: SparkSession, mode: str = "overwrite") -> None:
-        """
-        Class constructor.
-        """
-        self.previous_path = previous_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
-
-    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """
-        Save data as parquet on desired location.
-
-        Parameters
-        ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-        """
-        df_save.write.mode(self.mode).parquet(path)
-
-    def _create_groupby_query(self, query_dict: Dict[str, Any], group_by: List[str], filter_columns: List[str]) -> str:
-        """
-        Creates the SQL aggregation sentence to group the PNL data
-
-        Parameters
-        ----------
-        query_dict: Dictionary
-            All parameters needed to create SQL sentence
-        group_by: List
-            String list containing group by column names
-
-        Returns
-        -------
-        string
-            SQL Sentence
-        """
-        agg_df = pd.DataFrame(data=query_dict)
-        agg_df = agg_df[agg_df["variable"] != ""]
-        features = ",".join(["{0}({1}) as {1}".format(
-            item["agg"], item["variable"]) for _, item in agg_df.iterrows() if item['variable'] in filter_columns])
-        group_str = ",".join(group_by)
-        query_str = "SELECT "+group_str+","+features + \
-            " FROM tempPnl GROUP BY "+group_str
-        return query_str
-
     def aggregate(self) -> None:
         """
         Process to aggregate PNL cohort data.
@@ -100,8 +37,7 @@ class PNLCohortAggregate:
         -------
         None
         """
-        reading_path = os.path.join(
-            self.previous_path, self.agg_dict['table_name'])
+        reading_path = self._table_path()
         df_out = self.sqlContext.read.parquet(reading_path).filter("tfrom==0").drop("inf_dt","tfrom_date")
         df_out = df_out.fillna(0)
         df_out.createOrReplaceTempView("tempPnl")
@@ -109,5 +45,4 @@ class PNLCohortAggregate:
         query_str = self._create_groupby_query(
             self.agg_dict['query_dict'], self.agg_dict['group_by_key'], filter_columns)
         df_out_f = self.sqlContext.sql(query_str)
-        head, _ = os.path.split(self.previous_path)
-        self._save_parquet(df_out_f, os.path.join(head, "groupby"))
+        self._save_parquet(df_out_f, self._sibling_path("groupby"))

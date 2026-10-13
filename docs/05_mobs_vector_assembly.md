@@ -7,7 +7,7 @@ features lista para modelado.
 
 ## `mobs` — cálculo de observaciones
 
-**Módulos:** `MissingTreatment.run_mobs` (`libs/missing_treatment.py`) + `libs/mobs/`
+**Módulos:** `Mobs.run_mobs` (`libs/mobs/mobs.py`) + `libs/mobs/`
 
 En banca, **MOB** (*months on books*) es la observación de comportamiento del cliente en el
 mes N de vida de su cosecha. Este paso toma las `features/` y genera las columnas de MOB
@@ -20,10 +20,10 @@ imputadas que el modelo usa como target/auxiliar.
    (`_check_mobs_extract` valida que el parquet `premobs` exista).
 2. `_get_mobs_list(path_fe)` arma la lista de features/periodos a imputar a partir de lo
    que hay en `features/`.
-3. `mt.run_mobs(tables_path, pathwrite, features_path, feat_list, periodo, sql_context)`
+3. `mobs.run_mobs(tables_path, pathwrite, features_path, feat_list, periodo, sql_context)`
    ejecuta la imputación por fuente.
 
-### Imputación por fuente (`MissingTreatment`)
+### Imputación por fuente (`Mobs`)
 
 | Método | Fuente | Detalle |
 |---|---|---|

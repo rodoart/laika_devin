@@ -30,13 +30,13 @@ libs/
   paths.py           Loader de config/paths.json
   extract.py         Extracción Hive -> parquet por vintages
   weeks.py           Retaggeado semanal (WeekOfMonth*, WeeklyTFrom*)
-  missing_treatment.py
+  missing_treatment.py  MissingTreatment: relleno de nulos (etapa mt)
   group_by.py        Dispatcher source -> *Aggregate
   aggregattes/       21 agregadores (payroll_streaks, bureau_pull, ...)
   generate_pivot.py  Pivoteo long -> wide
   generate_ratios.py Ratios entre variables
   feature_engineering.py  Transformaciones FE (standard/MT/ONZ)
-  mobs/              Imputación de MOBs por fuente
+  mobs/              Mobs + PreviousFixer*: cálculo e imputación de MOBs (etapa mobs)
   vector_assembler.py, colums_2_vector.py
   extract_special_treatments/  Cohortes especiales de extracción
   email_sender.py
@@ -133,12 +133,14 @@ Según qué etapas incluya su `steps_list`, hace falta lo siguiente:
 
 4. **`groupby`** — agregado por `(numcliente, vintage_date, tfrom)`:
    - Crear `libs/aggregattes/mi_source.py` con una clase
-     `MiSourceAggregate` (firma `__init__(self, previous_path, agg_dict,
-     sqlContext, mode="overwrite")` + `run()`), siguiendo el patrón de
-     `payroll_income.py` / `pnl.py` (`@dynamic` por subetapa,
-     `_create_groupby_query`, `_save_parquet`).
-   - Registrarla en `libs/group_by.py`: import + rama del dispatcher
-     `elif self.source == "mi_source": group_class = MiSourceAggregate`.
+     `MiSourceAggregate(BaseAggregate)` — la base ya aporta
+     `__init__`, `_save_parquet`, `_table_path`/`_read_table`,
+     `_sibling_path` y el `_create_groupby_query` estándar; solo hace
+     falta implementar `aggregate()` (ver `pnl.py` como ejemplo mínimo
+     o `payroll_income.py` si necesita `n_mis`/`period`/`@dynamic`).
+   - Registrarla en `libs/group_by.py`: una entrada en
+     `AGGREGATE_CLASSES` (+ otra en `AGGREGATE_EXTRA_ARGS` si el
+     constructor acepta argumentos extra).
    - Declarar `group_by` en el JSON (reglas / `query_dict` según el
      estilo del agregador).
 

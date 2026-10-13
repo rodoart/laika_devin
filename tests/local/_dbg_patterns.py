@@ -1,7 +1,6 @@
 import sys, json
 sys.path.insert(0, 'tests/local')
 import bootstrap
-bootstrap.install_aggregates_alias()
 from pathlib import Path
 
 import libs.aggregattes.payroll_streaks as ps

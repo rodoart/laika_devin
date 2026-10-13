@@ -15,9 +15,8 @@ Notas
   recrea la sesión Spark entre etapas (evita que un driver saturado
   arrastre fallos a la siguiente etapa).
 - Los helpers de filesystem (``_check_files``, ``_evaluate_path``)
-  shell-out a ``hdfs dfs``; en ejecuciones locales se sustituyen por los
-  helpers duales de :mod:`libs.steps` (ver ``patch_datapull_fs`` en
-  ``main_dynamic.py``).
+  delegan en :mod:`libs.steps` (CLI ``hdfs`` en el clúster, FS local si
+  la ruta no parece HDFS).
 """
 from pyspark import conf
 from libs.email_sender import EmailSender
@@ -26,16 +25,17 @@ from libs.weeks import WeeklyTFrom
 from libs.feature_engineering import FeatureEngineering
 from libs.vector_assembler import FeaturesVectorAssembler
 from libs.missing_treatment import MissingTreatment
+from libs.mobs.mobs import Mobs
 from libs.group_by import GroupBy
 from libs.generate_pivot import GeneratePivot
 from libs.generate_ratios import GenerateRatios
 from libs.colums_2_vector import ColumnsToVector
+from libs.steps import path_exists as _fs_path_exists, path_listdir as _fs_path_listdir
 import pyspark.sql.functions as F
 from functools import reduce
 from pyspark.sql import DataFrame, SparkSession
 
 import os
-import subprocess
 import re
 import pandas as pd
 import traceback
@@ -226,10 +226,11 @@ class DataPull():
         ######### Execution of different steps ###########
         previous_step = None
         previous_path = None
-        #Defining missing treatment (required because contains missing treatment and mobs in the same class)
-        #mt=missing_treatment(year_id,source_dict,source,self.config_custom["n_mis"])
+        # MissingTreatment (etapa mt) y Mobs (etapa mobs) — clases separadas
         mt = MissingTreatment(year_id, source_dict, source,
                               self.config_custom["n_mis"], self.config_custom["n_threads"])
+        mobs = Mobs(year_id, source_dict, source,
+                    self.config_custom["n_mis"], self.config_custom["n_threads"])
         time_execution = []
         for step in steps_list:
             time_start = time.time()
@@ -313,7 +314,7 @@ class DataPull():
                 working_path = self.config_custom["working_path"]
                 path_fe = previous_path
                 previous_path = os.path.join(write_path,"mobs")
-                self._perform_mobs(working_path, path_fe, mt, previous_path, source)
+                self._perform_mobs(working_path, path_fe, mobs, previous_path, source)
                 previous_step = "mobs"
                 previous_path = os.path.join(write_path,"mobs","imputate_mobs")
             elif step == "va":
@@ -603,7 +604,7 @@ class DataPull():
     #
     @reset_spark_session
     def _perform_mobs(self, working_path: str, path_fe: str,
-                      mt: MissingTreatment, path_mobs: str,
+                      mobs: Mobs, path_mobs: str,
                       source: str) -> None:
         """Ejecuta los MOBs (months on books / imputación por antigüedad).
 
@@ -613,8 +614,8 @@ class DataPull():
             Working path raíz de la corrida.
         path_fe : str
             Path de las transformaciones de feature engineering.
-        mt : MissingTreatment
-            Objeto de tratamiento de la fuente (también corre los mobs).
+        mobs : Mobs
+            Objeto de cálculo/imputación de MOBs de la fuente.
         path_mobs : str
             Path de salida de los mobs.
         source : str
@@ -627,7 +628,7 @@ class DataPull():
         path_mobs_aux = os.path.join(path_mobs,"imputate_mobs")
         if self._check_mobs(path_mobs_aux, files_fe):
             feat_list = self._get_mobs_list(path_fe)
-            mt.run_mobs(working_path, path_mobs, path_fe, feat_list, periodo, self.sqlContext)
+            mobs.run_mobs(working_path, path_mobs, path_fe, feat_list, periodo, self.sqlContext)
         else:
             #print("Mobs already performed!")
             logging.info("%s - MOBs was already performed", source.upper())
@@ -910,19 +911,15 @@ class DataPull():
                 pivots_aux_list.append(pivot_aux)
             # Unimos todos los pivots de vintages
             pivot = reduce(DataFrame.unionAll, pivots_aux_list)
-        if self._check_crd_acct_nbr(sources) and self._check_contratos(sources):
-            cols_pivot = ['numcliente', 'vintage', 'crd_acct_nbr', 'num_contrato_maestra', 'num_contrato_perfiles',
+        cols_pivot = ['numcliente', 'vintage']
+        if self._check_crd_acct_nbr(sources):
+            cols_pivot += ['crd_acct_nbr']
+        if self._check_contratos(sources):
+            cols_pivot += ['num_contrato_maestra', 'num_contrato_perfiles',
             'num_contrato_perf_ejec', 'num_contrato_cheques', 'num_contrato_otros']
-            pivot = pivot[cols_pivot].distinct()
-        elif self._check_crd_acct_nbr(sources):
-            cols_pivot = ['numcliente', 'vintage', 'crd_acct_nbr']
-            pivot = pivot[cols_pivot].distinct()
-        elif self._check_contratos(sources):
-            cols_pivot = ['numcliente', 'vintage','num_contrato_maestra', 'num_contrato_perfiles', 'num_contrato_perf_ejec',
-            'num_contrato_cheques', 'num_contrato_otros']
-            pivot = pivot[cols_pivot].distinct()
-        else:
+        if len(cols_pivot) == 2:
             return pivot
+        pivot = pivot[cols_pivot].distinct()
         pivot.write.mode(self.config_custom["write_mode"]).parquet(path_new_pivot)
         pivot = self.sqlContext.read.parquet(path_new_pivot)
         #print("Ending pivot preparation")
@@ -1141,50 +1138,16 @@ class DataPull():
         return False
 
     def _check_files(self, path: str) -> List[str]:
-        """Lista los ficheros/directorios de ``path`` en Hadoop.
+        """Lista los ficheros/directorios de ``path``.
 
-        En ejecuciones locales se sustituye por
-        ``libs.steps.path_listdir`` (ver ``patch_datapull_fs``).
-
-        Parameters
-        ----------
-        path : str
-            Path a listar.
-
-        Returns
-        -------
-        List[str]
-            Lista con todos los ficheros del path.
+        Delega en :func:`libs.steps.path_listdir` (CLI ``hdfs`` en el
+        clúster, FS local si la ruta no parece HDFS).
         """
-        args_list=['hdfs', 'dfs', '-ls', path]
-        proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        stdout, stderr = proc.communicate()
-        proc.wait()
-        return [elem[re.search(path, elem).end():].replace("/","") for elem in stdout.decode('ascii','ignore').splitlines() if path
-        in elem]
+        return _fs_path_listdir(path)
 
     def _evaluate_path(self, path: str) -> bool:
-        """Evalúa si ``path`` existe en Hadoop.
-
-        En ejecuciones locales se sustituye por
-        ``libs.steps.path_exists``.
-
-        Parameters
-        ----------
-        path : str
-            Path a comprobar.
-
-        Returns
-        -------
-        bool
-            ``True`` si el path existe; ``False`` si no.
-        """
-        args_list=['hdfs', 'dfs', '-test', '-d', path]
-        proc = subprocess.Popen(args_list, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
-        proc.communicate()
-        value=proc.returncode==0 and True or False
-        return value
+        """Evalúa si ``path`` existe (ver :func:`libs.steps.path_exists`)."""
+        return _fs_path_exists(path)
 
     def _change_types_config(self) -> None:
         """Convierte a ``int`` las claves ``n_mis``/``period``/``n_threads``

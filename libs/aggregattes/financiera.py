@@ -7,20 +7,13 @@ Version: 0.1
 Class and Functions required to aggregate (general)
 """
 
-import os
 import pandas as pd
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws
-from pyspark.sql.types import IntegerType, DoubleType
+from pyspark.sql.functions import col, lit, create_map, lower
 from itertools import chain
 from typing import Any, Dict, List
-import logging
+from .base import BaseAggregate
 
-logging.basicConfig(format='%(asctime)s | %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
-
-
-class FinancieraAggregate:
+class FinancieraAggregate(BaseAggregate):
     """
     Class to aggregate Financiera Data
 
@@ -35,16 +28,6 @@ class FinancieraAggregate:
     mode: string
         Optional, parquet write mode, defaults to overwrite
     """
-
-    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
-        sqlContext: SparkSession, mode: str = "overwrite") -> None:
-        """
-        Class constructor.
-        """
-        self.previous_path = previous_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
 
     def _create_groupby_query(self, query_dict: Dict[str, Any], group_by: List[str]) -> str:
         """
@@ -80,23 +63,6 @@ class FinancieraAggregate:
             " FROM financiera GROUP BY "+group_str
         return query_str
 
-    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """
-        Save data as parquet on desired location.
-
-        Parameters
-        ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-        """
-        df_save.write.mode(self.mode).parquet(path)
-
     def aggregate(self) -> None:
         """
         Process to aggregate Financiera data.
@@ -124,8 +90,7 @@ class FinancieraAggregate:
             8000: 'na', 1: 'na', 2: 'na', 0: 'na'
         }
 
-        reading_path = os.path.join(
-            self.previous_path, self.agg_dict['table_name'])
+        reading_path = self._table_path()
         financiera = self.sqlContext.read.parquet(reading_path)
         mapping_expr = create_map([lit(x) for x in chain(*cves_dict.items())])
         financiera = financiera.withColumn("b1", mapping_expr[col("cve_ajp")])
@@ -136,5 +101,4 @@ class FinancieraAggregate:
         query_str = self._create_groupby_query(
             self.agg_dict['query_dict'], self.agg_dict['group_by_key'])
         df_out = self.sqlContext.sql(query_str)
-        head, _ = os.path.split(self.previous_path)
-        self._save_parquet(df_out, os.path.join(head, "groupby"))
+        self._save_parquet(df_out, self._sibling_path("groupby"))

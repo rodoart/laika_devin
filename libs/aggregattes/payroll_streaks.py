@@ -9,7 +9,6 @@ Class and Functions required to aggregate (payroll streaks)
 
 # Libraries
 from dateutil.relativedelta import relativedelta
-import subprocess
 from pathlib import PosixPath
 from typing import Callable, Dict, List, Optional, Union
 
@@ -19,8 +18,11 @@ collect_list, sort_array, first, greatest, last, lit, row_number,
 min as spark_min, sum as spark_sum, trunc, when, max as spark_max,
 struct, expr, lag)
 
-from ..aggregates.payroll_income import cached_property, dynamic
+from .payroll_income import cached_property, dynamic
 from ..weeks import WeekOfMonthPayroll
+from .base import (columns_with_prefix, columns_with_prefixes,
+                   parse_config_bool, sort_df_columns)
+from ..steps import path_delete
 
 
 # PRINCIPAL CLASS
@@ -284,12 +286,8 @@ class PayrollStreaksAggregate:
 
     #
     def _delete_intermediate(self, path: str) -> None:
-        """
-        Elimina rutas utilizando Hadoop.
-        """
-        args_list=['hdfs', 'dfs', '-rm', '-f', '-r', '-skipTrash', path]
-        proc=subprocess.Popen(args_list, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        proc.communicate()
+        """Borra ``path`` si existe (ver :func:`libs.steps.path_delete`)."""
+        path_delete(path)
 
     #
     def _clean(self) -> None:
@@ -782,15 +780,8 @@ class _RenamerStep(_Step):
     def __init__(self, parent:"PayrollStreaksAggregate", df: DataFrame, rename_dict:dict) -> None:
         self.df = df
         self.columns_to_rename:Dict[str,str] = rename_dict["columns_to_rename"]
-        is_enabled = str(rename_dict["enable"]).lower()
-        if is_enabled == "true":
-            self.is_enabled = True
-        elif is_enabled == "false":
-            self.is_enabled = False
-        elif is_enabled == "none":
-            self.is_enabled = False
-        else:
-            raise ValueError(f"Invalid value for is_enabled: {is_enabled}")
+        self.is_enabled = parse_config_bool(
+            rename_dict["enable"], "is_enabled", none_is_false=True)
         #
         super().__init__(parent)
         return None
@@ -821,30 +812,15 @@ class _PatternStep(_Step):
         self.prefixes_to_apply = self.step_config["prefixes_to_apply"]
         self.step_method = step_method
         # enabled
-        enabled = str(step_config["enable"]).lower()
-        if enabled == "false":
-            self.enabled = False
-        elif enabled == "true":
-            self.enabled = True
-        else:
-            raise ValueError("The enable value should be a boolean.")
-        try:
-            self.prefixes_to_drop = self.step_config["prefixes_to_drop"]
-        except:
-            self.prefixes_to_drop = []
+        self.enabled = parse_config_bool(step_config["enable"], "enable")
+        self.prefixes_to_drop = self.step_config.get("prefixes_to_drop", [])
         # optional attributes
         self.optional_attributes = {
-            "remove_previous_prefix": self.step_config["remove_previous_prefix"]
-            if "remove_previous_prefix" in self.step_config.keys() else False
+            "remove_previous_prefix": self.step_config.get("remove_previous_prefix", False)
         }
-        remove_previous_prefix = str(self.step_config["remove_previous_prefix"]).lower() \
-            if "remove_previous_prefix" in self.step_config.keys() else "false"
-        if remove_previous_prefix == "false":
-            self.remove_previous_prefix = False
-        elif remove_previous_prefix == "true":
-            self.remove_previous_prefix = True
-        else:
-            raise ValueError("The remove_previous_prefix value should be a boolean.")
+        self.remove_previous_prefix = parse_config_bool(
+            self.step_config.get("remove_previous_prefix", "false"),
+            "remove_previous_prefix")
         self.previous_prefix = previous_prefix
         self._columns_not_to_be_renamed = parent._columns_not_to_be_renamed
         #
@@ -856,27 +832,21 @@ class _PatternStep(_Step):
         return self.get_columns_with_prefixes(df, self.prefixes_to_apply)
     #
     def _get_columns_with_prefix(self, df: DataFrame, prefix:Optional[str]="None") -> List[str]:
-        """Obtiene las columnas del DataFrame que tienen un prefijo específico."""
-        columns_to_check = df.columns
-        if (prefix is None) or (prefix.lower() == "none") or prefix == "":
-            return [column for column in columns_to_check if (column not in self._columns_not_to_be_renamed) and (not any(column.startswith(p) for p in self.parent.prefixes))]
-        else:
-            return [column for column in columns_to_check if column.startswith(prefix) and (column not in self._columns_not_to_be_renamed)]
+        """Columnas de ``df`` con el prefijo dado (ver
+        :func:`libs.aggregattes.base.columns_with_prefix`)."""
+        return columns_with_prefix(
+            df.columns, self.parent.prefixes,
+            self._columns_not_to_be_renamed, prefix)
     #
     def get_columns_with_prefixes(self, df: DataFrame, prefixes:List[str]) -> List[str]:
-        """Obtiene las columnas del DataFrame que tienen alguno de los prefijos especificos."""
-        result = []
-        for prefix in prefixes:
-            result += self._get_columns_with_prefix(df, prefix)
-        result = list(set(result))
-        return result
+        """Unión sin duplicados de las columnas de cada prefijo."""
+        return columns_with_prefixes(
+            df, self.parent.prefixes, self._columns_not_to_be_renamed,
+            prefixes)
     #
     def sort_columns(self, df: DataFrame) -> DataFrame:
-        """Ordena las columnas del DataFrame."""
-        colums = df.columns
-        colums_without_principals = [col for col in colums if col not in self._columns_not_to_be_renamed]
-        colums_without_principals.sort()
-        return df.select(self._columns_not_to_be_renamed + colums_without_principals)
+        """``protected`` primero, resto ordenado alfabéticamente."""
+        return sort_df_columns(df, self._columns_not_to_be_renamed)
     #
     @cached_property
     def columns_to_apply(self) -> List[str]:

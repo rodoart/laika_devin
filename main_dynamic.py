@@ -65,8 +65,7 @@ def parse_args() -> argparse.Namespace:
 def install_local_shims() -> None:
     """Shims de ejecución local desde ``tests/local/bootstrap.py``.
 
-    Instala el alias ``aggregates`` -> ``aggregattes``, el parche
-    ``PurePosixPath``, backports de numpy/typing y ``HADOOP_HOME``.
+    Instala el parche ``PurePosixPath`` y ``HADOOP_HOME`` en Windows.
     No-op en el clúster (si ``tests/local`` no existe o falla el import).
     """
     tests_local = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -74,10 +73,7 @@ def install_local_shims() -> None:
     if os.path.isdir(tests_local) and tests_local not in sys.path:
         sys.path.insert(0, tests_local)
     try:
-        import bootstrap
-        bootstrap.install_aggregates_alias()
-        bootstrap.install_numpy_shims()
-        bootstrap.install_typing_shims()
+        import bootstrap  # noqa: F401  (los shims viven a nivel de módulo)
     except ImportError:
         pass
 
@@ -106,51 +102,6 @@ def build_session_builder(local: bool) -> Callable[[], "Any"]:
             master="local[*]",
             extra_conf=extra_conf).build
     return SparkSessionBuilder().build
-
-
-def patch_datapull_fs(datapull: Any) -> None:
-    """Enruta ``DataPull._check_files``/``_evaluate_path`` por los helpers
-    duales de FS (CLI ``hdfs`` en el clúster, FS local si no)."""
-    from libs import steps as fs
-    datapull._check_files = fs.path_listdir
-    datapull._evaluate_path = fs.path_exists
-
-
-def patch_filesystem() -> None:
-    """Enruta cada shell-out ``hdfs dfs`` de las clases del datapull por los
-    helpers duales de :mod:`libs.steps`.
-
-    También es seguro en el clúster: ``path_exists``/``path_delete``/
-    ``path_listdir`` siguen llamando a ``hdfs dfs`` cuando la ruta parece
-    HDFS (:func:`~libs.hive_path.is_hdfs_path`).
-    """
-    from libs import steps as fs
-    from libs.missing_treatment import MissingTreatment
-    from libs.extract import Extract
-    from libs.feature_engineering import FeatureEngineering
-    from libs.generate_ratios import GenerateRatios
-    from libs.vector_assembler import FeaturesVectorAssembler
-    from libs.weeks import WeeklyTFromParquetReTagger
-    from libs.aggregattes.payroll_streaks import PayrollStreaksAggregate
-    from libs.aggregattes.payroll_income import PayrollIncomeAggregate
-
-    MissingTreatment._MissingTreatment__evaluate_path = \
-        lambda self, p: fs.path_exists(p)
-    MissingTreatment._delete_intermediate = \
-        lambda self, p: fs.path_delete(p)
-    Extract._evaluate_path = lambda self, p: fs.path_exists(p)
-    Extract._delete_intermediate = lambda self, p: fs.path_delete(p)
-    FeatureEngineering._evaluate_path = lambda self, p: fs.path_exists(p)
-    GenerateRatios._evaluate_path = lambda self, p: fs.path_exists(p)
-    FeaturesVectorAssembler._check_files = lambda self, p: fs.path_listdir(p)
-    FeaturesVectorAssembler._evaluate_path = lambda self, p: fs.path_exists(p)
-    FeaturesVectorAssembler._delete_intermediate = \
-        lambda self, p: fs.path_delete(p)
-    WeeklyTFromParquetReTagger._delete_intermediate = \
-        staticmethod(fs.path_delete)
-    PayrollStreaksAggregate._delete_intermediate = \
-        lambda self, p: fs.path_delete(p)
-    PayrollIncomeAggregate._delete_intermediate = staticmethod(fs.path_delete)
 
 
 def disable_email(datapull: Any) -> None:
@@ -266,8 +217,6 @@ def main() -> int:
 
     builder = build_session_builder(local=args.local)
     datapull = DataPull(config_rigid, config_custom, builder)
-    patch_datapull_fs(datapull)
-    patch_filesystem()
 
     send_email = not args.no_email and not os.environ.get("LAIKA_DISABLE_EMAIL")
     if not send_email:

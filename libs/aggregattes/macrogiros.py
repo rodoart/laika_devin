@@ -7,20 +7,11 @@ Version: 0.1
 Class and Functions required to aggregate (general)
 """
 
-import os
 import pandas as pd
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws
-from pyspark.sql.types import IntegerType, DoubleType
-from itertools import chain
 from typing import Any, Dict, List
-import logging
+from .base import BaseAggregate
 
-logging.basicConfig(format='%(asctime)s | %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
-
-
-class MacrogirosAggregate:
+class MacrogirosAggregate(BaseAggregate):
     """
     Class to aggregate Macrogiros Data
 
@@ -35,16 +26,6 @@ class MacrogirosAggregate:
     mode: string
         Optional, parquet write mode, defaults to overwrite
     """
-
-    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
-        sqlContext: SparkSession, mode: str = "overwrite") -> None:
-        """
-        Class constructor.
-        """
-        self.previous_path = previous_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
 
     def _create_groupby_query(self, query_dict: Dict[str, Any], group_by: List[str]) -> str:
         """
@@ -74,23 +55,6 @@ class MacrogirosAggregate:
             " FROM macrogiros GROUP BY "+group_str
         return query_str
 
-    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """
-        Save data as parquet on desired location.
-
-        Parameters
-        ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-        """
-        df_save.write.mode(self.mode).parquet(path)
-
     def aggregate(self) -> None:
         """
         Process to aggregate Macrogiros data.
@@ -103,8 +67,7 @@ class MacrogirosAggregate:
         -------
         None
         """
-        reading_path = os.path.join(
-            self.previous_path, self.agg_dict['table_name'])
+        reading_path = self._table_path()
         macrogiros = self.sqlContext.read.parquet(reading_path)
         macrogiros = macrogiros.na.fill("sin clasificar", subset=["c2"])
         macrogiros.createOrReplaceTempView("macrogiros")
@@ -112,5 +75,4 @@ class MacrogirosAggregate:
         query_str = self._create_groupby_query(
             self.agg_dict['query_dict'], self.agg_dict['group_by_key'])
         df_out = self.sqlContext.sql(query_str)
-        head, _ = os.path.split(self.previous_path)
-        self._save_parquet(df_out, os.path.join(head, "groupby"))
+        self._save_parquet(df_out, self._sibling_path("groupby"))

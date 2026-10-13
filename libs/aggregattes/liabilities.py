@@ -9,18 +9,11 @@ Class and Functions required to aggregate (general)
 
 import os
 import pandas as pd
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import greatest, expr, col, broadcast, month, when, expr, lit, create_map, lower, array, explode, struct, concat_ws
-from pyspark.sql.types import IntegerType, DoubleType
-from itertools import chain
-from typing import Any, Dict, List, Optional
-import logging
+from pyspark.sql.functions import col
+from typing import Any, Dict, List
+from .base import BaseAggregate
 
-logging.basicConfig(format='%(asctime)s | %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
-
-
-class LiabilitiesPullAggregate:
+class LiabilitiesPullAggregate(BaseAggregate):
     """
     Class to aggregate Liabilities Data
 
@@ -35,16 +28,6 @@ class LiabilitiesPullAggregate:
     mode: string
         Optional, parquet write mode, defaults to overwrite
     """
-
-    def __init__(self, previous_path: str, agg_dict: Dict[str, Any],
-        sqlContext: SparkSession, mode: str = "overwrite") -> None:
-        """
-        Class constructor.
-        """
-        self.previous_path = previous_path
-        self.agg_dict = agg_dict
-        self.sqlContext = sqlContext
-        self.mode = mode
 
     def _create_groupby_query(self, agg_dict: Dict[str, Any], liab: str, filter_col: List[str]) -> str:
         """
@@ -98,23 +81,6 @@ class LiabilitiesPullAggregate:
             " FROM df_agg_temp_pgom" + " GROUP BY "+group_str
         return query_str
 
-    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """
-        Save data as parquet on desired location.
-
-        Parameters
-        ----------
-        df_save: PySpark Dataframe
-            Data to be saved
-        path: string
-            Path to store the data
-
-        Returns
-        -------
-        None
-        """
-        df_save.write.mode(self.mode).parquet(path)
-
     def aggregate(self) -> None:
         """
         Process to aggregate Liabilities data.
@@ -128,8 +94,7 @@ class LiabilitiesPullAggregate:
         None
         """
         # Get the auxliar path
-        head, _ = os.path.split(self.previous_path)
-        aux_path = os.path.join(head, "auxiliar/outputs")
+        aux_path = self._sibling_path("auxiliar/outputs")
         maestra = self.sqlContext.read.parquet(
             os.path.join(aux_path, "maestra"))
         maestra = maestra.withColumn("numcliente", col(
@@ -140,7 +105,7 @@ class LiabilitiesPullAggregate:
             selected_group + selected_columns)]
         maestra = maestra.select(*sel_colums)
         onus_capt_snap = self.sqlContext.read.parquet(
-            os.path.join(self.previous_path, self.agg_dict['table_name']))
+            self._table_path())
         sel_vars = [col(column) for column in (
             ["numcliente"] + self.agg_dict["pgom_cols"])]
         df_pgom = onus_capt_snap.select(sel_vars)
@@ -204,5 +169,4 @@ class LiabilitiesPullAggregate:
             )
 
         onus_capt_snap_tmp = onus_capt_snap_tmp.fillna(0)
-        head, _ = os.path.split(self.previous_path)
-        self._save_parquet(onus_capt_snap_tmp, os.path.join(head, "groupby"))
+        self._save_parquet(onus_capt_snap_tmp, self._sibling_path("groupby"))

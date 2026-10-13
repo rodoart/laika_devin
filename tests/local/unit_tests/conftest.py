@@ -4,9 +4,8 @@ Fixtures y bootstrap compartido para la suite de pruebas unitarias.
 Puntos clave:
 
 - ``bootstrap`` del harness local aplica los shims necesarios
-  (``PosixPath`` -> ``PurePosixPath`` en Windows, alias
-  ``libs.aggregates`` -> ``libs.aggregattes``, ``hadoop.dll`` en PATH,
-  ``PYSPARK_PYTHON`` = intérprete del env).
+  (``PosixPath`` -> ``PurePosixPath`` en Windows, ``hadoop.dll`` en
+  PATH, ``PYSPARK_PYTHON`` = intérprete del env).
 - ``LAIKA_FS_MODE=local`` fuerza a :class:`HivePath` a usar el backend
   de filesystem local (sin tocar HDFS).
 - La sesión de Spark es **session-scoped**: una sola JVM para toda la
@@ -27,10 +26,6 @@ if TESTS_LOCAL not in sys.path:
     sys.path.insert(0, TESTS_LOCAL)
 
 import bootstrap  # noqa: E402
-
-bootstrap.install_aggregates_alias()
-bootstrap.install_numpy_shims()
-bootstrap.install_typing_shims()
 
 # Fuerza backend local en HivePath para todos los tests.
 os.environ["LAIKA_FS_MODE"] = "local"

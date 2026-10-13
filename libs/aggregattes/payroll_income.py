@@ -11,63 +11,27 @@ Class and Functions required to aggregate (payroll income)
 
 # Libraries
 from datetime import date
-from os import remove
 from dateutil.relativedelta import relativedelta
 from functools import wraps
 from pathlib import PosixPath
-import subprocess
-from typing import Callable, Dict, List, Optional, Union, Callable, Any
+from typing import Callable, Dict, List, Optional, Union, Any
 import re
 import logging
 
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import MinMaxScaler, VectorAssembler
-from pyspark.sql import DataFrame, dataframe
+from pyspark.sql import DataFrame
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, greatest, least,  when, lit
 from pyspark.sql.types import DoubleType
+from .base import (columns_with_prefix, columns_with_prefixes,
+                   parse_config_bool, sort_df_columns)
+from ..steps import cached_property, path_delete
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
 
 # FUNCTIONS
-
-class cached_property:
-    """
-    Decorador que convierte un método en una propiedad que se calcula una sola vez y se almacena en caché.
-    La primera vez que se accede a la propiedad, se calcula su valor y se almacena. En accesos posteriores,
-    se devuelve el valor almacenado en lugar de recalcularlo.
-    """
-
-    def __init__(self, func: Callable[[Any], Any]) -> None:
-        """
-        Inicializa el decorador con la función que se va a convertir en una propiedad en caché.
-
-        Args:
-            func (Callable[[Any], Any]): La función que se convertirá en una propiedad en caché.
-        """
-        self.func = func
-        self.cache_name = f"_{func.__name__}_cache"
-
-    def __get__(self, instance: Any, owner: Any) -> Any:
-        """
-        Método descriptor que se llama cuando se accede a la propiedad.
-
-        Args:
-            instance (Any): La instancia de la clase que contiene la propiedad.
-            owner (Any): La clase que contiene la propiedad.
-
-        Returns:
-            Any: El valor de la propiedad, ya sea calculado o almacenado en caché.
-        """
-        if instance is None:
-            return self
-
-        # Si la propiedad no está en caché, se calcula y se almacena
-        if not hasattr(instance, self.cache_name):
-            setattr(instance, self.cache_name, self.func(instance))
-        # Se devuelve el valor almacenado en caché
-        return getattr(instance, self.cache_name)
 
 
 def dynamic(path_key: str) -> Callable:
@@ -190,19 +154,11 @@ def fix_2_imputate(df: DataFrame, columns: List[str], final_output_column:Option
     #
     col_0 = columns[0]
     #
-    # Manejar diferentes casos basados en el número de columnas proporcionadas
-    if len(columns) == 3:
-        col_1 = columns[1]
-        col_2 = columns[2]
-    elif len(columns) == 2:
-        col_1 = columns[1]
-        col_2 = "fake_col_2"
-        df = df.withColumn(col_2, lit(0.0))
-    elif len(columns) == 1:
-        col_1 = "fake_col_1"
-        col_2 = "fake_col_2"
-        df = df.withColumn(col_1, lit(0.0))
-        df = df.withColumn(col_2, lit(0.0))
+    # Rellenar hasta 3 columnas con fakes en 0 si faltan
+    col_1, col_2 = list(columns[1:3]) + ["fake_col_1", "fake_col_2"][len(columns)-1:]
+    fake_cols = [c for c in (col_1, col_2) if c.startswith("fake_col")]
+    for fake in fake_cols:
+        df = df.withColumn(fake, lit(0.0))
     #
     # Crear la columna de salida basada en las reglas de imputación
     df = df.withColumn(final_output_column,
@@ -219,10 +175,8 @@ def fix_2_imputate(df: DataFrame, columns: List[str], final_output_column:Option
         ))))
     #
     # Eliminar columnas falsas si fueron creadas
-    if len(columns) == 1:
-        df = df.drop(col_1, col_2)
-    elif len(columns) == 2:
-        df = df.drop(col_2)
+    if fake_cols:
+        df = df.drop(*fake_cols)
     #
     return df
 
@@ -544,13 +498,8 @@ class PayrollIncomeAggregate:
 
     @cached_property
     def vectors_removed(self) -> DataFrame:
-        normalize_enable = str(self._normalize_config["enable"]).lower()
-        if normalize_enable == "false":
-            normalize_enable = False
-        elif normalize_enable == "true":
-            normalize_enable = True
-        else:
-            raise ValueError("The normalize enable value should be a boolean.")
+        normalize_enable = parse_config_bool(
+            self._normalize_config["enable"], "normalize enable")
         #
         if not normalize_enable:
             return self.capped
@@ -594,66 +543,20 @@ class PayrollIncomeAggregate:
         return [re.sub(self.tfrom_suffix_pattern, '', column) for column in columns]
 
     def sort_columns(self, df: DataFrame) -> DataFrame:
-        """
-        Ordena las columnas del DataFrame.
-
-        La corrección específica se realiza ordenando las columnas del DataFrame alfabéticamente,
-        excluyendo las columnas que no deben ser renombradas, y luego seleccionando las columnas
-        en el orden deseado.
-
-        Args:
-            df (DataFrame): El DataFrame de entrada.
-
-        Returns:
-            DataFrame: Un nuevo DataFrame con las columnas ordenadas.
-        """
-        colums = df.columns
-        colums_without_principals = [col for col in colums if col not in self._columns_not_to_be_renamed]
-        colums_without_principals.sort()
-        return df.select(self._columns_not_to_be_renamed + colums_without_principals)
+        """``protected`` primero, resto ordenado alfabéticamente."""
+        return sort_df_columns(df, self._columns_not_to_be_renamed)
 
     def _get_columns_with_prefix(self, df: DataFrame, prefix:Optional[str]="None") -> List[str]:
-        """
-        Obtiene las columnas del DataFrame que tienen un prefijo específico.
-
-        La corrección específica se realiza filtrando las columnas del DataFrame que comienzan
-        con el prefijo dado y que no están en la lista de columnas que no deben ser renombradas.
-
-        Args:
-            df (DataFrame): El DataFrame de entrada.
-            prefix (Optional[str], optional): Prefijo a buscar en los nombres de las columnas.
-                Defaults to "None".
-
-        Returns:
-            List[str]: Lista de nombres de columnas que cumplen con el criterio.
-        """
-        columns_to_check = df.columns
-        if (prefix is None) or (prefix.lower() == "none") or prefix == "":
-            return [column for column in columns_to_check if (column not in self._columns_not_to_be_renamed) and (not any(column.
-            startswith(p) for p in self.prefixes))]
-        else:
-            return [column for column in columns_to_check if column.startswith(prefix) and (column not in self.
-            _columns_not_to_be_renamed)]
+        """Columnas de ``df`` con el prefijo dado (ver
+        :func:`libs.aggregattes.base.columns_with_prefix`)."""
+        return columns_with_prefix(
+            df.columns, self.prefixes, self._columns_not_to_be_renamed,
+            prefix)
 
     def get_columns_with_prefixes(self, df: DataFrame, prefixes:List[str]) -> List[str]:
-        """
-        Obtiene las columnas del DataFrame que tienen alguno de los prefijos especificos.
-
-        La corrección especifica se realiza utilizando la función `_get_columns_with_prefix`,
-        que filtra las columnas del DataFrame que comienzan con cada uno de los prefijos dados.
-
-        Args:
-            df (DataFrame): El DataFrame de entrada.
-            prefixes (List[str]): Lista de prefijos a buscar en los nombres de las columnas.
-
-        Returns:
-            List[str]: Lista de nombres de columnas que cumplen con los criterios de los prefijos.
-        """
-        result = []
-        for prefix in prefixes:
-            result += self._get_columns_with_prefix(df, prefix)
-        result = list(set(result))
-        return result
+        """Unión sin duplicados de las columnas de cada prefijo."""
+        return columns_with_prefixes(
+            df, self.prefixes, self._columns_not_to_be_renamed, prefixes)
 
     #
     class _Step:
@@ -703,17 +606,8 @@ class PayrollIncomeAggregate:
             self.prefixes_to_apply = step_config["prefixes_to_apply"]
             self.step_method = step_method
             #
-            enabled = str(step_config["enable"]).lower()
-            if enabled == "false":
-                self.enabled = False
-            elif enabled == "true":
-                self.enabled = True
-            else:
-                raise ValueError("The enable value should be a boolean.")
-            try:
-                self.prefixes_to_drop = step_config["prefixes_to_drop"]
-            except:
-                self.prefixes_to_drop = []
+            self.enabled = parse_config_bool(step_config["enable"], "enable")
+            self.prefixes_to_drop = step_config.get("prefixes_to_drop", [])
             self.columns_to_apply = self._get_columns_to_apply()
             #
         def _get_columns_to_apply(self) -> List[str]:
@@ -984,21 +878,8 @@ class PayrollIncomeAggregate:
     #
     @staticmethod
     def _delete_intermediate(path:str) -> None:
-        """
-        Elimina rutas utilizando Hadoop.
-
-        La corrección específica se realiza utilizando el comando `hdfs dfs -rm -f -r -skipTrash`,
-        que elimina las rutas especificadas de Hadoop.
-
-        Args:
-            path (str): Ruta a eliminar.
-
-        Returns:
-            None
-        """
-        args_list=['hdfs', 'dfs', '-rm', '-f', '-r', '-skipTrash', path]
-        proc=subprocess.Popen(args_list, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        proc.communicate()
+        """Borra ``path`` si existe (ver :func:`libs.steps.path_delete`)."""
+        path_delete(path)
     #
     def _clean(self) -> None:
         """
