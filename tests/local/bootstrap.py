@@ -27,13 +27,16 @@ POSIX_WORKDIR = WORKDIR.as_posix()
 
 # PosixPath() cannot be instantiated on Windows; PurePosixPath has the same
 # path API and is what the code actually needs (string building only).
-import pathlib
-pathlib.PosixPath = pathlib.PurePosixPath
+# SOLO en Windows: en unix/wsl PosixPath es la clase real (con .exists(),
+# .resolve(), ...) y sustituirla por PurePosixPath rompe pytest/pathlib.
+if os.name == "nt" or os.environ.get("APP_OS_MODE") == "windows":
+    import pathlib
+    pathlib.PosixPath = pathlib.PurePosixPath
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-if os.name == "nt":
+if os.name == "nt" or os.environ.get("APP_OS_MODE") == "windows":
     os.environ.setdefault("HADOOP_HOME", str(DEFAULT_HADOOP_HOME))
     # hadoop.dll must be visible to the JVM (native IO for local FS writes)
     _hadoop_bin = Path(os.environ["HADOOP_HOME"]) / "bin"
@@ -54,7 +57,7 @@ def get_spark(app_name: str = "laika_local_test"):
         .config("spark.ui.enabled", "false")
         .config("spark.driver.memory", "2g")
     )
-    if os.name == "nt":
+    if os.environ.get("HADOOP_HOME"):
         _hadoop_bin = (Path(os.environ["HADOOP_HOME"]) / "bin").as_posix()
         builder = builder.config(
             "spark.driver.extraJavaOptions", f'-Djava.library.path="{_hadoop_bin}"')

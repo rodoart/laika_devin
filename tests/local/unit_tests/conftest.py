@@ -6,8 +6,9 @@ Puntos clave:
 - ``bootstrap`` del harness local aplica los shims necesarios
   (``PosixPath`` -> ``PurePosixPath`` en Windows, ``hadoop.dll`` en
   PATH, ``PYSPARK_PYTHON`` = intérprete del env).
-- ``LAIKA_FS_MODE=local`` fuerza a :class:`HivePath` a usar el backend
-  de filesystem local (sin tocar HDFS).
+- ``LAIKA_FS_MODE=<os_mode>`` fuerza a :class:`HivePath` a usar el backend
+  de filesystem local (sin tocar HDFS); ``local``/``windows``/``unix``/
+  ``wsl`` equivalen a local.
 - La sesión de Spark es **session-scoped**: una sola JVM para toda la
   suite (``local[2]``, sin UI, 4 shuffle partitions).
 
@@ -26,9 +27,10 @@ if TESTS_LOCAL not in sys.path:
     sys.path.insert(0, TESTS_LOCAL)
 
 import bootstrap  # noqa: E402
+from libs.hive_path import os_mode  # noqa: E402
 
-# Fuerza backend local en HivePath para todos los tests.
-os.environ["LAIKA_FS_MODE"] = "local"
+# Fuerza backend local en HivePath para todos los tests (modo detectado).
+os.environ["LAIKA_FS_MODE"] = os_mode()
 
 
 @pytest.fixture(scope="session")

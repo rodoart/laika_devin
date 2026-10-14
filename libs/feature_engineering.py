@@ -23,7 +23,8 @@ import logging
 import types
 from itertools import groupby as it_groupby
 
-from .steps import path_exists
+from .steps import dynamic, path_exists
+from .hive_path import is_successful
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -62,13 +63,16 @@ class FeatureEngineering:
                  sqlContext: "SparkSession",
                  fe_dict: Optional[Dict[str, Any]] = None,
                  number_threads: int = 32,
-                 mode: str = "overwrite") -> None:
+                 mode: str = "overwrite",
+                 is_dynamic: bool = True) -> None:
         self.path = os.path.join(working_path, "features")
         self.sqlContext = sqlContext
         self.period = period
         self.number_threads = number_threads
         self.mode = mode
-        self.df = self._check_raw(df)
+        self.is_dynamic = is_dynamic
+        self.hdfs = {"raw_features": os.path.join(self.path, "raw_features")}
+        self.df = self._raw_features(df)
         self.list_mvars = self._get_mvars(period)
         self.lista_metodo = self._get_lista_metodo()
 
@@ -84,24 +88,12 @@ class FeatureEngineering:
 
         self.weights_dict = {last_weight:self.assign_weights(last_weight) for last_weight in [0.0, 0.25, 0.5, 0.75]}
 
-    def _check_raw(self, df: DataFrame) -> DataFrame:
-        """
-        Creates if exist the raw features parquet, if not, creates it
-
-        Parameters
-        ----------
-        df: Pyspark dataframe
-            Dataframe with the output of missing treatment
-        Returns
-        -------
-        Pyspark dataframe
-            Dataframe with raw features
-        """
-        path_raw = os.path.join(self.path,"raw_features")
-        if self._evaluate_path(path_raw):
-            return self.sqlContext.read.parquet(path_raw)
-        else:
-            return self._create_dataframe(df)
+    @dynamic("raw_features")
+    def _raw_features(self, df: DataFrame) -> DataFrame:
+        """Parquet de raw variables con reload-or-recompute (ver
+        :func:`libs.steps.dynamic`): si ``raw_features`` ya está escrito y
+        ``is_dynamic``, se recarga de disco en vez de recomputarse."""
+        return self._create_dataframe(df)
 
     def _create_dataframe(self, df: DataFrame) -> DataFrame:
         """
@@ -176,8 +168,6 @@ class FeatureEngineering:
         # print("Running raw features")
         logging.info("Performing Raw Features")
         df = df.withColumn("id_msf_tools_v2_12315", F.monotonically_increasing_id())
-        df.write.mode(self.mode).parquet(path + "/raw_features")
-        df = self.sqlContext.read.parquet(path + "/raw_features")
         logging.info("Ending Raw Features")
         #print("Ending raw features")
         return(df)
@@ -312,6 +302,11 @@ class FeatureEngineering:
         df=df.na.fill(0)
         return(df)
 
+    def _save_parquet(self, df_save: DataFrame, path: str) -> None:
+        """Guarda ``df_save`` como parquet con ``self.mode`` (protocolo de
+        :func:`libs.steps.dynamic`)."""
+        df_save.write.mode(self.mode).parquet(path)
+
     def _write_parquet(self, df: DataFrame, path: str,
                        file_name: str) -> Tuple[()]:
         """
@@ -375,6 +370,13 @@ class FeatureEngineering:
         transformations: list
             List with all the transformations
         """
+        # reload intermedio: si <trans>_features ya está escrita
+        # (directorio con _SUCCESS), se recarga/salta en vez de recomputar
+        out_path = os.path.join(self.path, transformation + "_features")
+        if self.is_dynamic and is_successful(out_path):
+            logging.info("%s_features reloaded from %s",
+                         transformation, out_path)
+            return
         # El orden importa: "onz_mt" termina en "_mt"; "onz_mt" termina
         # en "mt" pero no en "onz" al revés. Sufijo -> fábrica del objeto
         # que define el método `_<trans>Transformation`.
@@ -862,7 +864,7 @@ class FeatureEngineering:
         trans_d = [("max","min"),("mean","min"),("max","mean")]
         not_performed_trans = []
         for trans in elemental_trans:
-            if not self._evaluate_path(os.path.join(self.path, trans + "_features")):
+            if not is_successful(os.path.join(self.path, trans + "_features")):
                 for element in trans_rt.copy():
                     if trans in element:
                         trans_rt.remove(element)
@@ -1478,7 +1480,7 @@ class StandardMethodsMT(ExternalTransformations):
         trans_d_mt = [("max_mt","min_mt"),("mean_mt","min_mt"),("max_mt","mean_mt")]
         not_performed_trans = []
         for trans in elemental_trans:
-            if not self._evaluate_path(os.path.join(self.path, trans + "_features")):
+            if not is_successful(os.path.join(self.path, trans + "_features")):
                 for element in trans_rt_mt.copy():
                     if trans in element:
                         trans_rt_mt.remove(element)

@@ -12,8 +12,7 @@ Class and Functions required to aggregate (payroll income)
 # Libraries
 from datetime import date
 from dateutil.relativedelta import relativedelta
-from functools import wraps
-from pathlib import PosixPath
+from pathlib import PurePosixPath as PosixPath
 from typing import Callable, Dict, List, Optional, Union, Any
 import re
 import logging
@@ -26,51 +25,12 @@ from pyspark.sql.functions import col, greatest, least,  when, lit
 from pyspark.sql.types import DoubleType
 from .base import (columns_with_prefix, columns_with_prefixes,
                    parse_config_bool, sort_df_columns)
-from ..steps import cached_property, path_delete
+from ..steps import cached_property, dynamic, path_delete
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
 
 # FUNCTIONS
-
-
-def dynamic(path_key: str) -> Callable:
-    """
-    Decorador que gestiona la carga y almacenamiento de datos en formato Parquet de manera dinámica.
-
-    Args:
-        path_key (str): Clave para obtener la ruta del HDFS desde el diccionario `hdfs`.
-
-    Returns:
-        Callable: Función decoradora.
-    """
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(self) -> DataFrame:
-            """
-            Envuelve la función original para gestionar la carga y almacenamiento de datos.
-
-            Args:
-                self: Instancia de la clase que contiene el método decorado.
-
-            Returns:
-                DataFrame: DataFrame leído desde el archivo Parquet.
-            """
-            hdfs = self.hdfs
-            is_dynamic = self.is_dynamic
-            path = hdfs[path_key]
-            try:
-                if not is_dynamic:
-                    raise Exception
-                result = self.sqlContext.read.parquet(path)
-                logging.info(f"INFO: {path_key.capitalize()} data reloaded from {path}")
-            except:
-                self._save_parquet(func(self), path)
-                result = self.sqlContext.read.parquet(path)
-                logging.info(f"INFO: {path_key.capitalize()} data saved on {path}")
-            return result
-        return wrapper
-    return decorator
 
 
 def tfrom_to_month(tfrom:int, vintage_date:date) -> int:

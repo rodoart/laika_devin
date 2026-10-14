@@ -45,6 +45,12 @@ import urllib.request
 from datetime import datetime
 from typing import Any, Optional, Set, Tuple
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from libs.hive_path import os_mode
+
+#: ``True`` en Windows nativo (sin killpg ni shlex POSIX); unix/wsl -> POSIX.
+_IS_WINDOWS = os_mode() == "windows"
+
 #: "Executing step: <name>" emitido por Step.execute().
 STEP_START_RE = re.compile(r"Executing step:\s*(\S+)")
 #: "Step finished: <name>" emitido por Step.execute().
@@ -211,15 +217,15 @@ def run_child(monitor: PipelineMonitor) -> int:
     """
     env = dict(os.environ, PYTHONUNBUFFERED="1")
     kwargs: dict = {}
-    if os.name != "nt":
+    if not _IS_WINDOWS:
         kwargs["start_new_session"] = True   # grupo propio: killpg mata el árbol
     proc = subprocess.Popen(
-        shlex.split(COMMAND) if os.name != "nt" else COMMAND,
+        COMMAND if _IS_WINDOWS else shlex.split(COMMAND),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         env=env,
-        shell=(os.name == "nt"),
+        shell=_IS_WINDOWS,
         **kwargs,
     )
     threading.Thread(target=_drain_stdout, args=(proc, monitor), daemon=True).start()

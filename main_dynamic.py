@@ -92,8 +92,9 @@ def build_session_builder(local: bool) -> Callable[[], "Any"]:
     """
     from libs.session import SparkSessionBuilder
     if local:
+        from libs.hive_path import os_mode
         extra_conf = {"spark.ui.enabled": "true"}
-        if os.name == "nt" and os.environ.get("HADOOP_HOME"):
+        if os_mode() == "windows" and os.environ.get("HADOOP_HOME"):
             hadoop_bin = (Path(os.environ["HADOOP_HOME"]) / "bin").as_posix()
             extra_conf["spark.driver.extraJavaOptions"] = \
                 f'-Djava.library.path="{hadoop_bin}"'

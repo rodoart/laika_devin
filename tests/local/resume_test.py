@@ -41,6 +41,7 @@ ENV = dict(os.environ)
 ENV.update({
     "LAIKA_CONFIG_DIR": "tests/local/config_dyn",
     "LAIKA_DISABLE_EMAIL": "1",
+    # Backend local del FS; la plataforma (windows/wsl/unix) se autodetecta.
     "LAIKA_FS_MODE": "local",
 })
 CMD = [sys.executable, str(PROJECT_ROOT / "main_dynamic.py"),

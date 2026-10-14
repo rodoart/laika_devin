@@ -454,7 +454,8 @@ def build_source_chain(datapull: Any, source: str,
     mt = MissingTreatment(cc["year_id"], datapull.config_rigid[source],
                           source, cc["n_mis"], cc["n_threads"])
     mobs = Mobs(cc["year_id"], datapull.config_rigid[source],
-                source, cc["n_mis"], cc["n_threads"])
+                source, cc["n_mis"], cc["n_threads"],
+                is_dynamic=is_dynamic)
 
     previous: Optional[Step] = None
     for stage in steps_list:

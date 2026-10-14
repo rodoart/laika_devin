@@ -18,7 +18,7 @@ stage).
 import logging
 import os
 from functools import reduce
-from pathlib import PosixPath
+from pathlib import PurePosixPath as PosixPath
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from pyspark.sql import Column, DataFrame, SparkSession
@@ -39,6 +39,7 @@ from pyspark.sql.functions import (
 from pyspark.sql.types import *
 from pyspark.sql.window import Window
 
+from ..hive_path import is_successful
 from ..steps import path_delete
 from .payroll_income import PreviousFixerPayrollIncome, get_months
 from .payroll_streaks import PreviousFixerPayrollStreaks
@@ -100,10 +101,16 @@ class Mobs:
         Number of threads to be used
     mode:
         How will the parquets be written
+    is_dynamic:
+        Si es True, los intermedios ya escritos (``calculate_mobs`` y cada
+        feature imputada/copiada con ``_SUCCESS``) se recargan/saltan en
+        vez de recomputarse — equivale al decorador ``dynamic`` de
+        ``libs.steps`` para los guardados que no devuelven DataFrame.
     """
     def __init__(self, year: str, mt_dict: Dict[str, Any], source: str,
                  n_mis: int, n_threads: int,
-                 mode: str = "overwrite") -> None:
+                 mode: str = "overwrite",
+                 is_dynamic: bool = True) -> None:
         """Constructor de la clase Mobs."""
         self.year: str = year
         self.mt_dict: Dict[str, Any] = mt_dict
@@ -111,6 +118,7 @@ class Mobs:
         self.n_mis: int = n_mis
         self.n_threads: int = n_threads
         self.mode: str = mode
+        self.is_dynamic: bool = is_dynamic
 
     ######################################## metodo principal mobs (run_mobs) ########################################
     def run_mobs(self, tables_path: str, pathwrite: str, features_path: str,
@@ -146,6 +154,9 @@ class Mobs:
                 n_mis=self.n_mis,
                 n_threads=self.n_threads,
                 sql_context=sql_context,
+                # is_dynamic: las features ya imputadas se recargan/saltan
+                # (reanudación a mitad de mobs)
+                is_dynamic=True,
             ).multi_thread_imputate_features()
         else:
             self.previous_fixer(pathwrite, features_path,
@@ -166,6 +177,12 @@ class Mobs:
             specifiyng the path where the parquet is going to be stored
         sql_context: SparkSession
         """
+        # reload intermedio: calculate_mobs ya escrito (dir con _SUCCESS)
+        # y corrida dinámica -> se salta el join pesado por fuente
+        if self.is_dynamic and is_successful(
+                os.path.join(pathwrite, "calculate_mobs")):
+            logging.info("calculate_mobs reloaded from %s", pathwrite)
+            return
         df_full = sql_context.createDataFrame([], StructType([StructField('numcliente', StringType(), True),
                                                             StructField('vintage_date', StringType(), True)]))
         tables_path = os.path.join(
@@ -385,6 +402,12 @@ class Mobs:
         for item in range(len(lst_months)-1):
             df_paths.append(f"temp{item}")
         for feature in feat_list[0]:  # imputacion de features
+            # reload intermedio: feature ya imputada (dir con _SUCCESS)
+            # -> se salta; reanudación a mitad de mobs
+            if self.is_dynamic and is_successful(
+                    os.path.join(pathwrite, feature)):
+                logging.info("Feature %s reloaded from %s", feature, pathwrite)
+                continue
             print(f"inicia imputacion {feature}")
             self.valor_previo4(features_path,feature,join_mobs,pathwrite,lst_months,sql_context)
         for feature in feat_list[1]:  # Copia de features
@@ -472,6 +495,11 @@ class Mobs:
         sql_context: sql_context
             Your sql_context.
         """
+        # reload intermedio: feature ya copiada (dir con _SUCCESS)
+        if self.is_dynamic and is_successful(
+                os.path.join(pathwrite, feature)):
+            logging.info("Feature %s reloaded from %s", feature, pathwrite)
+            return
         data_feature = sql_context.read.parquet(
             os.path.join(features_path, feature))
         self._write_parquet(data_feature, pathwrite, feature)

@@ -1,11 +1,28 @@
 """
 Tests de ``libs.hive_path`` — el objeto-path del datapull con backend
-dual (HDFS / FS local). En este módulo ``LAIKA_FS_MODE=local`` (ver
-conftest), así que todo opera sobre ``tmp_path``.
+dual (HDFS / FS local). En este módulo ``LAIKA_FS_MODE`` lleva el modo de
+plataforma detectado (``windows``/``unix``/``wsl``, ver conftest), así que
+todo opera sobre ``tmp_path``.
 """
 import pytest
 
-from libs.hive_path import HivePath, is_hdfs_path
+from libs.hive_path import HivePath, is_hdfs_path, os_mode
+
+
+# ---------------------------------------------------------------------------
+# os_mode
+# ---------------------------------------------------------------------------
+class TestOsMode:
+    def test_env_override(self, monkeypatch):
+        for mode in ("unix", "wsl", "windows"):
+            monkeypatch.setenv("APP_OS_MODE", mode)
+            assert os_mode() == mode
+
+    def test_default_is_valid(self, monkeypatch):
+        monkeypatch.delenv("APP_OS_MODE", raising=False)
+        monkeypatch.delenv("APP_MODE", raising=False)
+        monkeypatch.delenv("LAIKA_OS_MODE", raising=False)
+        assert os_mode() in ("unix", "wsl", "windows")
 
 
 # ---------------------------------------------------------------------------
@@ -23,12 +40,16 @@ class TestIsHdfsPath:
         assert is_hdfs_path("file:/data/x") is False
         assert is_hdfs_path("file:///data/x") is False
 
-    def test_local_mode_env_forces_local(self, monkeypatch):
-        monkeypatch.setenv("LAIKA_FS_MODE", "local")
+    @pytest.mark.parametrize("mode", ["local", "windows", "unix", "wsl"])
+    def test_local_modes_env_force_local(self, monkeypatch, mode):
+        monkeypatch.setenv("LAIKA_FS_MODE", mode)
+        monkeypatch.delenv("APP_MODE", raising=False)
         assert is_hdfs_path("/some/posix/path") is False
 
-    def test_hdfs_mode_env_forces_hdfs(self, monkeypatch):
-        monkeypatch.setenv("LAIKA_FS_MODE", "hdfs")
+    @pytest.mark.parametrize("mode", ["hdfs", "cluster"])
+    def test_hdfs_modes_env_force_hdfs(self, monkeypatch, mode):
+        monkeypatch.setenv("LAIKA_FS_MODE", mode)
+        monkeypatch.delenv("APP_MODE", raising=False)
         assert is_hdfs_path("/some/posix/path") is True
 
 

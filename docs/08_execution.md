@@ -113,7 +113,20 @@ conda run -n laika_datapull_py310 pip install \
 En **Windows** hacen falta binarios Hadoop para el FS local:
 `tests/local/hadoop/bin/winutils.exe` + `hadoop.dll`
 (ya descargados en el repo; `bootstrap.py` los pone en `PATH` vía
-`HADOOP_HOME`). En Linux/Mac no hace falta nada extra.
+`HADOOP_HOME`). En **Linux/Mac/WSL** no hace falta nada extra.
+
+### Modos de plataforma (`libs/hive_path.os_mode`)
+
+| Modo | Qué es | Detección |
+|---|---|---|
+| `unix` (**default**) | Cualquier POSIX (Linux, macOS, WSL sin especificar) | resto |
+| `wsl` | WSL específico | kernel `microsoft`/`wsl` |
+| `windows` | Windows nativo | `win32` |
+
+Se fuerza con `APP_OS_MODE`/`APP_MODE`/`LAIKA_OS_MODE`. El backend del FS
+lo decide `LAIKA_FS_MODE`/`APP_MODE`: `hdfs`/`cluster` → CLI hdfs;
+`windows`/`unix`/`wsl`/`local` → FS local; sin envs → autodetección
+(`hdfs://`, `file:`, letra de unidad, presencia del CLI `hdfs`).
 
 ### 2.2 Datos tiny
 
@@ -163,6 +176,8 @@ conda run -n laika_datapull_py310 python -m pytest tests/local/unit_tests -q
 |---|---|---|
 | `LAIKA_TEST_WORKDIR` | `tests/local/workdir` | raíz de inputs/outputs de prueba |
 | `LAIKA_CONFIG_DIR` | `config/` | directorio de los JSON de configuración |
+| `LAIKA_FS_MODE` | auto | backend del FS: `hdfs`/`cluster`/`windows`/`unix`/`wsl`/`local` |
+| `APP_MODE`/`APP_OS_MODE` | auto | plataforma: `unix` (default)/`wsl`/`windows` |
 | `HADOOP_HOME` | `tests/local/hadoop` | dir con `bin/winutils.exe` (Windows) |
 | `LAIKA_DISABLE_EMAIL` | — | si vale `1`, no se envían correos |
 | `PYSPARK_PYTHON` | `sys.executable` | bootstrap lo fija al intérprete del env |

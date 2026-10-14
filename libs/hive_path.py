@@ -11,16 +11,19 @@ Selección de *backend* por ruta:
 
 - ``hdfs://...``                -> CLI ``hdfs``
 - ``file:...``, ``C:\\...``, ... -> FS local
-- resto -> variable de entorno ``LAIKA_FS_MODE`` (``"hdfs"``/``"local"``);
-  automático: CLI ``hdfs`` si existe y la ruta es POSIX absoluta,
-  en otro caso local.
+- resto -> variables de entorno ``LAIKA_FS_MODE``/``APP_MODE``:
+  ``"hdfs"``/``"cluster"`` -> HDFS; ``"windows"``/``"unix"``/``"wsl"``/
+  ``"local"`` -> local; automático: CLI ``hdfs`` si existe y la ruta es
+  POSIX absoluta, en otro caso local.
 """
 from __future__ import annotations
 
 import os
+import platform
 import re
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 from fnmatch import fnmatch
 from operator import itemgetter
@@ -32,6 +35,48 @@ from typing import Any, Dict, Generator, Iterable, Iterator, List, Optional, Uni
 PathLike = Union[str, Path, "HivePath"]
 # Fila de un `ls` parseado (mismo formato que `hdfs dfs -ls`).
 LsEntry = Dict[str, Any]
+
+###############################################################################
+# Modo de plataforma (unix / wsl / windows)
+###############################################################################
+
+#: Modos de plataforma reconocidos.
+OS_MODES = ("unix", "wsl", "windows")
+#: Modos que fuerzan el backend HDFS.
+HDFS_MODES = ("hdfs", "cluster")
+#: Modos que fuerzan el filesystem local (``local`` = alias legacy).
+LOCAL_MODES = ("local", "windows", "unix", "wsl")
+
+
+def os_mode() -> str:
+    """Plataforma de ejecución: ``"unix"`` | ``"wsl"`` | ``"windows"``.
+
+    1. ``APP_OS_MODE`` / ``APP_MODE`` / ``LAIKA_OS_MODE`` con valor válido.
+    2. Autodetección: ``win32`` -> ``windows``; kernel
+       ``microsoft``/``wsl`` -> ``wsl``.
+    3. **Default: ``"unix"``** — cualquier POSIX funciona sin configuración.
+    """
+    mode = (os.environ.get("APP_OS_MODE")
+            or os.environ.get("APP_MODE")
+            or os.environ.get("LAIKA_OS_MODE") or "").lower()
+    if mode in OS_MODES:
+        return mode
+    if os.name == "nt" or sys.platform == "win32":
+        return "windows"
+    try:
+        release = (platform.release() + " " + platform.version()).lower()
+    except Exception:
+        release = ""
+    if "microsoft" in release or "wsl" in release:
+        return "wsl"
+    return "unix"
+
+
+def _configured_fs_mode() -> str:
+    """Modo de backend forzado por env."""
+    return (os.environ.get("LAIKA_FS_MODE")
+            or os.environ.get("APP_MODE") or "").lower()
+
 
 ###############################################################################
 # Selección de backend
@@ -56,9 +101,11 @@ def is_hdfs_path(path: PathLike) -> bool:
         return True
     if s.startswith("file:") or re.match(r"^[A-Za-z]:[/\\]", s):
         return False
-    mode = os.environ.get("LAIKA_FS_MODE")
-    if mode:
-        return mode == "hdfs"
+    mode = _configured_fs_mode()
+    if mode in HDFS_MODES:
+        return True
+    if mode in LOCAL_MODES:
+        return False
     return s.startswith("/") and shutil.which("hdfs") is not None
 
 

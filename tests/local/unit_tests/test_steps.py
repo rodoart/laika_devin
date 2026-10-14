@@ -11,6 +11,7 @@ from libs.steps import (
     Step,
     cached_property,
     collect_step_output,
+    dynamic,
     dynamic_parquet,
     dynamic_parquet_with_path,
     inherit_parent_step_attributes,
@@ -60,7 +61,7 @@ class _Counter(Step):
 class TestStepBasics:
     def test_default_step_name_format(self):
         s = _Counter()
-        assert s.step_name.startswith("__counter_")
+        assert s.step_name.startswith("_counter_")
 
     def test_explicit_step_name(self):
         s = _Counter(step_name="mi_paso")
@@ -268,6 +269,78 @@ class TestDynamicParquet:
         _ = s.data()
         assert s.calls == 1  # recarga
         assert df.count() == 1
+
+
+# ---------------------------------------------------------------------------
+# Decorador dynamic (protocolo agregado: self.hdfs + self._save_parquet)
+# ---------------------------------------------------------------------------
+class _AggregateLike:
+    """Clase "agregado" mínima con el protocolo de `dynamic` (no Step)."""
+
+    def __init__(self, spark, hdfs, is_dynamic=True, mode="overwrite"):
+        self.sqlContext = spark
+        self.hdfs = hdfs
+        self.is_dynamic = is_dynamic
+        self.mode = mode
+        self.compute_calls = 0
+        self.saved_with_mode = []
+
+    def _save_parquet(self, df_save, path):
+        self.saved_with_mode.append(self.mode)
+        df_save.write.mode(self.mode).parquet(path)
+
+    @dynamic("intermediate")
+    def data(self):
+        self.compute_calls += 1
+        return self.sqlContext.createDataFrame(
+            [(1, "x"), (2, "y")], ["id", "v"])
+
+
+class TestDynamicAggregate:
+    def test_computes_and_saves_via_save_parquet(self, spark, tmp_path):
+        path = (tmp_path / "intermediate").as_posix()
+        agg = _AggregateLike(spark, {"intermediate": path})
+        df = agg.data()
+        assert agg.compute_calls == 1
+        assert agg.saved_with_mode == ["overwrite"]  # self.mode respetado
+        assert sorted(r.v for r in df.collect()) == ["x", "y"]
+
+    def test_reloads_when_present(self, spark, tmp_path):
+        path = (tmp_path / "intermediate").as_posix()
+        agg = _AggregateLike(spark, {"intermediate": path})
+        _ = agg.data()
+        _ = agg.data()
+        assert agg.compute_calls == 1        # segunda llamada: recarga
+        assert len(agg.saved_with_mode) == 1
+
+    def test_is_dynamic_false_recomputes(self, spark, tmp_path):
+        path = (tmp_path / "intermediate").as_posix()
+        agg = _AggregateLike(spark, {"intermediate": path}, is_dynamic=False)
+        _ = agg.data()
+        _ = agg.data()
+        assert agg.compute_calls == 2
+        assert len(agg.saved_with_mode) == 2
+
+    def test_args_forwarded_to_wrapped_method(self, spark, tmp_path):
+        """Los args del método decorado llegan a la función real."""
+        path = (tmp_path / "intermediate").as_posix()
+
+        class _WithArgs(_AggregateLike):
+            @dynamic("intermediate")
+            def data_with_arg(self, value: int):
+                self.compute_calls += 1
+                return self.sqlContext.createDataFrame(
+                    [(value,)], ["v"])
+
+        agg = _WithArgs(spark, {"intermediate": path})
+        df = agg.data_with_arg(42)
+        assert df.collect()[0][0] == 42
+        assert agg.compute_calls == 1
+
+    def test_missing_key_raises(self, spark, tmp_path):
+        agg = _AggregateLike(spark, {})
+        with pytest.raises(KeyError):
+            agg.data()
 
 
 # ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, when
 
 from ..aggregattes.payroll_income import cached_property
+from ..hive_path import is_successful
 
 # Log configuration
 logging.basicConfig(format='%(asctime)s | %(message)s',
@@ -183,8 +184,13 @@ class PreviousFixerPayroll:
             Exception: Si ocurre una excepción durante la lectura, imputación o guardado del DataFrame,
                 se captura y se imprime.
         """
-        logging.info(f"Starting imputation for {feature}")
         output_path = os.path.join(self.hdfs["pathwrite"], feature)
+        # reload intermedio: si la feature ya está imputada (directorio
+        # con _SUCCESS) se salta — equivale al decorador `dynamic`
+        if self.is_dynamic and is_successful(output_path):
+            logging.info(f"Feature {feature} reloaded from {output_path}")
+            return
+        logging.info(f"Starting imputation for {feature}")
         # Read one feature datframe
         feature_df = self.sql_context.read.parquet(os.path.join(self.hdfs["features"], feature))
         # Get variables
@@ -211,8 +217,11 @@ class PreviousFixerPayroll:
         """Copia la carpeta raw features al path de salida
         """
         feature = Path(self.hdfs["raw_feature"]).name
-        logging.info(f"Starting imputation for {feature}")
         output_path = os.path.join(self.hdfs["pathwrite"], feature)
+        if self.is_dynamic and is_successful(output_path):
+            logging.info(f"Feature {feature} reloaded from {output_path}")
+            return
+        logging.info(f"Starting imputation for {feature}")
         self._save_parquet(self.raw_feature, output_path)
         logging.info(f"Ending imputation for {feature}")
     #

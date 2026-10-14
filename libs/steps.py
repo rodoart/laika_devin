@@ -31,8 +31,13 @@ try:
     from inflection import underscore
 except ImportError:
     def underscore(name: str) -> str:
-        """CamelCase -> camel_case (sustituto de ``inflection.underscore``)."""
-        s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+        """CamelCase -> camel_case (sustituto de ``inflection.underscore``).
+
+        Mismas reglas que inflection: acrónimos seguidos de palabra se
+        separan, y solo se inserta '_' entre minúscula/dígito y mayúscula
+        (un '_' o mayúscula inicial no genera doble '_').
+        """
+        s1 = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
         return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 from pyspark.sql import DataFrame, SparkSession
@@ -299,12 +304,19 @@ class Step:
 # Decoradores dinámicos: escribir a disco / recargar de disco
 ###############################################################################
 
-def _reload_or_recompute_parquet(self: Step, func: Callable[[Step], DataFrame],
-                                 path: PathLike, label: str) -> DataFrame:
+def _reload_or_recompute_parquet(self, func: Callable,
+                                 path: PathLike, label: str,
+                                 save: Optional[Callable[[DataFrame], None]] = None
+                                 ) -> DataFrame:
     """Lee ``path`` como parquet si ``is_dynamic``; si falla, ejecuta ``func``
     y lo guarda.
 
-    Implementación común de los decoradores ``dynamic_parquet*``.
+    Implementación común de los decoradores ``dynamic*`` (paridad con el
+    ``_reload_or_recompute_parquet`` del framework).
+
+    ``save`` personaliza la escritura (default:
+    ``df.write.mode("overwrite").parquet(path)``); las clases agregado lo
+    usan para respetar ``self.mode`` vía ``self._save_parquet``.
     """
     try:
         if not self.is_dynamic:
@@ -314,10 +326,45 @@ def _reload_or_recompute_parquet(self: Step, func: Callable[[Step], DataFrame],
     except Exception as e:
         logger.warning("Could not load %s from %s due to %s. Recomputing...",
                        label, path, e)
-        func(self).write.mode("overwrite").parquet(str(path))
+        computed = func(self)
+        if save is not None:
+            save(computed)
+        else:
+            computed.write.mode("overwrite").parquet(str(path))
         result = self.sqlContext.read.parquet(str(path))
         logger.info("%s data saved on %s", label.capitalize(), path)
     return result
+
+
+def dynamic(path_key: str) -> Callable:
+    """Decorador recarga-o-recomputo para intermedios de clases *agregado*.
+
+    Adaptación del ``dynamic`` del framework al protocolo de los
+    agregadores del datapull (``Payroll*Aggregate``, ``Weeks*``,
+    ``FeatureEngineering``, ``PreviousFixer*``), que no son ``Step``:
+
+    * la ruta viene de ``self.hdfs[path_key]`` (dict plano de paths, no el
+      config ``output_hive`` de los steps);
+    * la escritura usa ``self._save_parquet(df, path)`` si la clase lo
+      define (respeta ``self.mode``); si no, ``mode("overwrite")``;
+    * requiere ``self.is_dynamic`` y ``self.sqlContext``.
+
+    Parameters
+    ----------
+    path_key:
+        Clave de ``self.hdfs`` con la ruta del parquet intermedio.
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(self, *args: Any, **kwargs: Any) -> DataFrame:
+            path = self.hdfs[path_key]
+            save_parquet = getattr(self, "_save_parquet", None)
+            return _reload_or_recompute_parquet(
+                self, lambda s: func(s, *args, **kwargs), path, path_key,
+                save=(lambda df: save_parquet(df, path))
+                if save_parquet else None)
+        return wrapper
+    return decorator
 
 
 def dynamic_parquet_with_path(path: PathLike) -> Callable:
@@ -329,9 +376,10 @@ def dynamic_parquet_with_path(path: PathLike) -> Callable:
     """
     def decorator(func: Callable[[Step], DataFrame]) -> Callable[[Step], DataFrame]:
         @wraps(func)
-        def wrapper(self) -> DataFrame:
+        def wrapper(self, *args: Any, **kwargs: Any) -> DataFrame:
             path_key = str(path).split("/")[-1]
-            return _reload_or_recompute_parquet(self, func, path, path_key)
+            return _reload_or_recompute_parquet(
+                self, lambda s: func(s, *args, **kwargs), path, path_key)
         return wrapper
     return decorator
 
@@ -350,13 +398,14 @@ def dynamic_parquet(path_key: str) -> Callable:
     """
     def decorator(func: Callable[[Step], DataFrame]) -> Callable[[Step], DataFrame]:
         @wraps(func)
-        def wrapper(self) -> DataFrame:
+        def wrapper(self, *args: Any, **kwargs: Any) -> DataFrame:
             output_hive = self.output_hive
             cfg = output_hive[path_key]
             path = cfg["table_or_hdfs"] if isinstance(cfg, dict) else cfg
             if isinstance(cfg, dict) and cfg.get("keep_or_delete") == "delete":
                 self.tmp_paths.append(path)
-            return _reload_or_recompute_parquet(self, func, path, path_key)
+            return _reload_or_recompute_parquet(
+                self, lambda s: func(s, *args, **kwargs), path, path_key)
         return wrapper
     return decorator
 

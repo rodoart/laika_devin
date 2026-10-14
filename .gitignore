@@ -15,6 +15,7 @@ tests/local/__pycache__/
 tests/local/snap_*/
 tests/local/resume_baseline.json
 tests/local/_dbg*.py
+tests/local/email_drafts/
 
 # Local Hadoop binaries for Windows Spark (re-downloadable, see
 # tests/local/README.md)

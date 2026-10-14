@@ -31,6 +31,7 @@ from libs.generate_pivot import GeneratePivot
 from libs.generate_ratios import GenerateRatios
 from libs.colums_2_vector import ColumnsToVector
 from libs.steps import path_exists as _fs_path_exists, path_listdir as _fs_path_listdir
+from libs.hive_path import is_successful as _fs_is_successful
 import pyspark.sql.functions as F
 from functools import reduce
 from pyspark.sql import DataFrame, SparkSession
@@ -807,7 +808,10 @@ class DataPull():
         List[str]
             Transformaciones pendientes (``[]`` si no queda ninguna).
         """
-        files = set(self._check_files(path_fe))
+        # solo dirs parquet terminados (con _SUCCESS): una escritura a
+        # medias por kill de la etapa cuenta como pendiente y se recomputa
+        files = {d for d in self._check_files(path_fe)
+                 if _fs_is_successful(os.path.join(path_fe, d))}
         remaining = [t for t in trans_list
                      if f"{t}_features" not in files]
         # ``ratiosmod``/``ratiosmod_mt`` no escriben ``ratiosmod_features``
@@ -841,7 +845,8 @@ class DataPull():
             ``True`` si hay que ejecutarlo; ``False`` si ya existe (para
             todas las transformaciones).
         """
-        files = self._check_files(path_mobs)
+        files = [d for d in self._check_files(path_mobs)
+                 if _fs_is_successful(os.path.join(path_mobs, d))]
         if files:
             for file_aux in files:
                 if file_aux in files_fe:

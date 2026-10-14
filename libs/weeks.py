@@ -10,7 +10,7 @@ Changes tfrom column to weeks, in order to use DataPull as Weeks
 # Libraries
 from collections import namedtuple
 from datetime import date, datetime, timedelta
-from pathlib import PosixPath
+from pathlib import PurePosixPath as PosixPath
 from typing import Dict, List, Optional, Tuple, Type, Union
 
 from dateutil.relativedelta import relativedelta
@@ -20,8 +20,8 @@ from pyspark.sql.functions import (
     min as spark_min, month, to_date, trunc, weekofyear, when, year
 )
 
-from .aggregattes.payroll_income import cached_property, dynamic
-from .steps import path_delete
+from .aggregattes.payroll_income import cached_property
+from .steps import dynamic, path_delete
 
 # Functions
 

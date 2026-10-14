@@ -75,7 +75,9 @@ class SparkSessionBuilder:
     @staticmethod
     def hdfs_uri(p: PathLike) -> str:
         """Prefija ``hdfs://`` para que Spark no caiga en ``file:/``."""
-        s = str(p)
+        # as_posix(): Path stringify con "\" en Windows; las URIs hdfs son
+        # siempre posix independientemente del OS del driver.
+        s = p.as_posix() if isinstance(p, Path) else str(p)
         return s if s.startswith("hdfs://") else f"hdfs://{s}"
 
     def build(self) -> SparkSession:

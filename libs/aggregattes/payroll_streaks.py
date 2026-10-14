@@ -9,7 +9,7 @@ Class and Functions required to aggregate (payroll streaks)
 
 # Libraries
 from dateutil.relativedelta import relativedelta
-from pathlib import PosixPath
+from pathlib import PurePosixPath as PosixPath
 from typing import Callable, Dict, List, Optional, Union
 
 from pyspark.sql import Column, DataFrame, Row, SparkSession, Window
@@ -18,11 +18,11 @@ collect_list, sort_array, first, greatest, last, lit, row_number,
 min as spark_min, sum as spark_sum, trunc, when, max as spark_max,
 struct, expr, lag)
 
-from .payroll_income import cached_property, dynamic
+from .payroll_income import cached_property
 from ..weeks import WeekOfMonthPayroll
 from .base import (columns_with_prefix, columns_with_prefixes,
                    parse_config_bool, sort_df_columns)
-from ..steps import path_delete
+from ..steps import dynamic, path_delete
 
 
 # PRINCIPAL CLASS
