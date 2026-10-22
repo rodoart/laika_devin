@@ -150,6 +150,9 @@ class DataPull():
         self.spark_session_builder: Callable[[], SparkSession] = spark_session_builder
         self.sources: List[str] = self._get_sources()
         self.email_sender: EmailSender = EmailSender(self.config_custom["email_sender"])
+        #: HTML de los controles del extract (para el reporte único de
+        #: ``main_dynamic``; ``None`` si el extract se recargó).
+        self.extract_controls_html: Optional[str] = None
         self._quita_acentos()
     #
     @property
@@ -385,7 +388,8 @@ class DataPull():
 
     def _perform_extract(self, source_dict: Dict[str, Any], write_path: str,
                          number_threads: int, write_mode: str,
-                         source: str) -> None:
+                         source: str,
+                         send_controls: bool = True) -> None:
         """Ejecuta la extracción.
 
         Parameters
@@ -400,6 +404,10 @@ class DataPull():
             Modo de escritura de los parquets.
         source : str
             Fuente sobre la que hacer la extracción.
+        send_controls : bool
+            ``True``: envía el correo de controles aparte (pipeline
+            legado). ``False``: lo guarda en ``extract_controls_html``
+            para que ``main_dynamic`` lo incluya en el reporte único.
         """
         logging.info("%s - Starting Extract", source.upper())
         #print("Starting extract")
@@ -412,12 +420,16 @@ class DataPull():
                         number_threads = number_threads, mode = write_mode)
             extract.collect_history()
             html_mess = extract.create_html_controls(self.message_start_controls_stract, self.message_style, self.message_end)
-            subject = self.subject_controls.format(source)
-            self.email_sender.send(
-                self.config_custom["email_receivers"],
-                '{} completed'.format(subject),
-                html_mess
-            )
+            # el correo de controles queda disponible para el reporte
+            # único; en el pipeline legado se manda aparte
+            self.extract_controls_html = html_mess
+            if send_controls:
+                subject = self.subject_controls.format(source)
+                self.email_sender.send(
+                    self.config_custom["email_receivers"],
+                    '{} completed'.format(subject),
+                    html_mess
+                )
             #print("Ending extract")
             logging.info("%s - Ending Extract", source.upper())
         else:
@@ -547,7 +559,17 @@ class DataPull():
         #print("Starting pivoting")
         logging.info("%s - Starting Pivoting", source.upper())
         if self._check_pivoting(path_pivoting):
-            pivoting = GeneratePivot(previous_path, pivot_dict, self.sqlContext)
+            # keep_pivot_clients: el wide cubre a TODOS los clientes del
+            # pivot; los sin actividad llegan con features a 0 y mobs les
+            # imputa -99999 en ventanas (adobe_*)
+            pivot_clients = None
+            if pivot_dict.get("keep_pivot_clients"):
+                pivot_clients = self.pivot.select(
+                    F.col("numcliente"),
+                    F.col("vintage").alias("vintage_date")).distinct()
+            pivoting = GeneratePivot(previous_path, pivot_dict,
+                                     self.sqlContext,
+                                     pivot_clients=pivot_clients)
             pivoting.pivot_data()
         else:
             #print("pivoting was already performed!")

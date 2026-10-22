@@ -34,6 +34,7 @@ from .aggregattes.s15_nf import S15NFAggregate
 from .aggregattes.atms import AtmsAggregate
 from .aggregattes.s15 import S15Aggregate
 from .aggregattes.mokitara import MorkitaraAggregate
+from .aggregattes.adobe import AdobeAggregate
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -62,6 +63,8 @@ AGGREGATE_CLASSES: Dict[str, Type] = {
     "rev_balance": RevBalanceAggregate,
     "payroll_income": PayrollIncomeAggregate,
     "payroll_streaks": PayrollStreaksAggregate,
+    "adobe_bancanet": AdobeAggregate,
+    "adobe_mobile": AdobeAggregate,
 }
 
 # Argumentos extra que cada agregador acepta además de
@@ -70,6 +73,8 @@ AGGREGATE_EXTRA_ARGS: Dict[str, List[str]] = {
     "product_data": ["n_mis", "period"],
     "payroll_income": ["n_mis", "period"],
     "payroll_streaks": ["pivot_path", "tables", "n_mis", "period"],
+    "adobe_bancanet": ["tables"],
+    "adobe_mobile": ["tables"],
 }
 
 class GroupBy:

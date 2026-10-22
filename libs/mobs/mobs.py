@@ -41,6 +41,7 @@ from pyspark.sql.window import Window
 
 from ..hive_path import is_successful
 from ..steps import path_delete
+from .adobe import PreviousFixerAdobe
 from .payroll_income import PreviousFixerPayrollIncome, get_months
 from .payroll_streaks import PreviousFixerPayrollStreaks
 
@@ -51,6 +52,10 @@ logger = logging.getLogger(__name__)
 _FIXER_BY_SOURCE = {
     "payroll_income": PreviousFixerPayrollIncome,
     "payroll_streaks": PreviousFixerPayrollStreaks,
+    # las features adobe son _<N>w (semanas) y mobs_adobe está en meses —
+    # el fixer genérico (sufijo _<N>m) no las tocaría
+    "adobe_bancanet": PreviousFixerAdobe,
+    "adobe_mobile": PreviousFixerAdobe,
 }
 
 #: SELECT común de los cálculos de seniority (liabilities / credit_card).
@@ -195,6 +200,7 @@ class Mobs:
             "bureau": (self.bureau_mobs, tables_path),
             "payroll_income": (self.payroll_income_mobs, pathwrite),
             "payroll_streaks": (self.payroll_streaks_mobs, pathwrite),
+            "adobe": (self.adobe_mobs, pathwrite),
         }
         for source in self.mt_dict["missing_treatment"]["mobs"]["sources"]:
             method, base_path = dispatch[source]
@@ -292,7 +298,9 @@ class Mobs:
 
         ``tables_path`` es el directorio de salida de mobs, así que el
         input real está un nivel arriba (``datapull``)."""
-        datapull_path = str(PosixPath(tables_path).parent)
+        # os.path.dirname: en Windows el separador es '\' y PosixPath
+        # lo trataría como carácter normal (parent equivocado)
+        datapull_path = os.path.dirname(tables_path)
         source_data_frames = self._get_dataframes(
             datapull_path, list_tables, sql_context=sql_context)
         assert len(source_data_frames) == 1, "Only one mobs dataframe is expected"
@@ -364,6 +372,37 @@ class Mobs:
                for df, name in zip(dfs, mobs_columns)]
         #
         return self._join_mobs(dfs, mobs_columns)
+
+    def adobe_mobs(self, tables_path: str, list_tables: List[str],
+                   sql_context: SparkSession) -> DataFrame:
+        """
+        Antigüedad digital (mobs_adobe) para fuentes Adobe Clickstream.
+
+        Lee el ``extract/<table>_historic`` (tfrom mensual, pre-``weeks``)
+        filtrando los meses vacíos de la malla pivot y define
+        ``mobs_adobe = max(tfrom)``: meses desde la primera actividad
+        digital observada (tfrom inclusivo: 1 = mes del vintage), capeado
+        al borde de la ventana. Un cliente sin hits no aparece en el
+        dataframe — ``previous_fixer`` lo lleva a ``mobs=0`` y sus
+        features quedan en -99999.
+        """
+        df_tagged = self._single_tagged_df(tables_path, list_tables, sql_context)
+        assert "tfrom" in df_tagged.columns, "tfrom column is missing"
+        # la malla del extract trae meses vacíos (columnas de hit a null)
+        # por cada cliente del pivot: sin filtrar, max(tfrom) siempre
+        # sería el tope de ventana y nadie tendría antigüedad corta
+        date_col = self.mt_dict.get("extract", {}).get(
+            "name_mis", "file_date")
+        if isinstance(date_col, list):
+            date_col = date_col[0]
+        df_tagged = df_tagged.filter(col(date_col).isNotNull())
+        # tfrom del extract es inclusivo: 1 = mes del vintage, max = mes
+        # más viejo extraído -> max(tfrom) ya es la antigüedad en meses,
+        # naturalmente capeada al borde de la ventana (conservador: actividad
+        # en el mes más viejo no distingue 6m de historia mayor)
+        return df_tagged.groupBy("numcliente", "vintage_date")\
+            .agg(spark_max(col("tfrom")).alias("mobs_adobe"))\
+            .fillna(0, subset=["mobs_adobe"])
     ######################################## metodos para llenado mobs (Imputacion) ########################################
     def previous_fixer(self, path_mobs_fe: str, features_path: str,
                        write_mobs: str, feat_list: List[List[str]],

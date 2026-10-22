@@ -380,7 +380,7 @@
         "steps_list": [
             "extract",
             "groupby",
-            "st",
+            "mt",
             "pivoting",
             "fe",
             "mobs",
@@ -536,7 +536,7 @@
                 "enable": "true",
                 "q_floor": 0,
                 "q_cap": 0.995,
-                "error": 0.00001,
+                "error": 1e-05,
                 "prefix": "capped",
                 "prefixes_to_apply": [
                     "fix_2"
@@ -886,6 +886,607 @@
             "groupby",
             "pivoting",
             "fe",
+            "va"
+        ]
+    },
+    "adobe_bancanet": {
+        "extract": {
+            "libname": [
+                "gcgdlkmxpsd_dch_db"
+            ],
+            "table_name": [
+                "adobeanalytics_hit_data_mexicoprod_t_d"
+            ],
+            "select_variables": [
+                "post_visid_high, post_visid_low, visit_num, post_evar5, date_time, file_date, post_evar1, post_evar3, pagename, prop11, post_clickmaplinkbyregion, evar25, post_evar25, visit_page_num"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "file_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ],
+            "adobe": {
+                "hash_id_db": "gcgdlkmxpsd_cams_db.int_xs_b001_albnxfcrm_snap_t_m",
+                "clickstream_filters": [
+                    {
+                        "key": "pagename",
+                        "page_names": [
+                            "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Creditopersonal",
+                            "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Disponiblebanamex",
+                            "MX|BNP3|SESION|FINAL"
+                        ]
+                    },
+                    {
+                        "key": "post_evar25",
+                        "page_names": [
+                            "MX|BNP|Dashboard|Overlay|Con Disponible Banamex",
+                            "MX|BNP|Dashboard|Overlay|Logra m"
+                        ]
+                    },
+                    {
+                        "key": "post_clickmaplinkbyregion",
+                        "page_names": [
+                            "Iniciar sesi"
+                        ]
+                    }
+                ],
+                "event_filter": "",
+                "use_event_filter": false,
+                "keep_columns": [
+                    "numcliente",
+                    "session_id",
+                    "file_date",
+                    "date_time",
+                    "pagename",
+                    "post_evar1",
+                    "post_evar3",
+                    "post_clickmaplinkbyregion",
+                    "evar25",
+                    "post_evar25",
+                    "prop11",
+                    "visit_page_num"
+                ]
+            }
+        },
+        "weeks": {
+            "tfrom_method": "force_4_weeks",
+            "date_column_for_weekly_tfrom": [
+                "file_date"
+            ],
+            "type_of_date_column": [
+                "daily"
+            ],
+            "sql_date_format": [
+                "yyyy-MM-dd"
+            ],
+            "drop_columns_at_the_end": [
+                []
+            ]
+        },
+        "missing_treatment": {
+            "mobs": {
+                "table_name": [
+                    "extract/adobeanalytics_hit_data_mexicoprod_t_d_historic"
+                ],
+                "source": [
+                    "adobe"
+                ],
+                "sources": [
+                    "adobe"
+                ],
+                "mobs_tipo": [
+                    "mobs_adobe"
+                ]
+            }
+        },
+        "group_by": {
+            "prefix": "bnt",
+            "time_vars": [
+                "T_inicio",
+                "T_vista",
+                "T_session"
+            ],
+            "time_stats": [
+                "sum",
+                "mean",
+                "min",
+                "max",
+                "stddev"
+            ],
+            "flags": {
+                "PIL_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains_any",
+                        "value": [
+                            "Logra",
+                            "PERSONAL"
+                        ]
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "PIL_interested": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Creditopersonal|CAPTURA"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith",
+                        "value": "OfertasCitibanamex"
+                    }
+                ],
+                "LOP_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|Con Disponible Banamex"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "LOP_interested": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Disponiblebanamex|CAPTURA"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith",
+                        "value": "OfertasCitibanamex"
+                    }
+                ],
+                "CLI_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains",
+                        "value": "Aumenta tu l"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "HIP_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains",
+                        "value": "Hipoteca"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "NOM_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains",
+                        "value": "Nomina"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ]
+            },
+            "domains": {
+                "weekly": {
+                    "enabled": true
+                },
+                "fortnightly": {
+                    "enabled": true
+                },
+                "last_days": {
+                    "enabled": true,
+                    "windows": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        30,
+                        45,
+                        60,
+                        75,
+                        90,
+                        105,
+                        120,
+                        135,
+                        150,
+                        165,
+                        180
+                    ],
+                    "flag_stats": [
+                        "sum"
+                    ],
+                    "time_stats": [
+                        "sum",
+                        "mean"
+                    ]
+                },
+                "daily_seq": {
+                    "enabled": true,
+                    "days": 14
+                }
+            }
+        },
+        "pivoting": {
+            "source": "adobe_bancanet",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date"
+            ],
+            "drop_null_values": true,
+            "keep_pivot_clients": true
+        },
+        "fe": {
+            "ignore_this_value_when_calculating_mt_features": -99999,
+            "frequency_sufix": "w"
+        },
+        "steps_list": [
+            "extract",
+            "weeks",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "adobe_mobile": {
+        "extract": {
+            "libname": [
+                "gcgdlkmxpsd_dch_db"
+            ],
+            "table_name": [
+                "adobeanalytics_hit_data_mxmprod_t_d"
+            ],
+            "select_variables": [
+                "post_visid_high, post_visid_low, visit_num, post_evar5, CAST(TRIM(date_time) AS TIMESTAMP) AS date_time, file_date, UPPER(TRIM(pagename)) AS pagename, UPPER(TRIM(post_evar3)) AS post_evar3, post_evar1, prop11, evar25, evar30, post_evar63, post_evar25, visit_page_num"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "file_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ],
+            "adobe": {
+                "hash_id_db": "gcgdlkmxpsd_cams_db.int_xs_b001_albnxfcrm_snap_t_m",
+                "clickstream_filters": [
+                    {
+                        "key": "pagename",
+                        "page_names": [
+                            "MX|Mobile|Dashboard|Productos|MOB-"
+                        ]
+                    },
+                    {
+                        "key": "post_evar63",
+                        "page_names": [
+                            "MX|Mobile|Dashboard|DIS",
+                            "MX|Mobile|CPA"
+                        ]
+                    },
+                    {
+                        "key": "evar30",
+                        "page_names": [
+                            "zzzzvvvv"
+                        ]
+                    }
+                ],
+                "event_filter": "",
+                "use_event_filter": false,
+                "keep_columns": [
+                    "numcliente",
+                    "session_id",
+                    "file_date",
+                    "date_time",
+                    "pagename",
+                    "post_evar1",
+                    "post_evar3",
+                    "evar25",
+                    "evar30",
+                    "post_evar63",
+                    "post_evar25",
+                    "prop11",
+                    "visit_page_num"
+                ]
+            }
+        },
+        "weeks": {
+            "tfrom_method": "force_4_weeks",
+            "date_column_for_weekly_tfrom": [
+                "file_date"
+            ],
+            "type_of_date_column": [
+                "daily"
+            ],
+            "sql_date_format": [
+                "yyyy-MM-dd"
+            ],
+            "drop_columns_at_the_end": [
+                []
+            ]
+        },
+        "missing_treatment": {
+            "mobs": {
+                "table_name": [
+                    "extract/adobeanalytics_hit_data_mxmprod_t_d_historic"
+                ],
+                "source": [
+                    "adobe"
+                ],
+                "sources": [
+                    "adobe"
+                ],
+                "mobs_tipo": [
+                    "mobs_adobe"
+                ]
+            }
+        },
+        "group_by": {
+            "prefix": "mob",
+            "time_vars": [
+                "T_inicio",
+                "T_vista",
+                "T_session"
+            ],
+            "time_stats": [
+                "sum",
+                "mean",
+                "min",
+                "max",
+                "stddev"
+            ],
+            "flags": {
+                "Flag_interest_LOP": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "DIS"
+                    }
+                ],
+                "Flag_interest_PIL": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "CP"
+                    }
+                ],
+                "Flag_interest_NOM": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "CN"
+                    }
+                ],
+                "Flag_interest_CLI": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "CLI"
+                    }
+                ],
+                "Flag_interest_HIP": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "HIP"
+                    }
+                ],
+                "Flag_interest_TDC": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "TDC"
+                    }
+                ],
+                "Flag_interest_BAL": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "BAL"
+                    }
+                ]
+            },
+            "domains": {
+                "weekly": {
+                    "enabled": true
+                },
+                "fortnightly": {
+                    "enabled": true
+                },
+                "last_days": {
+                    "enabled": true,
+                    "windows": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        30,
+                        45,
+                        60,
+                        75,
+                        90,
+                        105,
+                        120,
+                        135,
+                        150,
+                        165,
+                        180
+                    ],
+                    "flag_stats": [
+                        "sum"
+                    ],
+                    "time_stats": [
+                        "sum",
+                        "mean"
+                    ]
+                },
+                "daily_seq": {
+                    "enabled": true,
+                    "days": 14
+                }
+            }
+        },
+        "pivoting": {
+            "source": "adobe_mobile",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date"
+            ],
+            "drop_null_values": true,
+            "keep_pivot_clients": true
+        },
+        "fe": {
+            "ignore_this_value_when_calculating_mt_features": -99999,
+            "frequency_sufix": "w"
+        },
+        "steps_list": [
+            "extract",
+            "weeks",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
             "va"
         ]
     },

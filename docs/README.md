@@ -18,6 +18,7 @@ resultado listo en Parquet para consumo de modelos.
 | [06_step_framework.md](06_step_framework.md) | Framework de `Step`s: ejecución dinámica, persistencia/reanudación, supervisor y sesiones |
 | [07_features.md](07_features.md) | Catálogo de features: transformaciones estándar, variantes MT/ONZ, `ratiosmod`, convención de nombres |
 | [08_execution.md](08_execution.md) | Cómo ejecutar: clúster (`run_fs.sh`, `main_dynamic`, supervisor) y local (env, datos tiny, flags) |
+| [09_adobe_source.md](09_adobe_source.md) | Fuentes Adobe Clickstream: integración `adobe_bancanet`/`adobe_mobile`, dominios de tfrom, mapeo de variables |
 
 ## En una frase
 

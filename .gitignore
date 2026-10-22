@@ -8,14 +8,19 @@ __pycache__/
 .mypy_cache/
 
 # Local test outputs (workdirs with generated parquets)
-tests/local/workdir/
-tests/local/workdir_dyn/
+tests/local/workdir*/
+# config_adobe lo regenera make_config() en cada corrida de adobe_e2e
+tests/local/config_adobe/
 tests/local/__pycache__/
 # Snapshots y artefactos del harness de reanudación / depuración local
 tests/local/snap_*/
 tests/local/resume_baseline.json
 tests/local/_dbg*.py
 tests/local/email_drafts/
+# fichero accidental: redirects a "nul" en git-bash crean un archivo real
+tests/local/nul
+# correos .eml del dry-run de EmailSender (LAIKA_EMAIL_DRY_RUN_DIR)
+*.eml
 
 # Local Hadoop binaries for Windows Spark (re-downloadable, see
 # tests/local/README.md)
@@ -34,3 +39,5 @@ Thumbs.db
 spark-warehouse/
 metastore_db/
 derby.log
+spark-events/
+*.crc

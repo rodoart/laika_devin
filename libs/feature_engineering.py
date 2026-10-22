@@ -129,9 +129,10 @@ class FeatureEngineering:
         lista_metodo = list()
         for feature in variables:
             lista_aux = self._filter_columns_feature(cols_df, feature)
-            lista_aux_2 = []
-            for k in range(len(lista_aux.items())):
-                lista_aux_2.append(lista_aux[str(k)])
+            # ordenar por tfrom numérico; las fuentes con dominios de
+            # tfrom dispersos (adobe: ld/dseq) no son densos desde 0
+            lista_aux_2 = [lista_aux[k]
+                           for k in sorted(lista_aux, key=int)]
             lista_metodo.append(lista_aux_2)
         return lista_metodo
 
@@ -279,10 +280,16 @@ class FeatureEngineering:
                 cont += 1
                 if cont % periodo == 0:
                     n_periodo += 1
-                    list_aux = []
-                    for k in range(n_periodo * periodo):
-                        list_aux.append(features[str(k)])
-                    return_features.append(list_aux)
+                    # solo tfroms presentes: dominios dispersos (adobe)
+                    # no tienen todas las columnas 0..k
+                    list_aux = [features[str(k)]
+                                for k in range(n_periodo * periodo)
+                                if str(k) in features]
+                    # saltar ventanas que no añaden columnas nuevas
+                    # (mismo último tfrom -> mismo stat y nombre duplicado)
+                    if list_aux and (not return_features
+                                     or list_aux[-1] != return_features[-1][-1]):
+                        return_features.append(list_aux)
         return return_features
 
     def _fill_na_zero(self, df: DataFrame) -> DataFrame:

@@ -98,6 +98,10 @@ class DatapullStageStep(Step):
             cc["working_path"], cc["year_id"], source)
         self.source_dict: Dict[str, Any] = datapull.config_rigid[source]
         self.last_duration: float = 0.0
+        # para el reporte de email: estado de la última ejecución de ESTE
+        # step (sin contar los upstream) y su duración propia
+        self.last_status: str = "pending"
+        self.action_duration: float = 0.0
 
     @property
     def _historic_tables(self) -> List[str]:
@@ -159,11 +163,20 @@ class DatapullStageStep(Step):
         listo para el step siguiente.
         """
         previous_path = self._read_previous_path()
-        if self.is_dynamic and self._already_done():
-            logger.info("%s data reloaded from %s", self.stage.capitalize(),
-                        self.output_path)
-        else:
-            self._run(previous_path)
+        _start = time.time()
+        try:
+            if self.is_dynamic and self._already_done():
+                self.last_status = "reloaded"
+                logger.info("%s data reloaded from %s",
+                            self.stage.capitalize(), self.output_path)
+            else:
+                self._run(previous_path)
+                self.last_status = "computed"
+        except Exception:
+            self.last_status = "failed"
+            raise
+        finally:
+            self.action_duration = time.time() - _start
         return collect_step_output(
             self, self._next_path(previous_path), "previous_path")
 
@@ -199,7 +212,9 @@ class ExtractStep(DatapullStageStep):
         try:
             self.datapull._perform_extract(
                 self.source_dict, self.write_path, cc["n_threads"],
-                cc["write_mode"], self.source)
+                cc["write_mode"], self.source,
+                # el correo de controles se pliega en el reporte único
+                send_controls=False)
         finally:
             cc["n_mis"] -= n_mis_bump
 
@@ -355,7 +370,8 @@ class MobsStep(DatapullStageStep):
         return not self.datapull._check_mobs(self.output_path, files_fe)
 
     def _run(self, previous_path: Optional[str]) -> None:
-        if self.source not in ["payroll_income", "payroll_streaks"]:
+        if self.source not in ["payroll_income", "payroll_streaks",
+                               "adobe_bancanet", "adobe_mobile"]:
             self.datapull._create_mobs_extract()
         cc = self.datapull.config_custom
         path_mobs = os.path.join(self.write_path, "mobs")

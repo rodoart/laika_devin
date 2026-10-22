@@ -27,12 +27,14 @@ import re
 
 from .extract_special_treatments.default import ExtractSpecialTreatment
 from .extract_special_treatments.payroll_streaks import PayrollStreaksExtractSpecialTreatment
+from .extract_special_treatments.adobe import AdobeExtractSpecialTreatment
 from .steps import path_exists, path_delete
 
 class Extract():
     #: Fuentes a las que se aplica tratamiento especial en la extracción.
     special_treatment_sources = [
-        "payroll_streaks", "payroll_income"
+        "payroll_streaks", "payroll_income",
+        "adobe_bancanet", "adobe_mobile"
     ]
     """Clase usada para el extract en datapull.
 
@@ -172,6 +174,8 @@ class Extract():
         """
         if self.source in ["payroll_streaks", "payroll_income"]:
             special_treatment_object = PayrollStreaksExtractSpecialTreatment
+        elif self.source in ["adobe_bancanet", "adobe_mobile"]:
+            special_treatment_object = AdobeExtractSpecialTreatment
         else:
             special_treatment_object = ExtractSpecialTreatment
         return special_treatment_object(parent=self, input_df=input_df, table_name=table_name, date=date, query=query,
@@ -571,7 +575,10 @@ class Extract():
             name_vintage_pivote = name_vintage_pivote, sqlContext = sqlContext)
             paths_delete += path_aux_list
             fun_delete = partial(self._delete_intermediate)
-            thread_pool.map(fun_delete, paths_delete)
+            # dedupe: un cohorte de vintage puede colisionar con un cohorte
+            # mensual (<table>_YYYYMM) -> dos threads borrarian el mismo
+            # dir y rmtree falla con FileNotFoundError
+            thread_pool.map(fun_delete, list(dict.fromkeys(paths_delete)))
             self.controls_out.append(self._controls_output(path_output = path_output, sqlContext = sqlContext))
             self.controls_out_f.append(self._controls_notnull_output(key_pivote = key_pivote, path_output = path_output,sqlContext =
             sqlContext))

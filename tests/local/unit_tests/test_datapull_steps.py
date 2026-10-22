@@ -93,8 +93,8 @@ class FakeDataPull:
         return []
     def _get_time_window(self, n_mis, period):
         return [2, 4]
-    def _perform_extract(self, *a):
-        self.calls.append(("extract", a))
+    def _perform_extract(self, *a, **kw):
+        self.calls.append(("extract", a, kw))
     def _perform_weeks(self, *a):
         self.calls.append(("weeks", a))
     def _perform_mt(self, *a):

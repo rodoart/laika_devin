@@ -31,6 +31,7 @@ import logging
 import os
 import sys
 import traceback
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Iterator, List, Optional
 
@@ -148,8 +149,9 @@ def run_source(datapull: Any, source: str, paths: Any, is_dynamic: bool,
     bool
         ``True`` si la fuente terminó bien.
     """
-    import pandas as pd
     from libs.datapull_steps import build_source_chain
+    from libs.notifications import (build_run_report, count_distinct_clients,
+                                    feature_stats, parquet_num_columns)
 
     logging.info("############# DATAPULL START FOR SOURCE: %s ###############",
                  source.upper())
@@ -159,33 +161,60 @@ def run_source(datapull: Any, source: str, paths: Any, is_dynamic: bool,
     if cleanup:
         last_step.delete_tmp_paths()
         return True
+
+    cc = datapull.config_custom
+    started_at = datetime.now()
+    status, error_tb = "success", None
+    # los controles del extract se acumulan en el datapull (instancia
+    # compartida entre fuentes) -> reset para no arrastrar la anterior
+    datapull.extract_controls_html = None
     try:
         last_step.execute()
     except Exception:
-        traceback_output = traceback.format_exc()
-        logger.error("Error in source %s:\n%s", source, traceback_output)
-        if send_email:
-            datapull.email_sender.send(
-                datapull.config_custom["email_receivers"],
-                "Error in execution of source {}".format(source),
-                "An error was found in source {}, contact data engineer team "
-                "for details and solutions\n{}".format(source, traceback_output))
-        return False
+        status = "failed"
+        error_tb = traceback.format_exc()
+        logger.error("Error in source %s:\n%s", source, error_tb)
 
     chain = list(iter_chain(last_step))
-    execution_dataframe = pd.DataFrame({
-        "steps": [s.stage for s in chain],
-        "time of execution": [
-            datapull._calculate_time(s.last_duration) for s in chain]})
+    # stats del reporte (defensivo: nunca debe impedir el envío del mail)
+    stats: dict = {"pivot_clients": None, "final_clients": None,
+                   "final_columns": None, "feature_detail": None,
+                   "trans_list": None}
+    try:
+        sql_context = datapull.sqlContext
+        stats["pivot_clients"] = count_distinct_clients(
+            sql_context, cc["pivot_path"])
+        out_path = last_step.output_path
+        stats["final_clients"] = count_distinct_clients(
+            sql_context, out_path)
+        stats["final_columns"] = parquet_num_columns(sql_context, out_path)
+        if any(s.stage == "fe" for s in chain):
+            trans_list = (cc["lista_trans_per_source"][source]
+                          if cc.get("lista_trans_per_source") is not None
+                          else cc["lista_trans"])
+            stats["trans_list"] = trans_list
+            stats["feature_detail"] = feature_stats(
+                sql_context,
+                paths.stage_path(cc["working_path"], cc["year_id"],
+                                 source, "fe"),
+                trans_list)[1]
+    except Exception:
+        logger.warning("Run report stats failed", exc_info=True)
+
     if send_email:
-        html_mess = datapull._create_html_notification_times(
-            execution_dataframe, datapull.message_start_finals,
-            datapull.message_style, datapull.message_end)
-        datapull.email_sender.send(
-            datapull.config_custom["email_receivers"],
-            '{} completed'.format(
-                datapull.subject_source_completed.format(source)),
-            html_mess)
+        try:
+            subject, html_mess = build_run_report(
+                source=source, chain=chain, status=status,
+                started_at=started_at, finished_at=datetime.now(),
+                config_custom=cc, error_traceback=error_tb,
+                controls_html=datapull.extract_controls_html, **stats)
+            datapull.email_sender.send(cc["email_receivers"], subject,
+                                       html_mess)
+        except Exception:
+            logger.warning("Run report email failed", exc_info=True)
+
+    if status == "failed":
+        return False
     logging.info("############# DATAPULL END FOR SOURCE: %s ###############",
                  source.upper())
     return True
