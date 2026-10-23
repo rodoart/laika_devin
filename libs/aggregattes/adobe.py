@@ -99,7 +99,8 @@ class AdobeAggregate(BaseAggregate):
     Parameters
     ----------
     previous_path : str
-        Path del paso anterior (``weekly_extract`` con tfrom semanal).
+        Path del paso anterior (``extract`` con tfrom semanal — el
+        reetiquetado de weeks vive integrado en el extract).
     agg_dict : Dict[str, Any]
         ``config_rigid[<source>].group_by`` — flags, dominios, stats.
     sqlContext : SparkSession

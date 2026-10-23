@@ -21,17 +21,15 @@ from dateutil.relativedelta import relativedelta
 import pyspark.sql.functions as F
 from random import randint
 import logging
-from multiprocessing.pool import ThreadPool
-from cytoolz.functoolz import partial
 import os
 import re
 
 from .extract_special_treatments.default import ExtractSpecialTreatment
 from .extract_special_treatments.payroll_streaks import PayrollStreaksExtractSpecialTreatment
 from .extract_special_treatments.adobe import AdobeExtractSpecialTreatment
-from .steps import path_exists, path_delete, save_parquet, \
-    read_parquet_many
-from .hive_path import is_successful
+from .steps import path_delete, path_exists, save_parquet
+from .hive_path import list_files, mkdir, touch
+from .weeks import retag_tfrom_columns, tfrom_window_bounds
 
 class Extract():
     #: Fuentes a las que se aplica tratamiento especial en la extracción.
@@ -76,7 +74,8 @@ class Extract():
                  sources_cat: Dict[str, Any], source: str,
                  sqlContext: SparkSession, number_threads: int = 32,
                  mode: str = "overwrite", name: str = "extract",
-                 is_dynamic: bool = False) -> None:
+                 is_dynamic: bool = False,
+                 weeks_dict: Optional[Dict[str, Any]] = None) -> None:
         self.pivot_table: DataFrame = pivot_table
         self.working_path: str = working_path
         self.sources_cat: Dict[str, Any] = sources_cat
@@ -91,6 +90,10 @@ class Extract():
         self.controls_out_f: List[pd.DataFrame] = []
         self.name: str = name
         self.is_dynamic: bool = is_dynamic
+        # Config del antiguo paso ``weeks`` integrada en el extract: si
+        # está presente, el ``<table>_historic`` sale ya con el tfrom
+        # semanal/diario (particiones ``vintage_date/tfrom`` finales)
+        self.weeks_dict: Dict[str, Any] = weeks_dict or {}
 
     def _create_queries(self, list_dates: List[str], table_name: str,
                         database: str, type_date: str, name_mis: str,
@@ -274,130 +277,134 @@ class Extract():
             range_vin.append((min_date.strftime(self.FORMAT_TIME), max_date.strftime(self.FORMAT_TIME)))
         return range_vin
 
-    def _write_parquet(self, df: DataFrame, path: str, file_name: str,
-                       partition_cols: Optional[List[str]] = None
-                       ) -> Tuple[()]:
-        """Escribe un parquet, particionado por vintage/tfrom si aplica
-        (ver :func:`libs.steps.save_parquet`).
+    def _weeks_table_config(self, k: int) -> Optional[Dict[str, Any]]:
+        """Config de reetiquetado semanal/diario para la tabla ``k``.
 
-        Parameters
-        ----------
-        df : DataFrame
-            Dataframe a escribir.
-        path : str
-            Path donde se va a escribir el parquet.
-        file_name : str
-            Nombre del parquet.
-        partition_cols : Optional[List[str]]
-            Columnas de particionado explícitas (p.ej. ``["tfrom_date"]``
-            para ``<table>_full``). ``None`` = autodetección.
+        Devuelve ``None`` si la fuente no tiene bloque ``weeks`` o la
+        tabla no tiene ``date_column_for_weekly_tfrom`` (esa tabla
+        mantiene el tfrom mensual).
         """
-        save_parquet(df, os.path.join(path, file_name), self.mode,
-                     partition_cols)
-        return()
+        try:
+            date_col = self.weeks_dict["date_column_for_weekly_tfrom"][k]
+            type_of_date = self.weeks_dict["type_of_date_column"][k]
+        except (KeyError, IndexError, TypeError):
+            return None
+        method = self.weeks_dict.get("tfrom_method", "standard")
+        if isinstance(method, list):
+            method = method[k]
+        formats = self.weeks_dict.get("sql_date_format") or []
+        return {
+            "date_col": date_col,
+            "type_of_date": type_of_date,
+            "method": method,
+            "date_format": formats[k]
+            if k < len(formats) and formats[k] else "yyyy-MM-dd",
+            # ``drop_columns_at_the_end`` existe en la config pero el
+            # viejo WeeklyTFrom nunca se lo pasaba al retagger (default
+            # []) — se ignora para conservar los outputs
+            "drop_cols": [],
+        }
 
-    def _evaluate_path(self, path: str) -> bool:
-        """Evalúa si ``path`` existe (ver :func:`libs.steps.path_exists`)."""
-        return path_exists(path)
+    def _join_month_pivot(self, df: DataFrame, df_pivot: DataFrame,
+                          key_pivote: str, key_source: str) -> DataFrame:
+        """Join ``df_pivot`` (left) con los datos del mes.
 
-    def _delete_intermediate(self, path: str) -> None:
-        """Borra ``path`` si existe (ver :func:`libs.steps.path_delete`)."""
-        path_delete(path)
-
-    def _create_cohorts(self, vintages_dates: List[Any],
-                        vintage_ranges: List[Tuple[str, str]],
-                        key_pivote: str, save_path: str, name_vintage: str,
-                        table_name: str, pivot: DataFrame,
-                        sqlContext: SparkSession,
-                        history_paths: List[str]) -> List[str]:
-        """Crea las cohortes por cada vintage.
-
-        Parameters
-        ----------
-        vintages_dates : list
-            Todas las fechas de vintage del pivot.
-        vintage_ranges : list
-            Lista de tuplas ``(min_date, max_date)`` del rango de cada
-            vintage.
-        key_pivote : str
-            Clave primaria de la tabla pivot.
-        save_path : str
-            Path donde se guardan los resultados.
-        name_vintage : str
-            Nombre del vintage en el pivot.
-        table_name : str
-            Nombre de la tabla de la fuente.
-        pivot : DataFrame
-            Tabla pivot.
-        sqlContext : SparkSession
-            Tu sqlContext.
-        history_paths : list
-            Paths de los cohortes mensuales ``<table>_YYYYMM`` ya
-            escritos (particionados por ``name_vintage``).
-
-        Returns
-        -------
-        List[str]
-            Paths con todas las cohortes creadas
-            (``<table>_<YYYYMM>`` por vintage).
+        Misma lógica que tenía el cohorte mensual: join por lista de
+        columnas cuando la clave es ``numcliente`` y por expresión en
+        otro caso (eliminando la clave duplicada cuando
+        ``key_source == key_pivote``).
         """
-        df_history = read_parquet_many(sqlContext, history_paths)
-        # tfrom_date llega como string desde los mensuales; el cast a
-        # date preserva el tipo que daba el antiguo ``_full`` particionado
-        df_history = df_history.withColumn(
-            "tfrom_date", F.to_date("tfrom_date"))
-        path_aux_list=[]
-        for k in range(len(vintages_dates)):
-            vintage = vintages_dates[k]
-            # ``_vintage_`` en el nombre evita la colisión con los
-            # cohortes mensuales ``<table>_YYYYMM`` (mismo nombre cuando
-            # el mes coincide con el vintage)
-            cohort_name = table_name + "_vintage_" + vintage.strftime("%Y%m")
-            path_aux = os.path.join(save_path, cohort_name)
-            path_aux_list.append(path_aux)
-            if self.is_dynamic and is_successful(path_aux):
-                logging.info(f"Vintage cohort {cohort_name} already written, reloading")
-                continue
-            # ``vintage == lit`` además del datediff: mismo conjunto de
-            # filas pero permite podar las particiones vintage= de los
-            # cohortes mensuales
-            df_final = df_history.withColumn("AUX_VTG", F.to_date(F.lit(vintage)))\
-            .filter(df_history.tfrom_date.between(vintage_ranges[k][0],vintage_ranges[k][1]))\
-            .where(F.datediff(F.col(name_vintage), F.col("AUX_VTG")) == 0)\
-            .where(F.col(name_vintage) == F.lit(vintage))
-            df_final = df_final.withColumn("vintage_date", F.lit(vintage)).withColumn("tfrom_ini", F.lit(vintage_ranges[k][1]))\
-            .withColumn("tfrom", F.months_between(F.col("tfrom_ini"), F.col("tfrom_date"))).drop("tfrom_ini","AUX_VTG")
-            self._write_parquet(df_final, save_path, cohort_name)
-        return path_aux_list
+        if key_pivote == "numcliente":
+            df_temp = df_pivot.join(df, [key_source], "left")
+        else:
+            df_temp = df_pivot.join(df,(df_pivot[key_pivote] == df[key_source]),"left")
+            # join por expresión conserva la clave de AMBOS lados; con
+            # key_source == key_pivote (p.ej. crd_acct_nbr en
+            # rev_balance) la columna queda duplicada y el write falla
+            if key_source == key_pivote:
+                df_temp = df_temp.drop(df[key_source])
+        if "numcliente" in df.columns and "numcliente" in df_pivot.columns:
+            df_temp = df_temp.drop(df.numcliente)
+        return df_temp
 
-    def _join_full_cohorts(self, save_path: str, path_aux_list: List[str],
-                           table_name: str, name_vintage_pivote: str,
-                           sqlContext: SparkSession) -> str:
-        """Crea el parquet ``<table>_historic`` uniendo todas las cohortes.
+    def _month_base(self, df_temp: DataFrame, date: str,
+                    name_vintage_pivote: str, retraso: int) -> DataFrame:
+        """Filas del mes ya acotadas al rango temporal de su vintage.
 
-        Parameters
-        ----------
-        save_path : str
-            Path donde se guardan los resultados.
-        path_aux_list : List[str]
-            Lista de paths de todas las cohortes en formato string.
-        table_name : str
-            Nombre de la tabla usada.
-        name_vintage_pivote : str
-            Nombre de la columna de vintage en el pivot.
-        sqlContext : SparkSession
-            Tu sqlContext.
-
-        Returns
-        -------
-        str
-            Path donde se escribió la cohorte final.
+        ``df_temp`` lleva ya el join con el pivot. ``tfrom_date`` es el
+        bucket mensual (fin de mes) y el filtro ``between`` equivale al
+        antiguo cohorte por vintage, pero evaluado por fila (cada fila
+        usa su propio vintage). Además asigna ``vintage_date``.
         """
-        df_final = read_parquet_many(sqlContext, path_aux_list)
-        if name_vintage_pivote in df_final.columns:
-            df_final = df_final.drop(name_vintage_pivote)
-        self._write_parquet(df_final, save_path, table_name + "_historic")
-        return(os.path.join(save_path, table_name + "_historic"))
+        vintage = F.to_date(F.col(name_vintage_pivote))
+        tfrom_ini = F.date_sub(
+            F.add_months(F.date_add(vintage, 1), -retraso), 1)
+        tfrom_min = F.date_sub(
+            F.add_months(F.date_add(vintage, 1),
+                         -(retraso + self.n_mis - 1)), 1)
+        return (df_temp
+                .withColumn("tfrom_date", F.to_date(F.lit(date)))
+                .filter(F.col("tfrom_date").between(tfrom_min, tfrom_ini))
+                .withColumn("vintage_date", F.col(name_vintage_pivote)))
+
+    def _apply_tfrom(self, base: DataFrame, name_vintage_pivote: str,
+                     retraso: int, wk: Optional[Dict[str, Any]],
+                     bounds: Optional[Tuple[Any, Any]]) -> DataFrame:
+        """Calcula ``tfrom``/``tfrom_date`` finales sobre ``base``.
+
+        Sin ``wk``: tfrom mensual (``months_between`` al fin del rango
+        del vintage). Con ``wk``: el reetiquetado semanal/diario del
+        antiguo paso ``weeks``, incluido el filtro global de ventana
+        (``bounds``), anclado a ``last_day(vintage_date)``.
+        """
+        if wk is None:
+            vintage = F.to_date(F.col(name_vintage_pivote))
+            tfrom_ini = F.date_sub(
+                F.add_months(F.date_add(vintage, 1), -retraso), 1)
+            result = base.withColumn(
+                "tfrom", F.months_between(tfrom_ini, F.col("tfrom_date")))
+        else:
+            # el retagger calculaba el tfrom sobre la fecha del fichero
+            # (tfrom_date = to_date(date_col)), no sobre el bucket
+            result = base.withColumn(
+                "tfrom_date",
+                F.to_date(F.col(wk["date_col"]), wk["date_format"]))
+            if bounds is not None:
+                result = result.filter(
+                    (F.col("tfrom_date") >= F.lit(str(bounds[0])))
+                    & (F.col("tfrom_date") < F.lit(str(bounds[1]))))
+            result = retag_tfrom_columns(
+                result, wk["date_col"], wk["method"], wk["type_of_date"],
+                wk["date_format"], wk["drop_cols"])
+        if name_vintage_pivote in result.columns \
+                and name_vintage_pivote != "vintage_date":
+            result = result.drop(name_vintage_pivote)
+        return result
+
+    def _write_month_partitions(self, df: DataFrame,
+                                historic_path: str) -> None:
+        """Escribe un mes en ``<table>_historic`` con overwrite dinámico.
+
+        ``partitionOverwriteMode=dynamic`` hace el write idempotente:
+        solo se reemplazan las particiones ``vintage_date/tfrom``
+        presentes en el df, así un kill a mitad de mes deja particiones
+        parciales que la reanudación limpia al reescribir el mismo
+        conjunto. Los meses vacíos no escriben nada.
+        """
+        if not df.head(1):
+            return
+        # un kill previo puede dejar staging ``_temporary`` del commit
+        # abortado — se ignora al leer pero ocupa espacio
+        staging = os.path.join(historic_path, "_temporary")
+        if path_exists(staging):
+            path_delete(staging)
+        conf = "spark.sql.sources.partitionOverwriteMode"
+        self.sqlContext.conf.set(conf, "dynamic")
+        try:
+            df.write.mode("overwrite") \
+                .partitionBy("vintage_date", "tfrom").parquet(historic_path)
+        finally:
+            self.sqlContext.conf.set(conf, "static")
 
     def _append_pandas(self, *args: pd.DataFrame) -> pd.DataFrame:
         """Concatena dataframes pandas para los controles.
@@ -467,27 +474,6 @@ class Extract():
         ("vintage_date"),F.desc("tfrom_date")).toPandas()
         return controls
 
-    def _controls_in_from_parquet(self, path_output: str,
-                                  name_mis: str) -> pd.DataFrame:
-        """Controles de entrada recalculados desde un parquet ya
-        persistido.
-
-        Se usa al reanudar el extract (``is_dynamic``): evita reejecutar
-        la query a Hive solo para llenar los controles del correo. Si no
-        se puede reconstruir (columna ausente, parquet ilegible) devuelve
-        un dataframe vacío.
-        """
-        try:
-            match = re.search(r'\((.*?)\)', name_mis)
-            if match:
-                name_mis = match.group(1)
-            df = self.sqlContext.read.parquet(path_output)
-            if name_mis in df.columns:
-                return df.groupBy(name_mis).count().toPandas()
-        except Exception:
-            pass
-        return pd.DataFrame()
-
     def create_html_controls(self, message_start: str, message_style: str,
                              message_end: str,
                              table_id: str = "default") -> str:
@@ -518,83 +504,50 @@ class Extract():
         mess_final = mess_final + message_end
         return mess_final
 
-    def _create_month_cohort(self, master_list: List[Any], df_pivot: DataFrame,
-                             name_mis: str, key_pivote: str, key_source: str,
-                             save_path: str,
-                             name_vintage: str) -> Tuple[str, pd.DataFrame]:
-        """Crea las cohortes mensuales de toda la información.
-
-        Parameters
-        ----------
-        master_list : list
-            Lista con elementos ``[query, table_name, date]``, usados en la
-            query final y los filtros.
-        df_pivot : DataFrame
-            Dataframe con el pivot.
-        name_mis : str
-            Nombre de la columna de fecha en la tabla.
-        key_pivote : str
-            Nombre de la clave en el pivot.
-        key_source : str
-            Nombre de la clave en la fuente.
-        save_path : str
-            Path donde guardar.
-        name_vintage : str
-            Columna de vintage del pivot — los mensuales se particionan
-            por ella para que ``_create_cohorts`` pode por vintage.
+    def _run_month_query(self, query: str, name_mis: str, table_name: str,
+                         date: str) -> Tuple[DataFrame, DataFrame]:
+        """Ejecuta la query de un mes + tratamiento especial + controles.
 
         Returns
         -------
-        Tuple[str, pd.DataFrame]
-            Tupla ``(path_parquet, controls)``: el path donde se guardó el
-            parquet del mes y sus controles de entrada.
+        Tuple[DataFrame, DataFrame]
+            ``(df_mes, controls_spark)``: el df mensual (con
+            ``name_mis`` como string y el ``ExtractSpecialTreatment``
+            aplicado) y el ``groupBy(name_mis).count()`` de controles
+            de entrada (Spark df minúsculo, listo para persistir).
         """
-        query = master_list[0]
-        table_name = master_list[1]
-        date = master_list[2]
         match = re.search(r'\((.*?)\)', name_mis)
         if match:
             name_mis = match.group(1)
-        out_path = os.path.join(save_path, table_name)
-        # Reanudación: el parquet mensual ya está escrito completo -> no
-        # se reejecuta la query a Hive; solo se reconstruyen los controles
-        if self.is_dynamic and is_successful(out_path):
-            logging.info(f"Month cohort {table_name} already written, reloading")
-            return (out_path, self._controls_in_from_parquet(out_path, name_mis))
         df = self.sqlContext.sql(query)
         df = df.withColumn(name_mis, F.col(name_mis).cast("string"))
         if self.source in self.special_treatment_sources:
             df = self._special_treatment(df, table_name, date, query).run()
-        #
-        controls = df.groupBy(name_mis).count().toPandas()
-        if key_pivote == "numcliente":
-            df_temp = df_pivot.join(df, [key_source], "left")
-        else:
-            df_temp = df_pivot.join(df,(df_pivot[key_pivote] == df[key_source]),"left")
-            # join por expresión conserva la clave de AMBOS lados; con
-            # key_source == key_pivote (p.ej. crd_acct_nbr en rev_balance)
-            # la columna queda duplicada y el write falla
-            if key_source == key_pivote:
-                df_temp = df_temp.drop(df[key_source])
-        if "numcliente" in df.columns and "numcliente" in df_pivot.columns:
-            df_temp = df_temp.drop(df.numcliente)
-        df_temp = df_temp.withColumn("tfrom_date", F.lit(date))
-        # particionado por la columna de vintage del pivot: permite a
-        # _create_cohorts leer solo la partición del vintage en curso
-        # (tfrom_date es un solo valor por mensual -> no aporta)
-        self._write_parquet(df_temp, save_path, table_name,
-                            partition_cols=[name_vintage])
-        return (os.path.join(save_path, table_name), controls)
+        return df, df.groupBy(name_mis).count()
+
+    def _read_controls_sidecar(self, ctrl_path: str,
+                               sqlContext: SparkSession) -> pd.DataFrame:
+        """Recarga el parquet de controles de un mes ya procesado."""
+        try:
+            return sqlContext.read.parquet(ctrl_path).toPandas()
+        except Exception:
+            return pd.DataFrame()
 
     def collect_history(self) -> Tuple[()]:
         """Crea el collect history de una fuente (``sources_cat``) para el
         pivot en el path especificado.
 
-        Para cada tabla de la fuente: genera las queries mensuales, corre
-        :meth:`_create_month_cohort` en un ``ThreadPool``, une todo en
-        ``<table>_full``, crea las cohortes por vintage
-        (``<table>_historic``), borra los intermedios y calcula los
-        controles de entrada/salida.
+        Por cada tabla corre las queries mensuales y escribe **directo**
+        en las particiones ``vintage_date/tfrom`` de
+        ``<table>_historic`` (overwrite dinámico) — sin dirs
+        ``<table>_YYYYMM``, ``<table>_vintage_*`` ni ``_full``. Si la
+        fuente tiene bloque ``weeks``, el tfrom semanal/diario y la
+        ventana global ``filtered`` se calculan aquí mismo (la etapa
+        ``weeks`` queda como no-op).
+
+        Reanudación: marcadores ``_meta/<table>/<YYYYMM>.done`` por mes
+        (con ``<YYYYMM>.ctrl`` = controles de entrada persistidos) y
+        ``_meta/<table>/_DONE`` cuando la tabla está completa.
         """
         pivot_table = self.pivot_table
         sources_cat = self.sources_cat
@@ -602,7 +555,6 @@ class Extract():
         n_mis = self.n_mis
         save_path = os.path.join(self.working_path, self.name)
         for k in range(len(sources_cat["table_name"])):
-            paths_delete = []
             #Getting constants of dict:
             libname = sources_cat["libname"][k]
             table_name = sources_cat["table_name"][k]
@@ -618,12 +570,23 @@ class Extract():
             key_pivote = sources_cat["key_pivote"][k]
             name_vintage_pivote = sources_cat["name_vintage_pivote"][k]
             key_source = sources_cat["key_source"][k]
-            # Reanudación a nivel tabla: el ``<table>_historic`` final ya
-            # existe -> se recarga entera; solo se recalculan controles
             historic_path = os.path.join(save_path, table_name + "_historic")
-            if self.is_dynamic and is_successful(historic_path):
+            meta_dir = os.path.join(save_path, "_meta", table_name)
+            done_flag = os.path.join(meta_dir, "_DONE")
+            wk = self._weeks_table_config(k)
+            # Reanudación a nivel tabla: ``_DONE`` -> se recarga entera;
+            # solo se recalculan los controles para el correo
+            if self.is_dynamic and path_exists(done_flag):
                 logging.info(f"Table {table_name} historic already written, reloading")
-                self.controls_in.append(self._controls_in_from_parquet(historic_path, name_mis))
+                try:
+                    ctrl_dirs = [os.path.join(meta_dir, f)
+                                 for f in sorted(list_files(meta_dir))
+                                 if f.endswith(".ctrl")]
+                    self.controls_in.append(
+                        sqlContext.read.parquet(*ctrl_dirs).toPandas()
+                        if ctrl_dirs else pd.DataFrame())
+                except Exception:
+                    self.controls_in.append(pd.DataFrame())
                 self.controls_out.append(self._controls_output(path_output = historic_path, sqlContext = sqlContext))
                 self.controls_out_f.append(self._controls_notnull_output(key_pivote = key_pivote, path_output = historic_path,sqlContext =
                 sqlContext))
@@ -632,7 +595,6 @@ class Extract():
             vintages_dates = self._get_vintages_dates(pivot = pivot_table, name_vintage_date = name_vintage_pivote,\
                         table_key = table_pivote, sqlContext = sqlContext)
             list_dates = self._range_dates(vintages = vintages_dates, retraso = retraso, n_mis = n_mis)
-            vintage_ranges = self._range_vintages(vintages = vintages_dates, retraso = retraso, n_mis = n_mis)
             queries, tables = self._create_queries(list_dates = list_dates, table_name = table_name,\
                         database = libname, type_date = type_date,\
                         name_mis = name_mis, select_variables = select_variables)
@@ -641,39 +603,144 @@ class Extract():
             else:
                 df_pivot = pivot_table.select(key_pivote, name_vintage_pivote,"numcliente").distinct()
             df_pivot.cache()
-            paths = []
+            mkdir(meta_dir, "-p")
             controls_input = []
-            thread_pool = ThreadPool(self.number_threads)
-            lista_aux = []
-            master_lists = [[queries[k], tables[k], list_dates[k]] for k in range(len(queries))]
-            fun_month_cohorts = partial(self._create_month_cohort, df_pivot = df_pivot, name_mis = name_mis, key_pivote = key_pivote,\
-                        key_source = key_source, save_path = save_path,\
-                        name_vintage = name_vintage_pivote)
-            lista_aux.append(thread_pool.map(fun_month_cohorts, master_lists))
-            self.controls_in.append(self._append_pandas(*[tuple_aux[1] for tuple_aux in lista_aux[0]]))
-            # El ``<table>_full`` intermedio desapareció: los mensuales en
-            # disco (particionados por vintage) son el checkpoint de
-            # reanudación y ``_create_cohorts`` los lee con poda.
-            paths_delete += [tuple_aux[0] for tuple_aux in lista_aux[0]]
-            path_aux_list = self._create_cohorts(vintages_dates = vintages_dates, vintage_ranges = vintage_ranges, key_pivote =
-            key_pivote,\
-                        save_path = save_path, name_vintage = name_vintage_pivote, table_name = table_name,\
-                        pivot = pivot_table, sqlContext = sqlContext,\
-                        history_paths = [tuple_aux[0] for tuple_aux in lista_aux[0]])
-            path_output = self._join_full_cohorts(save_path = save_path, path_aux_list = path_aux_list, table_name = table_name,
-            name_vintage_pivote = name_vintage_pivote, sqlContext = sqlContext)
-            paths_delete += path_aux_list
-            fun_delete = partial(self._delete_intermediate)
-            # dedupe por seguridad: dos threads no deben borrar el mismo
-            # dir (rmtree falla con FileNotFoundError)
-            thread_pool.map(fun_delete, list(dict.fromkeys(paths_delete)))
-            self.controls_out.append(self._controls_output(path_output = path_output, sqlContext = sqlContext))
-            self.controls_out_f.append(self._controls_notnull_output(key_pivote = key_pivote, path_output = path_output,sqlContext =
+            master_lists = [[queries[j], tables[j], list_dates[j]]
+                            for j in range(len(queries))]
+            month_markers = [os.path.join(meta_dir, t + ".done")
+                             for t in tables]
+            done_flags = [self.is_dynamic and path_exists(m)
+                          for m in month_markers]
+            # Paridad con el overwrite total antiguo: una corrida no
+            # dinámica (o una sin marcadores mensuales — restos de runs
+            # previos) arranca con el _historic limpio para que no
+            # queden particiones de datos que ya no se computan
+            if path_exists(historic_path) and (
+                    not self.is_dynamic or not any(done_flags)):
+                path_delete(historic_path)
+            # bounds de la ventana semanal: el máximo ``tfrom_date``
+            # global de la tabla vive en el mes elegible más reciente con
+            # datos -> escaneo descendente hasta el primer mes no vacío.
+            # Solo hace falta si queda algo por escribir: con todos los
+            # marcadores presentes no se reejecuta ninguna query.
+            bounds = None
+            if wk is not None and not all(done_flags):
+                for master_list in reversed(master_lists):
+                    df_b, _ = self._run_month_query(
+                        master_list[0], name_mis, master_list[1],
+                        master_list[2])
+                    base_b = self._month_base(
+                        self._join_month_pivot(
+                            df_b, df_pivot, key_pivote, key_source),
+                        master_list[2], name_vintage_pivote, retraso)
+                    max_tfrom_date = base_b.agg(
+                        F.max(F.to_date(F.col(wk["date_col"]),
+                                        wk["date_format"]))
+                    ).collect()[0][0]
+                    if max_tfrom_date is not None:
+                        # la ventana usa el n_mis AMPLIADO (+1 weeks):
+                        # el viejo WeeksStep también subía n_mis antes
+                        # de llamar al retagger
+                        bounds = tfrom_window_bounds(
+                            max_tfrom_date, wk["method"],
+                            wk["type_of_date"], n_mis)
+                        break
+            # Spill de particiones semanales: una semana a caballo de dos
+            # meses agrupa ficheros de DOS buckets distintos en la misma
+            # partición (vintage, tfrom) — p.ej. la semana lun 29-sep a
+            # dom 5-oct contiene ficheros del 29-30 sep (bucket sep) y
+            # del 1-5 oct (bucket oct). Si cada bucket escribiera "sus"
+            # particiones, el segundo write clobberaría al primero.
+            # Regla: el bucket con fecha lit en el mes M escribe TODAS
+            # las particiones cuyo DOMINGO (lunes+6) cae en M — ese
+            # bucket tiene garantizados los ficheros del tramo final de
+            # la semana; el tramo inicial llega como spill del bucket
+            # anterior (sus ficheros cuyo domingo cae en M). El método
+            # 'daily' y el tfrom mensual no tienen spill: cada fichero
+            # cae en un único bucket.
+            needs_spill = wk is not None and wk["method"] != "daily"
+            spill_prev = None
+            df_template = None
+            for j, master_list in enumerate(master_lists):
+                query, month_table, month_date = master_list
+                marker = month_markers[j]
+                ctrl_path = os.path.join(meta_dir, month_table + ".ctrl")
+                month_lit = month_date[0:7] + "-01"
+                next_lit = master_lists[j + 1][2][0:7] + "-01" \
+                    if j + 1 < len(master_lists) else None
+                month_done = done_flags[j]
+                # Un mes con marker solo se recomputa si el siguiente
+                # bucket necesita su spill (sus ficheros de lunes en el
+                # mes siguiente)
+                spill_needed = needs_spill and next_lit is not None \
+                    and not done_flags[j + 1]
+                if month_done and not spill_needed:
+                    logging.info(
+                        f"Month {month_table} already written, reloading")
+                    controls_input.append(
+                        self._read_controls_sidecar(ctrl_path, sqlContext))
+                    spill_prev = None
+                    continue
+                df, controls = self._run_month_query(
+                    query, name_mis, month_table, month_date)
+                df_temp = self._join_month_pivot(df, df_pivot, key_pivote,
+                                                 key_source)
+                base = self._month_base(df_temp, month_date,
+                                        name_vintage_pivote, retraso)
+                if wk is not None and bounds is None:
+                    # ningún mes tuvo fechas válidas -> la ventana global
+                    # vacía toda la tabla
+                    df_out = self._apply_tfrom(
+                        base.limit(0), name_vintage_pivote, retraso, wk,
+                        bounds)
+                else:
+                    df_out = self._apply_tfrom(base, name_vintage_pivote,
+                                               retraso, wk, bounds)
+                df_template = df_out
+                if needs_spill:
+                    # mes del domingo de la semana (tfrom_date = lunes)
+                    sunday_month = F.trunc(
+                        F.date_add(F.col("tfrom_date"), 6), "month")
+                    # El último bucket no tiene un "dueño" posterior para
+                    # su spill (p.ej. ficheros de oct con domingo en oct
+                    # dentro del bucket lit-oct): sus particiones las
+                    # escribe él mismo por completo
+                    own = df_out if next_lit is None else df_out.filter(
+                        sunday_month == F.lit(month_lit))
+                    spill = df_out.filter(
+                        sunday_month == F.lit(next_lit)) \
+                        if next_lit is not None else base.limit(0)
+                    df_out = own if spill_prev is None \
+                        else own.unionByName(spill_prev)
+                    spill_prev = spill
+                if month_done:
+                    # solo se recomputó para aportar su spill al bucket
+                    # siguiente; su escritura ya está hecha
+                    controls_input.append(
+                        self._read_controls_sidecar(ctrl_path, sqlContext))
+                    continue
+                controls.write.mode("overwrite").parquet(ctrl_path)
+                controls_input.append(controls.toPandas())
+                self._write_month_partitions(df_out, historic_path)
+                touch(marker)
+            # Si ningún mes escribió nada (tabla vacía) el histórico no
+            # existe: materializarlo vacío para los controles y los
+            # lectores posteriores
+            if not path_exists(historic_path):
+                if df_template is None:
+                    raise RuntimeError(
+                        f"extract: marcadores _meta de {table_name} sin "
+                        f"historic — estado inconsistente, borra {meta_dir}")
+                save_parquet(df_template.limit(0), historic_path, self.mode)
+            # los writes con partitionOverwriteMode=dynamic no dejan
+            # ``_SUCCESS`` en la raíz (Spark 3.3) — se toca al cerrar la
+            # tabla para que las comprobaciones ``is_successful`` sigan
+            # funcionando sobre el _historic completo
+            touch(os.path.join(historic_path, "_SUCCESS"))
+            touch(done_flag)
+            self.controls_in.append(self._append_pandas(*controls_input))
+            self.controls_out.append(self._controls_output(path_output = historic_path, sqlContext = sqlContext))
+            self.controls_out_f.append(self._controls_notnull_output(key_pivote = key_pivote, path_output = historic_path,sqlContext =
             sqlContext))
-        # Si TODAS las tablas se recargaron (is_dynamic), ni thread_pool
-        # ni df_pivot llegaron a crearse -> no hay nada que cerrar
-        if 'thread_pool' in locals() and thread_pool is not None:
-            thread_pool.close()
-        if 'df_pivot' in locals() and df_pivot is not None:
             df_pivot.unpersist()
         return()

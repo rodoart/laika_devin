@@ -15,13 +15,14 @@ from libs.weeks import (
     WeekOfMonth,
     WeekOfMonthFourWeeksForced,
     WeekOfMonthPayroll,
-    WeeklyTFromParquetReTagger,
     add_weeks_to_yearweek,
     change_date_first_monday_of_the_week_column,
     change_date_to_first_monday_of_the_month_column,
     date_to_week_of_year_pyspark_consistent,
     date_to_yearweek,
     is_yearweek_complete_in_month,
+    retag_tfrom_columns,
+    tfrom_window_bounds,
     weeks_difference,
     yearweek_to_date,
 )
@@ -203,63 +204,38 @@ class TestWeekOfMonthTaggers:
 
 
 # ---------------------------------------------------------------------------
-# WeeklyTFromParquetReTagger — retaggea extract a semanas
+# retag_tfrom_columns / tfrom_window_bounds — tfrom integrado en el extract
 # ---------------------------------------------------------------------------
-class TestWeeklyTFromReTagger:
-    def _build_extract(self, spark, path, rows, fecha_col="fecha"):
-        df = spark.createDataFrame(rows, ["numcliente", "vintage_date",
-                                          fecha_col, "valor"])
-        df.write.mode("overwrite").parquet(path)
-        return df
+class TestRetagTFromColumns:
+    def _retag(self, spark, rows, method, date_type="daily"):
+        df = spark.createDataFrame(
+            rows, ["numcliente", "vintage_date", "fecha", "valor"])
+        return retag_tfrom_columns(
+            df, date_column_for_weekly_tfrom="fecha",
+            tfrom_method=method, type_of_date_column=date_type)
 
-    def test_standard_tfrom(self, spark, tmp_path):
+    def test_standard_tfrom(self, spark):
         """tfrom standard: semanas ISO hacia atrás desde el último día
         del mes vintage (30-jun-2024 = semana ISO 26)."""
-        extracted = tmp_path / "extract"
-        out = tmp_path / "weekly" / "t1"
         rows = [
             ("1", date(2024, 6, 30), date(2024, 6, 24), 10.0),  # wk26 -> t0
             ("1", date(2024, 6, 30), date(2024, 6, 17), 20.0),  # wk25 -> t1
             ("1", date(2024, 6, 30), date(2024, 6, 10), 30.0),  # wk24 -> t2
         ]
-        self._build_extract(spark, extracted.as_posix(), rows)
-        tagger = WeeklyTFromParquetReTagger(
-            date_column_for_weekly_tfrom="fecha",
-            tfrom_method="standard",
-            type_of_date_column="daily",
-            extracted_path=extracted.as_posix(),
-            output_path=out.as_posix(),
-            n_mis=4,
-            sqlContext=spark,
-            is_dynamic=False)
-        tagger.run()
-        result = spark.read.parquet(out.as_posix())
+        result = self._retag(spark, rows, "standard")
         tfroms = {r.fecha: r.tfrom for r in
                   result.select("fecha", "tfrom").collect()}
         assert tfroms[date(2024, 6, 24)] == 0
         assert tfroms[date(2024, 6, 17)] == 1
         assert tfroms[date(2024, 6, 10)] == 2
 
-    def test_force_4_weeks_tfrom(self, spark, tmp_path):
+    def test_force_4_weeks_tfrom(self, spark):
         """tfrom force_4_weeks: meses de 4 semanas hacia atrás."""
-        extracted = tmp_path / "extract"
-        out = tmp_path / "weekly" / "t1"
         rows = [
             ("1", date(2024, 6, 30), date(2024, 6, 24), 1.0),
             ("1", date(2024, 6, 30), date(2024, 5, 27), 2.0),
         ]
-        self._build_extract(spark, extracted.as_posix(), rows)
-        tagger = WeeklyTFromParquetReTagger(
-            date_column_for_weekly_tfrom="fecha",
-            tfrom_method="force_4_weeks",
-            type_of_date_column="daily",
-            extracted_path=extracted.as_posix(),
-            output_path=out.as_posix(),
-            n_mis=4,
-            sqlContext=spark,
-            is_dynamic=False)
-        tagger.run()
-        result = spark.read.parquet(out.as_posix())
+        result = self._retag(spark, rows, "force_4_weeks")
         assert "tfrom" in result.columns
         tfroms = {r.fecha: r.tfrom for r in
                   result.select("fecha", "tfrom").collect()}
@@ -267,44 +243,64 @@ class TestWeeklyTFromReTagger:
         assert tfroms[date(2024, 6, 24)] == 0
         assert tfroms[date(2024, 5, 27)] == 4
 
-    def test_payroll_tfrom(self, spark, tmp_path):
+    def test_payroll_tfrom(self, spark):
         """tfrom payroll: semanas payroll (1-7/8-15/16-21/22-fin);
         un mes atrás = 4 tfroms."""
-        extracted = tmp_path / "extract"
-        out = tmp_path / "weekly" / "t1"
         rows = [
             ("1", date(2024, 6, 30), date(2024, 6, 22), 1.0),  # w4 junio -> t0
             ("1", date(2024, 6, 30), date(2024, 5, 25), 2.0),  # w4 mayo -> t4
         ]
-        self._build_extract(spark, extracted.as_posix(), rows)
-        tagger = WeeklyTFromParquetReTagger(
-            date_column_for_weekly_tfrom="fecha",
-            tfrom_method="payroll",
-            type_of_date_column="daily",
-            extracted_path=extracted.as_posix(),
-            output_path=out.as_posix(),
-            n_mis=4,
-            sqlContext=spark,
-            is_dynamic=False)
-        tagger.run()
-        result = spark.read.parquet(out.as_posix())
+        result = self._retag(spark, rows, "payroll")
         tfroms = {r.fecha: r.tfrom for r in
                   result.select("fecha", "tfrom").collect()}
         assert tfroms[date(2024, 6, 22)] == 0
         assert tfroms[date(2024, 5, 25)] == 4
 
-    def test_asserts_on_bad_methods(self, spark, tmp_path):
-        with pytest.raises(AssertionError):
-            WeeklyTFromParquetReTagger(
-                date_column_for_weekly_tfrom="f",
-                tfrom_method="bad_method",
-                type_of_date_column="daily",
-                extracted_path="/x", output_path="/y",
-                n_mis=4, sqlContext=spark)
-        with pytest.raises(AssertionError):
-            WeeklyTFromParquetReTagger(
-                date_column_for_weekly_tfrom="f",
-                tfrom_method="standard",
-                type_of_date_column="bad_type",
-                extracted_path="/x", output_path="/y",
-                n_mis=4, sqlContext=spark)
+    def test_daily_tfrom(self, spark):
+        """tfrom daily: días naturales al last_day del vintage;
+        tfrom_date = la propia fecha del fichero."""
+        rows = [
+            ("1", date(2024, 6, 30), date(2024, 6, 30), 1.0),  # -> t0
+            ("1", date(2024, 6, 30), date(2024, 6, 15), 2.0),  # -> t15
+            ("1", date(2024, 6, 30), date(2024, 5, 31), 3.0),  # -> t30
+        ]
+        result = self._retag(spark, rows, "daily")
+        collected = {r.fecha: (r.tfrom, r.tfrom_date) for r in
+                     result.select("fecha", "tfrom", "tfrom_date").collect()}
+        assert collected[date(2024, 6, 30)] == (0.0, date(2024, 6, 30))
+        assert collected[date(2024, 6, 15)] == (15.0, date(2024, 6, 15))
+        assert collected[date(2024, 5, 31)] == (30.0, date(2024, 5, 31))
+
+    def test_raises_on_bad_methods(self, spark):
+        df = spark.createDataFrame(
+            [("1", date(2024, 6, 30), date(2024, 6, 24), 1.0)],
+            ["numcliente", "vintage_date", "fecha", "valor"])
+        with pytest.raises(ValueError):
+            retag_tfrom_columns(df, "fecha", "bad_method", "daily")
+        with pytest.raises(ValueError):
+            retag_tfrom_columns(df, "fecha", "standard", "bad_type")
+
+
+class TestTfromWindowBounds:
+    def test_monthly_like_methods(self):
+        # n_back = n_mis - 2; ventana mensual semiabierta
+        lo, hi = tfrom_window_bounds(
+            date(2024, 6, 30), "force_4_weeks", "daily", n_mis=4)
+        assert (lo, hi) == (date(2024, 4, 1), date(2024, 7, 1))
+        lo, hi = tfrom_window_bounds(
+            date(2024, 6, 30), "payroll", "monthly", n_mis=4)
+        assert (lo, hi) == (date(2024, 4, 1), date(2024, 7, 1))
+
+    def test_weekly_backed_standard(self):
+        # standard + daily: ventana en semanas completas (~4.35/sem/mes)
+        lo, hi = tfrom_window_bounds(
+            date(2024, 6, 15), "standard", "daily", n_mis=4)
+        # hi = lunes siguiente a la última semana completa de junio;
+        # lo = hi - 9 semanas aprox (round(4.35*2))
+        assert lo < date(2024, 5, 1)
+        assert hi > date(2024, 6, 24)
+        assert hi <= date(2024, 7, 8)
+
+    def test_bad_type_raises(self):
+        with pytest.raises(ValueError):
+            tfrom_window_bounds(date(2024, 6, 30), "standard", "bad", 4)

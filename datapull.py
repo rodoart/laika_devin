@@ -21,7 +21,6 @@ Notas
 from pyspark import conf
 from libs.email_sender import EmailSender
 from libs.extract import Extract
-from libs.weeks import WeeklyTFrom
 from libs.feature_engineering import FeatureEngineering
 from libs.vector_assembler import FeaturesVectorAssembler
 from libs.missing_treatment import MissingTreatment
@@ -208,9 +207,10 @@ class DataPull():
         """Crea y ejecuta el pipeline de una fuente concreta.
 
         Recorre ``steps_list`` de la config rígida enhebrando
-        ``previous_path`` entre etapas (extract -> weekly_extract ->
-        missing_treatment -> groupby -> pivot -> ratios/features -> mobs
-        -> vector_assembler) y manda el correo con los tiempos al final.
+        ``previous_path`` entre etapas (extract -> weeks(no-op, tfrom
+        integrado en extract) -> missing_treatment -> groupby -> pivot
+        -> ratios/features -> mobs -> vector_assembler) y manda el
+        correo con los tiempos al final.
 
         Parameters
         ----------
@@ -253,16 +253,10 @@ class DataPull():
                 previous_step = "extract"
                 previous_path = os.path.join(write_path,"extract")
             elif step == "weeks":
-                path_weeks = previous_path
-                tables_weeks = [table + "_historic" for table in source_dict["extract"]["table_name"]]
-                n_mis_bump = (2 if source == "payroll_income" else 0) + 1
-                self.config_custom["n_mis"] += n_mis_bump
-                try:
-                    self._perform_weeks(path_weeks, tables_weeks, source)
-                finally:
-                    self.config_custom["n_mis"] -= n_mis_bump
-                previous_step = "weekly_extract"
-                previous_path = os.path.join(write_path,"weekly_extract")
+                # no-op: el reetiquetado de tfrom vive dentro del
+                # extract — se propaga ``extract/`` como previous_path
+                previous_step = "extract"
+                previous_path = os.path.join(write_path,"extract")
             elif step == "mt":
                 path_mt = previous_path
                 tables_mt = [table + "_historic" for table in source_dict["extract"]["table_name"]]
@@ -423,7 +417,10 @@ class DataPull():
             extract = Extract(pivot_table = self.pivot, working_path = write_path, n_mis = n_mis,\
                         sources_cat = sources_cat, source=source, sqlContext = self.sqlContext,\
                         number_threads = number_threads, mode = write_mode,\
-                        is_dynamic = is_dynamic)
+                        is_dynamic = is_dynamic,\
+                        weeks_dict = source_dict.get("weeks") \
+                            if "weeks" in source_dict.get("steps_list", []) \
+                            else None)
             extract.collect_history()
             html_mess = extract.create_html_controls(self.message_start_controls_stract, self.message_style, self.message_end)
             # el correo de controles queda disponible para el reporte
@@ -441,43 +438,6 @@ class DataPull():
         else:
             logging.info("%s - Extract was already performed", source.upper())
             #print(f"Extract was already performed for source {source}!")
-    #
-    @reset_spark_session
-    def _perform_weeks(self, path_weeks: str, tables_weeks: List[str],
-                       source: str, is_dynamic: bool = False) -> None:
-        """Ejecuta el reetiquetado semanal (``WeeklyTFrom``).
-
-        Parameters
-        ----------
-        path_weeks : str
-            Path donde están los dataframes del paso extract.
-        tables_weeks : List[str]
-            Lista con todas las tablas a las que aplicar el reetiquetado.
-        source : str
-            Fuente en ejecución.
-        is_dynamic : bool
-            ``True``: reanudable por tabla — cada ``weekly_extract``
-            ya escrito se recarga en vez de recomputarse.
-        """
-        logging.info("%s - Starting Weeks Re TFrom", source.upper())
-        #print("Starting missing treatment")
-        path_write = self.config_custom["working_path"]
-        path_missing = os.path.join(path_weeks[:path_weeks.rindex("/")],"weekly_extract")
-        if self._check_missing(path_missing = path_missing, tables_missing = tables_weeks):
-            weekly_tfrom = WeeklyTFrom(
-                extracted_tables = tables_weeks,
-                extracted_path = path_weeks,
-                weeks_dict=self.config_rigid[source]["weeks"],
-                n_mis=self.config_custom["n_mis"],
-                sqlContext=self.sqlContext,
-                is_dynamic=is_dynamic
-            )
-            weekly_tfrom.run()
-            #print("Ending missing treatment")
-            logging.info("%s - Ending Weeks Re TFrom", source.upper())
-        else:
-            #print("Missing treatment was already performed!")
-            logging.info("%s - Weeks Re TFrom was already performed", source.upper())
     #
     @reset_spark_session
     def _perform_mt(self, mt: MissingTreatment, path_mt: str,
@@ -688,7 +648,7 @@ class DataPull():
         #print("Starting vector assembler")
         logging.info("%s - Starting Vector Assembler", source.upper())
         save_path = os.path.join(write_path,"vector_assembler")
-        if self._evaluate_path(save_path):
+        if _fs_is_successful(save_path):
             logging.info("%s - Vector Assembler was already performed", source.upper())
             #print(f"Vector assembler was already performed")
         else:
@@ -721,7 +681,7 @@ class DataPull():
         #print("Starting cols2vec")
         logging.info("%s - Starting Cols2Vec(VectorAssembler)", source.upper())
         save_path = os.path.join(write_path,"vector_assembler")
-        if self._evaluate_path(save_path):
+        if _fs_is_successful(save_path):
             #print(f"Cols2Vec(VectorAssembler) was already performed")
             logging.info("%s - Cols2Vec(VectorAssembler) was already performed", source.upper())
         else:
@@ -750,13 +710,13 @@ class DataPull():
             ``True`` si el extract hay que ejecutarlo y ``False`` si ya
             existe (para todas las tablas).
         """
-        tables_historic = [table + "_historic" for table in extract_dictionary["table_name"]]
-        # is_successful por tabla (dir + _SUCCESS): un write de parquet
-        # matado a medias deja el dir sin _SUCCESS -> se recomputa, no se
-        # recarga roto. Además hace el check reanudable por tabla.
+        # La tabla está completa solo con su marcador ``_meta/<t>/_DONE``:
+        # con escritura directa a particiones, ``<t>_historic/_SUCCESS``
+        # aparece tras el PRIMER mes — no garantiza la tabla entera.
         return any(
-            not _fs_is_successful(os.path.join(path_extract, table))
-            for table in tables_historic
+            not _fs_path_exists(
+                os.path.join(path_extract, "_meta", table, "_DONE"))
+            for table in extract_dictionary["table_name"]
         )
 
     def _check_missing(self, path_missing: str,
@@ -796,7 +756,7 @@ class DataPull():
         bool
             ``True`` si hay que ejecutarlo; ``False`` si ya existe.
         """
-        if self._evaluate_path(path_groupby):
+        if _fs_is_successful(path_groupby):
             return False
         else:
             return True
@@ -814,7 +774,7 @@ class DataPull():
         bool
             ``True`` si hay que ejecutarlo; ``False`` si ya existe.
         """
-        if self._evaluate_path(path_pivoting):
+        if _fs_is_successful(path_pivoting):
             return False
         else:
             return True
@@ -1009,10 +969,13 @@ class DataPull():
         bool
             ``True`` si hay que ejecutarlo; ``False`` si no.
         """
-        if len(self._check_files(path_premobs)) == 3:
-            return False
-        else:
-            return True
+        # Completo solo con ``_meta/<t>/_DONE`` por tabla (mismo
+        # contrato que ``_check_extract``).
+        return any(
+            not _fs_path_exists(
+                os.path.join(path_premobs, "_meta", table, "_DONE"))
+            for table in self.config_rigid["mobs_preparation"]["table_name"]
+        )
 
     def _check_crd_acct_nbr(self, sources: List[str]) -> bool:
         """Comprueba si alguna fuente necesita el número de tarjeta de crédito.

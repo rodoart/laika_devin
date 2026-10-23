@@ -72,26 +72,46 @@ Comportamiento clave: cada etapa escribe
   `<working_path>/<year_id>/pivot_prepared` (también cuando no hay
   enriquecimiento), así que los accesos posteriores a `self.pivot` lo
   recargan sin re-preparar ni resetear la sesión.
-- **extract**: cada parquet mensual `<table>_YYYYMM` (particionado por
-  vintage — ya no existe el `<table>_full` intermedio), los cohortes de
-  vintage `<table>_vintage_YYYYMM` y el `<table>_historic` final se
-  recargan si tienen `_SUCCESS` — un kill a mitad de tabla solo
-  reejecuta las queries mensuales que falten, no toca Hive por lo ya
-  escrito.
+- **extract**: escritura directa a particiones — cada mes transformado
+  se escribe en `<table>_historic/vintage_date=*/tfrom=*` con
+  `partitionOverwriteMode=dynamic` (ya no existen los parquets
+  intermedios `<table>_YYYYMM`, `<table>_vintage_YYYYMM` ni `<table>_full`).
+  La reanudación es por marcadores `extract/_meta/<table>/`:
+  `<YYYYMM>.done` salta la query de ese mes (solo se recomputa si el
+  siguiente bucket necesita su *spill* semanal), `<YYYYMM>.ctrl`
+  conserva los controles de entrada y `_meta/<table>/_DONE` marca la
+  tabla completa — un kill a mitad de tabla solo reejecuta las queries
+  mensuales que falten.
+- **weeks**: no-op — el retag de `tfrom` vive dentro del extract; el
+  step solo propaga `extract/` como `previous_path`.
 - **mobs**: cada feature imputada se recarga de `imputate_mobs/`; las
   features passthrough no se duplican — su marcador
   `imputate_mobs/_passthrough/<feature>` declara que el vector assembler
   las lea directamente de `features/` (los fixers payroll/adobe nunca
   las copiaron; el contrato del VA no cambia).
-- **weeks**: `WeeklyTFrom` pasa `is_dynamic` a cada
-  `WeeklyTFromParquetReTagger`; sus intermedios `filtered_<table>` y la
-  salida `weekly_extract/<table>` se recargan por tabla vía `@dynamic`.
 - **fe**: cada transformación es un parquet independiente en
   `features/` → reanudación a mitad de etapa.
 
-Los checks de etapa (`_check_extract`, `_check_missing`) verifican
-`_SUCCESS` por tabla, no solo la existencia del directorio — un write
-matado a medias nunca se da por completado.
+Los checks de completitud (`_check_extract`, `_check_missing`,
+`_check_groupby`, `_check_pivoting`, `_perform_va`, `_perform_cols2vec`,
+`_fe_performed`, `_check_mobs`, `Step._already_done` y
+`FeaturesVectorAssembler._resolve`) verifican `_SUCCESS`, no solo la
+existencia del directorio — un write matado a medias nunca se da por
+completado: se reescribe con `mode("overwrite")`, que borra los
+part-files corruptos antes de reescribir.
+
+> Invariante: ningún "ya existe" sobre un dir parquet debe usar
+> `path_exists` — solo `is_successful` (dir + `_SUCCESS`). Un dir sin
+> `_SUCCESS` puede contener part-files a medias que hacen fallar
+> `read.parquet` al inferir el footer.
+
+El test ácido `tests/local/acid_resume_test.py` valida esta invariante
+end-to-end: envuelve `DataFrameWriter.parquet`, mata el proceso a mitad
+de escritura en ~24 puntos (uno por etapa clave de cada fuente, dejando
+un part-file corrupto sin `_SUCCESS`), reanuda con `run_source` y exige
+que los 131 parquets finales sean idénticos a
+`golden_regression.json` — el resultado de una corrida sin
+interrupciones.
 
 ### 1.3 Layout de parquets: particionado por vintage/tfrom
 
@@ -102,8 +122,7 @@ automáticamente por las columnas temporales presentes en el DataFrame:
 |---|---|
 | `pivot_prepared`, `vector_assembler` | `vintage=` |
 | `pivot` (wide), `features/raw_features`, `mobs/calculate_mobs` | `vintage_date=` |
-| `<table>_vintage_*`, `<table>_historic`, `weekly_extract/<table>`, `groupby/`, `missing_treatment/` | `vintage_date=/tfrom=` (2 niveles) |
-| cohortes mensuales `<table>_YYYYMM` | `vintage=` (poda el filtro por vintage de `_create_cohorts`) |
+| `<table>_historic` (extract), `groupby/`, `missing_treatment/` | `vintage_date=/tfrom=` (2 niveles) |
 | `*_features` de fe/mobs | sin particionar (sin columnas temporales) |
 
 Consecuencias:
@@ -125,9 +144,11 @@ checkpoints en disco (un kill de plataforma reanuda sin recomputar):
   permite el broadcast en runtime **solo** cuando un lado del join
   resulta chico — convive con `autoBroadcastJoinThreshold=-1` (el
   broadcast plan-time sigue desactivado).
-- **extract**: sin el `<table>_full` intermedio (un write+read completo
-  menos por tabla); los mensuales particionados por vintage alimentan
-  los cohortes con poda (`vintage == lit` además del `datediff`).
+- **extract**: sin el `<table>_full` intermedio ni los parquets
+  mensuales/cohortes separados — cada mes se escribe directo en las
+  particiones `vintage_date/tfrom` del `_historic` (un write + un read
+  menos por tabla, con la regla de spill semanal para las semanas a
+  caballo de dos meses).
 - **missing_treatment**: un solo checkpoint por variable
   (`dir_temp1`); antes cada variable escribía `temp2` y lo copiaba
   verbatim a `temp1`. `fill_stat` solo escribe cuando el fill aplicó.

@@ -15,7 +15,8 @@ import os
 import re
 import logging
 
-from .steps import path_exists, path_listdir, path_delete, save_parquet
+from .steps import path_listdir, path_delete, save_parquet
+from .hive_path import is_successful
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -77,8 +78,12 @@ class FeaturesVectorAssembler:
         return path_listdir(path)
 
     def _evaluate_path(self, path: str) -> bool:
-        """Evalúa si ``path`` existe (ver :func:`libs.steps.path_exists`)."""
-        return path_exists(path)
+        """Evalúa si ``path`` es un parquet terminado (dir + ``_SUCCESS``).
+
+        Una escritura matada a medias no cuenta: un dir corrupto no se
+        lee — se resuelve al ``fallback_path`` si existe.
+        """
+        return is_successful(path)
 
     def _delete_intermediate(self, path: str) -> None:
         """Borra ``path`` si existe (ver :func:`libs.steps.path_delete`)."""

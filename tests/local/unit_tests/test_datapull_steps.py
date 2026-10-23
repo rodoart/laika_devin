@@ -174,7 +174,9 @@ class TestChainExecution:
         last = build_source_chain(dp, "payroll_streaks",
                                   paths=paths_config, is_dynamic=False)
         last.execute()
-        assert [c[0] for c in dp.calls] == ["extract", "weeks", "mt"]
+        # weeks es no-op (no llama ningún _perform_*): el retag de
+        # tfrom vive dentro del extract
+        assert [c[0] for c in dp.calls] == ["extract", "mt"]
 
     def test_n_mis_adjustments(self, tmp_path, paths_config):
         """weeks sube n_mis +1 en extract y lo restaura tras correr."""
@@ -189,9 +191,12 @@ class TestChainExecution:
                                           spark):
         """is_dynamic + salida existente -> no llama _perform_*."""
         # precreamos la salida de extract para que _already_done sea True
+        # (el centinela de tabla completa es _meta/<t>/_DONE)
         extract_out = (tmp_path / "202601" / "payroll_streaks" / "extract")
         (extract_out / "t1_historic").mkdir(parents=True)
         (extract_out / "t1_historic" / "_SUCCESS").write_text("")
+        (extract_out / "_meta" / "t1").mkdir(parents=True)
+        (extract_out / "_meta" / "t1" / "_DONE").write_text("")
         dp = FakeDataPull(tmp_path.as_posix(), ["extract"])
         last = build_source_chain(dp, "payroll_streaks",
                                   paths=paths_config, is_dynamic=True)
@@ -251,20 +256,17 @@ class TestStageSpecifics:
         step._run(None)
         assert dp.config_custom["n_mis"] == 4
 
-    def test_weeks_n_mis_bump_is_scoped(self, tmp_path, paths_config):
-        """Weeks usa n_mis+1 durante la llamada y lo restaura después."""
+    def test_weeks_is_noop_forwarding_previous_path(self, tmp_path,
+                                                    paths_config):
+        """``weeks`` es no-op: el retag de tfrom vive en el extract y el
+        step propaga ``extract/`` como previous_path sin tocar n_mis."""
         dp = FakeDataPull(tmp_path.as_posix(), ["extract", "weeks"])
-        seen = []
-        orig = dp._perform_weeks
-        def spy(*a, **kw):
-            seen.append(dp.config_custom["n_mis"])
-            return orig(*a, **kw)
-        dp._perform_weeks = spy
         step = WeeksStep(datapull=dp, source="payroll_streaks",
                          paths=paths_config, is_dynamic=False)
         step._run("/x/extract")
-        assert seen == [5]
         assert dp.config_custom["n_mis"] == 4
+        assert step._next_path("/x/extract") == "/x/extract"
+        assert step._already_done() is True
 
     def test_groupby_payroll_income_n_mis_plus_two(self, tmp_path,
                                                    paths_config):

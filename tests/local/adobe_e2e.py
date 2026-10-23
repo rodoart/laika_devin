@@ -34,6 +34,7 @@ sys.path.insert(0, str(TESTS_LOCAL))
 sys.path.insert(0, str(TESTS_LOCAL.parents[1]))
 
 import bootstrap  # noqa: E402  (shims + HADOOP_HOME)
+from pyspark.sql import functions as F  # noqa: E402
 
 os.environ.setdefault("LAIKA_DISABLE_EMAIL", "1")
 os.environ["LAIKA_FS_MODE"] = "local"
@@ -217,19 +218,20 @@ def run_pipeline() -> None:
 
 
 def resume_scenario() -> None:
-    """Simula un kill a mitad del extract de bancanet y verifica la
-    reanudación.
+    """Simula kills del extract de bancanet y verifica la reanudación.
 
-    1. Borra ``extract/`` y mata la corrida justo antes de escribir
-       ``<table>_historic`` (monkeypatch de ``_join_full_cohorts``):
-       quedan en disco los parquets mensuales y los cohortes
-       de vintage — el estado de un run matado a medias.
-    2. Re-ejecuta ``run_source`` con un builder **sin** las vistas
-       ``global_temp`` (sin "Hive"): cualquier reejecución de las queries
-       mensuales lanzaría ``AnalysisException``. Solo funciona si cada
-       parquet ya escrito se recarga (meses, cohortes,
-       ``pivot_prepared``).
-    3. Además borra ``mobs``/``vector_assembler`` para comprobar que el
+    1. Kill a mitad del 3er write mensual (monkeypatch de
+       ``_write_month_partitions``): quedan ``_meta/<table>/*.done``
+       de los meses ya escritos — sus particiones ya están en el
+       ``_historic``.
+    2. Re-ejecuta ``run_source`` con vistas: un spy sobre
+       ``_run_month_query`` verifica que los meses con marker no
+       re-ejecutan su query a "Hive".
+    3. Después borra ``_meta/<table>/_DONE`` y re-ejecuta **sin** las
+       vistas ``global_temp`` (sin "Hive"): con todos los marcadores
+       mensuales presentes el extract no necesita ninguna query — solo
+       retoca el centinela y recalcula controles sobre el parquet.
+    4. Además borra ``mobs``/``vector_assembler`` para comprobar que el
        resto de la cadena reanuda desde donde falta.
     """
     from datapull import DataPull
@@ -247,32 +249,62 @@ def resume_scenario() -> None:
         register_views(spark)
         return spark
 
-    # --- 1) kill simulado tras los parquets mensuales -------------------
+    # --- 1) kill simulado a mitad del 3er write mensual -----------------
     shutil.rmtree(src_b / "extract")
-    killed = {"called": False}
-    orig_join = extract_mod.Extract._join_full_cohorts
+    writes = {"n": 0}
+    orig_write = extract_mod.Extract._write_month_partitions
 
-    def boom(self, *a, **kw):
-        killed["called"] = True
-        raise RuntimeError("simulated kill mid-extract")
+    def boom(self, df, path):
+        writes["n"] += 1
+        if writes["n"] == 3:
+            raise RuntimeError("simulated kill mid-extract")
+        return orig_write(self, df, path)
 
-    extract_mod.Extract._join_full_cohorts = boom
+    extract_mod.Extract._write_month_partitions = boom
     try:
         run_source(DataPull(rigid, custom, builder_with_views),
                    "adobe_bancanet", paths=PathsConfig(),
                    is_dynamic=True, step_filter=None,
                    cleanup=False, send_email=False)
     finally:
-        extract_mod.Extract._join_full_cohorts = orig_join
-    assert killed["called"], "el kill simulado nunca se ejecutó"
-    # quedaron meses + cohortes de vintage, sin _historic
+        extract_mod.Extract._write_month_partitions = orig_write
+    assert writes["n"] == 3, "el kill simulado nunca se ejecutó"
     extract_dir = src_b / "extract"
-    months = [p for p in extract_dir.iterdir()
-              if p.name.startswith("adobe_t_20")]
-    assert months, "no quedaron parquets mensuales tras el kill"
-    assert not (extract_dir / "adobe_t_historic").exists()
+    meta = extract_dir / "_meta" / "adobe_t"
+    markers = list(meta.glob("*.done"))
+    assert markers, "no quedaron marcadores de mes tras el kill"
+    assert not (meta / "_DONE").exists()
 
-    # --- 2) re-ejecución sin vistas: solo puede recargar parquets -------
+    # --- 2) reanudación con vistas: meses con marker no reescriben ------
+    writes2 = {"n": 0}
+    orig_w2 = extract_mod.Extract._write_month_partitions
+
+    def spy_w(self, df, path):
+        writes2["n"] += 1
+        return orig_w2(self, df, path)
+
+    extract_mod.Extract._write_month_partitions = spy_w
+    try:
+        ok = run_source(DataPull(rigid, custom, builder_with_views),
+                        "adobe_bancanet", paths=PathsConfig(),
+                        is_dynamic=True, step_filter=None,
+                        cleanup=False, send_email=False)
+    finally:
+        extract_mod.Extract._write_month_partitions = orig_w2
+    if not ok:
+        sys.exit("resume de adobe_bancanet falló a mitad de extract")
+    assert (meta / "_DONE").exists(), "no se tocó _DONE en la reanudación"
+    assert (extract_dir / "adobe_t_historic" / "_SUCCESS").exists()
+    # los meses ya escritos no se reescriben: solo los que quedaron sin
+    # marker tras el kill vuelven a escribir particiones
+    total_markers = len(list(meta.glob("*.done")))
+    assert writes2["n"] == total_markers - len(markers), \
+        f"re-escribió {writes2['n']} meses — markers no ahorraron cómputo"
+    print(f"RESUME OK — extract reanudado ({writes2['n']} writes, "
+          f"{len(markers)} meses saltados por marker)")
+
+    # --- 3) re-ejecución sin vistas: marcadores completos = 0 queries ---
+    (meta / "_DONE").unlink()
     for d in ("mobs", "vector_assembler"):
         shutil.rmtree(src_b / d, ignore_errors=True)
     ok = run_source(DataPull(rigid, custom, real_build),
@@ -282,9 +314,8 @@ def resume_scenario() -> None:
     if not ok:
         sys.exit("resume de adobe_bancanet falló (¿re-executó queries "
                  "mensuales sin vistas?)")
-    assert (extract_dir / "adobe_t_historic" / "_SUCCESS").exists(), \
-        "el _historic no se reconstruyó en la reanudación"
-    print("RESUME OK — extract reanudado desde parquets mensuales")
+    assert (meta / "_DONE").exists()
+    print("RESUME OK — _DONE retocado sin tocar Hive")
 
 
 # ---------------------------------------------------------------------------
@@ -306,7 +337,8 @@ def verify() -> None:
     def check(name, cond):
         checks.append((name, bool(cond)))
 
-    # --- extract: identidad resuelta, sin fuga de futuro ---------------
+    # --- extract: identidad resuelta + tfrom semanal integrado --------
+    # (la etapa weeks es no-op: el _historic ya sale retagueado)
     hist = _read(spark, src_b, "extract",
                  "adobe_t_historic")
     check("extract: numcliente resuelto",
@@ -317,22 +349,19 @@ def verify() -> None:
           hist.filter("session_id = '11-111-7'").count() == 2)
     check("extract: hit fuera de filtro de página no está",
           hist.filter("pagename = 'MX|OTRA|PAGINA'").count() == 0)
-    # el extract emite la malla cliente×mes completa: c4 aparece pero
-    # con todas las columnas de hit a null
-    check("extract: c4 (sin actividad) solo meses vacíos",
-          hist.filter("numcliente = 'c4'").count() > 0
-          and hist.filter("numcliente = 'c4' AND file_date is not null")
-          .count() == 0)
-    check("extract: tfrom mensual presente",
-          "tfrom" in hist.columns)
-
-    # --- weeks: tfrom semanal ------------------------------------------
-    wk_hist = _read(spark, src_b, "weekly_extract",
-                    "adobe_t_historic")
-    max_w = wk_hist.agg({"tfrom": "max"}).first()[0]
-    check("weeks: tfrom semanal > tfrom mensual", max_w > 6)
-    check("weeks: file_date conservada",
-          "file_date" in wk_hist.columns)
+    # el filtro de ventana del retag elimina las filas sin file_date —
+    # c4 (sin actividad) ya no aparece en el _historic
+    check("extract: c4 (sin actividad) fuera por filtro de ventana",
+          hist.filter("numcliente = 'c4'").count() == 0)
+    max_w = hist.agg({"tfrom": "max"}).first()[0]
+    check("extract: tfrom semanal integrado (> mensual)", max_w > 6)
+    check("extract: file_date conservada",
+          "file_date" in hist.columns)
+    # inicio de semana: lunes, clampado al día 1 cuando el lunes cae en
+    # el mes anterior
+    check("extract: tfrom_date = inicio de semana",
+          hist.filter("(dayofweek(tfrom_date) != 2) AND "
+                      "(dayofmonth(tfrom_date) != 1)").count() == 0)
 
     # --- groupby: dominios ----------------------------------------------
     gb = _read(spark, src_b, "groupby")
@@ -454,9 +483,8 @@ def verify() -> None:
     check("parquet: _historic particionado por vintage_date+tfrom",
           _has_nested_parts(src_b / "extract" / "adobe_t_historic",
                             "vintage_date", "tfrom"))
-    check("parquet: weekly_extract particionado por tfrom",
-          _has_nested_parts(src_b / "weekly_extract" / "adobe_t_historic",
-                            "vintage_date", "tfrom"))
+    check("parquet: sin dir weekly_extract (weeks integrado)",
+          not (src_b / "weekly_extract").exists())
     check("parquet: groupby particionado",
           _has_nested_parts(src_b / "groupby", "vintage_date", "tfrom"))
     check("parquet: pivot wide particionado por vintage_date",

@@ -6,12 +6,21 @@ huecos temporales.
 
 ---
 
-## Parte A — `weeks` (`libs/weeks.py`)
+## Parte A — `weeks` (integrado en el extract; `libs/weeks.py`)
 
-Convierte la extracción mensual en **etiquetas semanales**: re-etiqueta cada registro con
-la semana del mes, la semana del año y el día de la semana en que ocurrió, y reindexa el
-`tfrom` a granularidad semanal. Por eso el pipeline hace `n_mis += 1` antes de `extract`
-cuando el paso existe: se necesita un mes extra para cubrir las semanas de borde.
+> **Cambio de arquitectura:** `weeks` ya **no** es una etapa separada del
+> datapull. El reetiquetado de `tfrom` (semanal o diario) vive dentro del
+> extract (`Extract._apply_tfrom`): `extract/<table>_historic` sale
+> directamente con el `tfrom` final y el dir `weekly_extract/` dejó de
+> existir. `WeeksStep` quedó como no-op en `steps_list` por
+> compatibilidad de config — solo propaga `extract/` como
+> `previous_path`. Las clases `WeeklyTFrom`/`WeeklyTFromParquetReTagger`
+> fueron eliminadas; su lógica es hoy las funciones
+> `retag_tfrom_columns` / `tfrom_window_bounds` de este módulo.
+>
+> Por eso el pipeline sigue haciendo `n_mis += 1` antes de `extract`
+> cuando `weeks` está en `steps_list`: se necesita un mes extra para
+> cubrir las semanas de borde que la ventana `filtered` luego recorta.
 
 ### Funciones auxiliares de calendario
 
@@ -31,15 +40,22 @@ Clases que, dado un DataFrame con una columna de fecha, añaden las columnas de 
 | `WeekOfMonthFourWeeksForced` | **Fuerza exactamente 4 semanas por mes** — días de arrastre de la semana 1/5 se reasignan para que toda semana etiquetada ∈ {1,2,3,4}. Es la convención que usan las reglas de patrón de `payroll_streaks` (`week_of_month` siempre en [1..4]) |
 | `WeekOfMonthPayroll` | Variante para nómina: la semana se cuenta por **periodos de pago** (los cortes `day_of_week_start` = 22, 16, 8, 1 que usa `dates_collection` en el agregador) |
 
-### `WeeklyTFrom` y `WeeklyTFromParquetReTagger`
+### `retag_tfrom_columns` / `tfrom_window_bounds`
 
-- `WeeklyTFrom`: recalcula `tfrom` en unidades semanales a partir de las fechas
-  re-etiquetadas (`run()` produce el parquet `weekly_extract/`).
-- `WeeklyTFromParquetReTagger`: re-etiqueta parquets ya escritos — lee el extract,
-  aplica el objeto `WeekOfMonth*` configurado y reescribe (`run()`).
+- `retag_tfrom_columns(df, date_col, tfrom_method, type_of_date, ...)`
+  reetiqueta en memoria lo que el viejo retagger hacía sobre parquets:
+  `tfrom_date` pasa a ser el inicio de su semana (o mes) y
+  `tfrom = weeks_difference(inicio_semana, last_day(vintage_date))`.
+- Métodos: `standard` (52 semanas/año), `force_4_weeks` y `payroll`
+  (48/año) — y **`daily`**: `tfrom = datediff(last_day(vintage),
+  tfrom_date)` — intervalos de **un día** (p.ej. adobe cuando un mes de
+  resolución es demasiado, o streaks diarios).
+- `tfrom_window_bounds(max_date, method, type, n_mis)` reproduce la
+  ventana `filtered` global (`month_interval` o `week_interval` según
+  método/tipo), anclada al **max `tfrom_date` de la tabla**.
 
-**Salida:** `{working_path}/{year_id}/{source}/weekly_extract/` con `tfrom` semanal y
-columnas `week_of_month`, `week_of_year`, `day_of_week`.
+**Salida:** la misma `extract/<table>_historic` con `tfrom` ya en la
+granularidad final.
 
 ---
 
@@ -87,8 +103,7 @@ series completas y valores imputados según la regla configurada por columna.
 
 ### Reanudación (`is_dynamic`)
 
-`WeeklyTFrom(is_dynamic=True)` (lo que pasa `WeeksStep` desde `main_dynamic`)
-propaga el flag a cada `WeeklyTFromParquetReTagger`: sus propiedades
-`filtered` y `filled_columns` están decoradas con `@dynamic`, así que el
-intermedio `filtered_<table>` y la salida `weekly_extract/<table>` se
-recargan por tabla si tienen `_SUCCESS`, sin releer el extract.
+Al estar integrado en el extract, el retag se reanuda con los marcadores
+`_meta/<table>/<YYYYMM>.done` del propio extract: un kill a mitad de
+tabla solo reejecuta las queries de los meses sin marker (ver
+[01](01_extract.md#reanudación-is_dynamic)).

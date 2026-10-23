@@ -223,27 +223,27 @@ class ExtractStep(DatapullStageStep):
 
 
 class WeeksStep(DatapullStageStep):
-    """Etapa ``weeks``: ``DataPull._perform_weeks``; restaura ``n_mis`` (-1)."""
+    """Etapa ``weeks``: no-op.
+
+    El reetiquetado de ``tfrom`` (semanal/diario) vive integrado en el
+    extract desde la refactorización de escritura directa a particiones:
+    ``extract/<table>_historic`` ya sale con el tfrom final. El step se
+    conserva en ``steps_list`` solo para compatibilidad de config y
+    propaga ``extract/`` como ``previous_path`` al step siguiente.
+    """
 
     stage: str = "weeks"
 
     def _already_done(self) -> bool:
-        """``True`` si no falta ninguna ``_historic`` (``_check_missing``)."""
-        return not self.datapull._check_missing(
-            self.output_path, self._historic_tables)
+        return True
 
     def _run(self, previous_path: Optional[str]) -> None:
-        # weeks consume el mismo n_mis ampliado que extract (+1 por el mes
-        # extra de historia, +2 si payroll_income); ajuste local a la llamada
-        cc = self.datapull.config_custom
-        n_mis_bump = (2 if self.source == "payroll_income" else 0) + 1
-        cc["n_mis"] += n_mis_bump
-        try:
-            self.datapull._perform_weeks(
-                previous_path, self._historic_tables, self.source,
-                is_dynamic=self.is_dynamic)
-        finally:
-            cc["n_mis"] -= n_mis_bump
+        logger.info("%s - Weeks skipped (tfrom integrado en extract)",
+                    self.source.upper())
+
+    def _next_path(self, previous_path: Optional[str]) -> Optional[str]:
+        # el siguiente step (mt/groupby/...) lee directamente el extract
+        return previous_path
 
 
 class MtStep(DatapullStageStep):
@@ -318,7 +318,7 @@ class RatiosStep(DatapullStageStep):
         return self.output_path
 
     def _already_done(self) -> bool:
-        return path_exists(self._next_path(None))
+        return HivePath(self._next_path(None)).is_successful()
 
     def _run(self, previous_path: Optional[str]) -> None:
         cc = self.datapull.config_custom
@@ -391,6 +391,11 @@ class VaStep(DatapullStageStep):
     """
 
     stage: str = "va"
+
+    def _already_done(self) -> bool:
+        # _SUCCESS, no solo existencia: un write matado a medias dejaria
+        # el dir y el step se daria por hecho sin output valido
+        return HivePath(self.output_path).is_successful()
 
     def _next_path(self, previous_path: Optional[str]) -> Optional[str]:
         # va escribe en vector_assembler pero previous_path pasa a través

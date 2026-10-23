@@ -577,15 +577,40 @@ def _df_fingerprint(spark, path: Path):
 
 def _parquet_dirs(root: Path):
     """Dirs con ``_SUCCESS`` bajo ``root`` (particiones de mas abajo no
-    cuentan — se lee la raiz del parquet)."""
+    cuentan — se lee la raiz del parquet; ``_meta`` del extract son
+    marcadores/controles, no datos del pipeline)."""
     out = []
     for p in sorted(root.rglob("_SUCCESS")):
         d = p.parent
         # saltar subdirs de particion (vintage_date=..., tfrom=...)
         if "=" in d.name:
             continue
+        if "_meta" in d.parts:
+            continue
         out.append(d)
     return out
+
+
+# Fuentes con ``weeks`` integrado en el extract: su
+# ``extract/<t>_historic`` equivale al antiguo
+# ``weekly_extract/<t>_historic`` — el viejo historic con tfrom mensual
+# y los dirs ``filtered_*`` ya no existen.
+WEEKLY_INTEGRATED_SOURCES = ("payroll_streaks",)
+
+
+def _equiv_golden_rel(rel: str) -> Optional[str]:
+    """Rel de golden -> rel del run nuevo que contiene lo mismo.
+
+    ``None`` si el dir ya no existe porque su contenido migró al
+    ``extract/`` integrado (se verifica por el otro lado del mapeo).
+    """
+    for src in WEEKLY_INTEGRATED_SOURCES:
+        if f"/{src}/weekly_extract/" in rel:
+            return None if "/filtered_" in rel else \
+                rel.replace("/weekly_extract/", "/extract/")
+        if f"/{src}/extract/" in rel:
+            return None
+    return rel
 
 
 def snapshot() -> None:
@@ -619,8 +644,13 @@ def verify() -> None:
         spark.stop()
 
         for rel, ref in gold.items():
+            equiv = _equiv_golden_rel(rel)
+            if equiv is None:
+                # layout viejo sin sucesor directo; su contenido se
+                # verifica por el otro lado de la equivalencia
+                continue
             checks += 1
-            cur = seen.get(rel)
+            cur = seen.get(equiv)
             if cur is None:
                 # Passthrough de mobs: ``imputate_mobs/<X>`` ya no se
                 # copia — el VA lo lee de ``features/<X>``. El FALTA es
@@ -646,6 +676,12 @@ def verify() -> None:
                 fails.append(f"DIFF {rel} ({','.join(diffs)}){detail}")
         for rel in seen:
             if rel not in gold:
+                # nuevo ``extract/<t>`` de una fuente con weeks
+                # integrado: su contenido se verificó contra el viejo
+                # ``weekly_extract/<t>`` por el lado golden->nuevo
+                if any(f"/{src}/extract/" in rel
+                       for src in WEEKLY_INTEGRATED_SOURCES):
+                    continue
                 checks += 1
                 fails.append(f"EXTRA {rel}")
         print(f"{checks - len(fails)}/{checks} parquets identicos")

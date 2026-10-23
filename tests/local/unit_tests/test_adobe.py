@@ -216,7 +216,7 @@ class TestAdobeExtractSpecialTreatment:
 # ---------------------------------------------------------------------------
 class TestAdobeAggregate:
     def _run(self, spark, tmp_path, rows, agg_dict=None, tables=None):
-        prev = tmp_path / "weekly_extract"
+        prev = tmp_path / "extract"
         hist = prev / "adobe_t_historic"
         _write_historic(spark, hist.as_posix(), rows)
         agg = AdobeAggregate(
