@@ -30,7 +30,7 @@ from libs.group_by import GroupBy
 from libs.generate_pivot import GeneratePivot
 from libs.generate_ratios import GenerateRatios
 from libs.colums_2_vector import ColumnsToVector
-from libs.steps import path_exists as _fs_path_exists, path_listdir as _fs_path_listdir
+from libs.steps import path_exists as _fs_path_exists, path_listdir as _fs_path_listdir, save_parquet as _fs_save_parquet
 from libs.hive_path import is_successful as _fs_is_successful
 import pyspark.sql.functions as F
 from functools import reduce
@@ -389,7 +389,8 @@ class DataPull():
     def _perform_extract(self, source_dict: Dict[str, Any], write_path: str,
                          number_threads: int, write_mode: str,
                          source: str,
-                         send_controls: bool = True) -> None:
+                         send_controls: bool = True,
+                         is_dynamic: bool = False) -> None:
         """Ejecuta la extracción.
 
         Parameters
@@ -408,6 +409,10 @@ class DataPull():
             ``True``: envía el correo de controles aparte (pipeline
             legado). ``False``: lo guarda en ``extract_controls_html``
             para que ``main_dynamic`` lo incluya en el reporte único.
+        is_dynamic : bool
+            ``True``: extract reanudable — cada parquet mensual, de
+            vintage, ``_full`` o ``_historic`` ya escrito se recarga en
+            vez de recomputarse (las queries a Hive no se reejecutan).
         """
         logging.info("%s - Starting Extract", source.upper())
         #print("Starting extract")
@@ -417,7 +422,8 @@ class DataPull():
             n_mis = self.config_custom["n_mis"]
             extract = Extract(pivot_table = self.pivot, working_path = write_path, n_mis = n_mis,\
                         sources_cat = sources_cat, source=source, sqlContext = self.sqlContext,\
-                        number_threads = number_threads, mode = write_mode)
+                        number_threads = number_threads, mode = write_mode,\
+                        is_dynamic = is_dynamic)
             extract.collect_history()
             html_mess = extract.create_html_controls(self.message_start_controls_stract, self.message_style, self.message_end)
             # el correo de controles queda disponible para el reporte
@@ -438,7 +444,7 @@ class DataPull():
     #
     @reset_spark_session
     def _perform_weeks(self, path_weeks: str, tables_weeks: List[str],
-                       source: str) -> None:
+                       source: str, is_dynamic: bool = False) -> None:
         """Ejecuta el reetiquetado semanal (``WeeklyTFrom``).
 
         Parameters
@@ -449,6 +455,9 @@ class DataPull():
             Lista con todas las tablas a las que aplicar el reetiquetado.
         source : str
             Fuente en ejecución.
+        is_dynamic : bool
+            ``True``: reanudable por tabla — cada ``weekly_extract``
+            ya escrito se recarga en vez de recomputarse.
         """
         logging.info("%s - Starting Weeks Re TFrom", source.upper())
         #print("Starting missing treatment")
@@ -460,7 +469,8 @@ class DataPull():
                 extracted_path = path_weeks,
                 weeks_dict=self.config_rigid[source]["weeks"],
                 n_mis=self.config_custom["n_mis"],
-                sqlContext=self.sqlContext
+                sqlContext=self.sqlContext,
+                is_dynamic=is_dynamic
             )
             weekly_tfrom.run()
             #print("Ending missing treatment")
@@ -682,7 +692,12 @@ class DataPull():
             logging.info("%s - Vector Assembler was already performed", source.upper())
             #print(f"Vector assembler was already performed")
         else:
-            va = FeaturesVectorAssembler(path_features = path_features, save_path = save_path, sqlContext = self.sqlContext)
+            va = FeaturesVectorAssembler(
+                path_features = path_features, save_path = save_path,
+                sqlContext = self.sqlContext,
+                # los passthrough de mobs (marcadores ``_passthrough``)
+                # se resuelven leyendo directamente el dir de features
+                fallback_path = os.path.join(write_path, "features"))
             va.run()
 
             logging.info("%s - Ending Vector Assembler", source.upper())
@@ -736,17 +751,13 @@ class DataPull():
             existe (para todas las tablas).
         """
         tables_historic = [table + "_historic" for table in extract_dictionary["table_name"]]
-        files = self._check_files(path_extract)
-        if files:
-            for file_aux in files:
-                if file_aux in tables_historic:
-                    tables_historic.remove(file_aux)
-            if tables_historic:
-                return True
-            else:
-                return False
-        else:
-            return True
+        # is_successful por tabla (dir + _SUCCESS): un write de parquet
+        # matado a medias deja el dir sin _SUCCESS -> se recomputa, no se
+        # recarga roto. Además hace el check reanudable por tabla.
+        return any(
+            not _fs_is_successful(os.path.join(path_extract, table))
+            for table in tables_historic
+        )
 
     def _check_missing(self, path_missing: str,
                        tables_missing: List[str]) -> bool:
@@ -765,18 +776,12 @@ class DataPull():
             ``True`` si hay que ejecutarlo; ``False`` si ya existe (para
             todas las tablas).
         """
-        tables_aux = tables_missing.copy()
-        files = self._check_files(path_missing)
-        if files:
-            for file_aux in files:
-                if file_aux in tables_aux:
-                    tables_aux.remove(file_aux)
-            if tables_aux:
-                return True
-            else:
-                return False
-        else:
-            return True
+        # is_successful por tabla (dir + _SUCCESS): un write a medias no
+        # cuenta como tabla completada
+        return any(
+            not _fs_is_successful(os.path.join(path_missing, table))
+            for table in tables_missing
+        )
 
     def _check_groupby(self, path_groupby: str) -> bool:
         """Comprueba si el groupby ya se ejecutó en el workpath.
@@ -867,8 +872,12 @@ class DataPull():
             ``True`` si hay que ejecutarlo; ``False`` si ya existe (para
             todas las transformaciones).
         """
-        files = [d for d in self._check_files(path_mobs)
-                 if _fs_is_successful(os.path.join(path_mobs, d))]
+        files = {d for d in self._check_files(path_mobs)
+                 if _fs_is_successful(os.path.join(path_mobs, d))}
+        # los passthrough no se copian: su marcador bajo
+        # ``_passthrough/<feature>`` tambien cuenta como hecho
+        files |= set(self._check_files(
+            os.path.join(path_mobs, "_passthrough")))
         if files:
             for file_aux in files:
                 if file_aux in files_fe:
@@ -902,7 +911,9 @@ class DataPull():
         logging.info(f"Preparing Pivot for sources: {sources}")
         path_new_pivot = os.path.join(self.config_custom["working_path"], self.config_custom["year_id"], "pivot_prepared")
         self._path_new_pivot = path_new_pivot
-        if self._evaluate_path(path_new_pivot):
+        # is_successful (dir + _SUCCESS): una escritura matada a medias
+        # deja el dir sin _SUCCESS y se recomputa, no se recarga rota
+        if _fs_is_successful(path_new_pivot):
             logging.info("Pivot was already prepared")
             #print("Pivot already prepared!")
             return self.sqlContext.read.parquet(path_new_pivot)
@@ -951,10 +962,13 @@ class DataPull():
         if self._check_contratos(sources):
             cols_pivot += ['num_contrato_maestra', 'num_contrato_perfiles',
             'num_contrato_perf_ejec', 'num_contrato_cheques', 'num_contrato_otros']
-        if len(cols_pivot) == 2:
-            return pivot
+        # Siempre se persiste ``pivot_prepared`` — también cuando no hace
+        # falta enriquecer (cols_pivot == 2): es lo que hace la
+        # preparación REANUDABLE. Sin esto, cada acceso a ``self.pivot``
+        # reejecutaba toda la preparación (y su reset de sesión).
         pivot = pivot[cols_pivot].distinct()
-        pivot.write.mode(self.config_custom["write_mode"]).parquet(path_new_pivot)
+        _fs_save_parquet(pivot, path_new_pivot,
+                         self.config_custom["write_mode"])
         pivot = self.sqlContext.read.parquet(path_new_pivot)
         #print("Ending pivot preparation")
         logging.info("Ending Pivot Preparation")

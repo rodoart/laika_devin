@@ -94,7 +94,12 @@ def build_session_builder(local: bool) -> Callable[[], "Any"]:
     from libs.session import SparkSessionBuilder
     if local:
         from libs.hive_path import os_mode
-        extra_conf = {"spark.ui.enabled": "true"}
+        extra_conf = {
+            "spark.ui.enabled": "true",
+            "spark.sql.adaptive.enabled": "true",
+            "spark.sql.adaptive.skewJoin.enabled": "true",
+            "spark.sql.adaptive.autoBroadcastJoinThreshold": "100m",
+        }
         if os_mode() == "windows" and os.environ.get("HADOOP_HOME"):
             hadoop_bin = (Path(os.environ["HADOOP_HOME"]) / "bin").as_posix()
             extra_conf["spark.driver.extraJavaOptions"] = \

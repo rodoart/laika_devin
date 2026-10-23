@@ -66,10 +66,78 @@ main_dynamic.py --no-email
 Comportamiento clave: cada etapa escribe
 `working_path/<stage_dir>` y **se recarga si el parquet ya existe**
 (directorio + `_SUCCESS`), así que un proceso matado reanuda desde la
-última etapa completada. Dentro de `fe`, cada transformación es un
-parquet independiente → reanudación a mitad de etapa.
+última etapa completada. La reanudación también es **intra-etapa**:
 
-### 1.3 Con supervisor (recomendado en corridas largas)
+- **pivot**: `_pivot_preparation` siempre persiste
+  `<working_path>/<year_id>/pivot_prepared` (también cuando no hay
+  enriquecimiento), así que los accesos posteriores a `self.pivot` lo
+  recargan sin re-preparar ni resetear la sesión.
+- **extract**: cada parquet mensual `<table>_YYYYMM` (particionado por
+  vintage — ya no existe el `<table>_full` intermedio), los cohortes de
+  vintage `<table>_vintage_YYYYMM` y el `<table>_historic` final se
+  recargan si tienen `_SUCCESS` — un kill a mitad de tabla solo
+  reejecuta las queries mensuales que falten, no toca Hive por lo ya
+  escrito.
+- **mobs**: cada feature imputada se recarga de `imputate_mobs/`; las
+  features passthrough no se duplican — su marcador
+  `imputate_mobs/_passthrough/<feature>` declara que el vector assembler
+  las lea directamente de `features/` (los fixers payroll/adobe nunca
+  las copiaron; el contrato del VA no cambia).
+- **weeks**: `WeeklyTFrom` pasa `is_dynamic` a cada
+  `WeeklyTFromParquetReTagger`; sus intermedios `filtered_<table>` y la
+  salida `weekly_extract/<table>` se recargan por tabla vía `@dynamic`.
+- **fe**: cada transformación es un parquet independiente en
+  `features/` → reanudación a mitad de etapa.
+
+Los checks de etapa (`_check_extract`, `_check_missing`) verifican
+`_SUCCESS` por tabla, no solo la existencia del directorio — un write
+matado a medias nunca se da por completado.
+
+### 1.3 Layout de parquets: particionado por vintage/tfrom
+
+Todas las escrituras pasan por `libs.steps.save_parquet`, que particiona
+automáticamente por las columnas temporales presentes en el DataFrame:
+
+| Salida | Particiones |
+|---|---|
+| `pivot_prepared`, `vector_assembler` | `vintage=` |
+| `pivot` (wide), `features/raw_features`, `mobs/calculate_mobs` | `vintage_date=` |
+| `<table>_vintage_*`, `<table>_historic`, `weekly_extract/<table>`, `groupby/`, `missing_treatment/` | `vintage_date=/tfrom=` (2 niveles) |
+| cohortes mensuales `<table>_YYYYMM` | `vintage=` (poda el filtro por vintage de `_create_cohorts`) |
+| `*_features` de fe/mobs | sin particionar (sin columnas temporales) |
+
+Consecuencias:
+
+- Los reads **multi-raíz** (`read.parquet(*paths)`) fallan sobre parquets
+  particionados con "Conflicting directory structures" — usar
+  `libs.steps.read_parquet_many` (lee cada raíz y une por nombre).
+- Las columnas de partición se mueven **al final del esquema** al releer
+  y Spark las infiere como `date`/`double` cuando el formato lo permite
+  (`vintage_date=2025-08-31`, `tfrom=3.0`).
+
+### 1.4 Optimizaciones de ejecución
+
+Config y código orientados a reducir IO/memoria manteniendo los
+checkpoints en disco (un kill de plataforma reanuda sin recomputar):
+
+- **AQE** (`spark.sql.adaptive.enabled`): coalesce de particiones y
+  manejo de skew joins. `adaptive.autoBroadcastJoinThreshold=100m`
+  permite el broadcast en runtime **solo** cuando un lado del join
+  resulta chico — convive con `autoBroadcastJoinThreshold=-1` (el
+  broadcast plan-time sigue desactivado).
+- **extract**: sin el `<table>_full` intermedio (un write+read completo
+  menos por tabla); los mensuales particionados por vintage alimentan
+  los cohortes con poda (`vintage == lit` además del `datediff`).
+- **missing_treatment**: un solo checkpoint por variable
+  (`dir_temp1`); antes cada variable escribía `temp2` y lo copiaba
+  verbatim a `temp1`. `fill_stat` solo escribe cuando el fill aplicó.
+- **imputate_mobs**: las features `list_no_mobs` ya no se copian —
+  `_passthrough/<feature>` + `FeaturesVectorAssembler(fallback_path=features)`.
+- **payroll_income `_apply_fix_1`**: `vintage_date = '<fecha>'` sin
+  `CAST(... AS STRING)` — permite podar la partición `vintage_date=` en
+  vez de escanear todo el histórico por cada vintage.
+
+### 1.4 Con supervisor (recomendado en corridas largas)
 
 ```bash
 nohup python supervisor.py -- main_dynamic.py --sources payroll_streaks \

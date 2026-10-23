@@ -122,6 +122,12 @@ class SparkSessionBuilder:
             .config("spark.history.fs.logDirectory", self.hdfs_uri(os.environ["PYSPARK_STAGING_DIR_HDFS"]))
             .config("spark.sql.warehouse.dir", self.hdfs_uri(os.environ["PYSPARK_WAREHOUSE_DIR_HDFS"]))
             .config("spark.sql.autoBroadcastJoinThreshold", "-1")
+            .config("spark.sql.adaptive.enabled", "true")
+            .config("spark.sql.adaptive.skewJoin.enabled", "true")
+            # autoBroadcastJoinThreshold=-1 tambien apaga el broadcast en
+            # runtime de AQE; este umbral lo reactiva solo cuando un lado
+            # del join resulta chico en ejecucion (output identico)
+            .config("spark.sql.adaptive.autoBroadcastJoinThreshold", "100m")
             .config("spark.sql.execution.arrow.pyspark.enabled", "true")
             .config("hive.exec.dynamic.partition", "true")
             .config("hive.exec.dynamic.partition.mode", "nonstrict")

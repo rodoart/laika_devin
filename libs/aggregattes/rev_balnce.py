@@ -8,7 +8,7 @@ Class and Functions required to aggregate (general)
 """
 
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import expr, col, broadcast, month, when, lit
+from pyspark.sql.functions import expr, col, broadcast, month, when, lit, round
 from pyspark.sql.types import DoubleType
 from typing import Any, Dict
 from .base import BaseAggregate
@@ -207,8 +207,8 @@ class RevBalanceAggregate(BaseAggregate):
             groupBy, query)
 
         histCliente = self.sqlContext.sql(queryAgg)
-        histCliente1 = histCliente.withColumn("total_interes_fin", when(round("Total_Intereses", 6) == round(
-            "eir", 6), round("eir", 6)).otherwise(col("Total_Intereses")+col("Plan_int_grav_exent_Compras")-round("eir", 6)))
+        histCliente1 = histCliente.withColumn("total_interes_fin", when(round(col("Total_Intereses"), 6) == round(
+            col("eir"), 6), round(col("eir"), 6)).otherwise(col("Total_Intereses")+col("Plan_int_grav_exent_Compras")-round(col("eir"), 6)))
         histCliente1 = histCliente1.withColumn("total_bal_rev", when(
             col("total_interes_fin") > 0, col("Total_Balance")).otherwise(0))
         histCliente2 = histCliente1.withColumn("rev_flag", when(

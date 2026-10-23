@@ -214,7 +214,10 @@ class ExtractStep(DatapullStageStep):
                 self.source_dict, self.write_path, cc["n_threads"],
                 cc["write_mode"], self.source,
                 # el correo de controles se pliega en el reporte único
-                send_controls=False)
+                send_controls=False,
+                # reanudable: cada parquet mensual/_full/_historic ya
+                # escrito se recarga; solo falta lo que falte
+                is_dynamic=self.is_dynamic)
         finally:
             cc["n_mis"] -= n_mis_bump
 
@@ -237,7 +240,8 @@ class WeeksStep(DatapullStageStep):
         cc["n_mis"] += n_mis_bump
         try:
             self.datapull._perform_weeks(
-                previous_path, self._historic_tables, self.source)
+                previous_path, self._historic_tables, self.source,
+                is_dynamic=self.is_dynamic)
         finally:
             cc["n_mis"] -= n_mis_bump
 

@@ -301,6 +301,76 @@ class Step:
 
 
 ###############################################################################
+# Escritura de parquets particionados por vintage / tfrom
+###############################################################################
+
+def partition_columns(columns: Iterable[str]) -> List[str]:
+    """Columnas de particionado temporales presentes en ``columns``.
+
+    Regla: una columna de vintage (``vintage_date`` en los frames con
+    pivot unido; ``vintage`` en el pivot preparado y en las salidas
+    finales que renombran la columna) y, si el df es long, ``tfrom``.
+    Los frames sin columnas temporales (``*_features`` de fe/mobs, que
+    solo llevan ``id_msf`` + features) quedan sin particionar.
+
+    ``tfrom_date`` no entra en la regla automática: solo interesa como
+    partición en ``<table>_full`` del extract (poda el filtro
+    ``tfrom_date.between`` de ``_create_cohorts``) y se pasa explícito
+    vía ``save_parquet(..., partition_cols=...)``.
+    """
+    cols = list(columns)
+    parts = [c for c in ("vintage_date", "vintage") if c in cols][:1]
+    if "tfrom" in cols:
+        parts.append("tfrom")
+    return parts
+
+
+def save_parquet(df: DataFrame, path: PathLike, mode: str = "overwrite",
+                 partition_cols: Optional[Iterable[str]] = None) -> None:
+    """Escribe ``df`` como parquet en ``path``, particionando por las
+    columnas temporales que tenga.
+
+    Por defecto particiona por ``vintage_date``/``vintage`` y ``tfrom``
+    según :func:`partition_columns`; con ``partition_cols`` se fuerza una
+    lista concreta (p.ej. ``["tfrom_date"]`` en ``<table>_full``) o se
+    desactiva con ``[]``. Las columnas de partición siguen apareciendo al
+    releer el parquet (Spark las infiere por nombre de directorio).
+    """
+    parts = list(partition_cols) if partition_cols is not None \
+        else partition_columns(df.columns)
+    if parts and not df.head(1):
+        # partitionBy sobre un df vacío no genera ni part-files ni
+        # _common_metadata -> el parquet queda ILEGIBLE ("Unable to
+        # infer schema"). Sin particionar sí quedan part-files vacíos
+        # con schema y la recarga funciona.
+        parts = []
+    writer = df.write.mode(mode)
+    if parts:
+        writer = writer.partitionBy(*parts)
+    writer.parquet(str(path))
+
+
+def read_parquet_many(sqlContext: SparkSession,
+                      paths: Iterable[PathLike]) -> DataFrame:
+    """Lee varias raíces parquet y las une por nombre de columna.
+
+    ``read.parquet(*paths)`` falla cuando cada raíz está particionada
+    ("Conflicting directory structures detected"): Spark exige la misma
+    estructura relativa bajo todas las rutas. Leyendo cada raíz por
+    separado cada una descubre sus particiones, y ``unionByName`` une
+    por nombre (las columnas de partición se reordenan al final del
+    esquema al releer, así que un ``union`` posicional sería frágil).
+    """
+    dfs = [sqlContext.read.parquet(str(p)) for p in paths]
+    if not dfs:
+        raise ValueError("read_parquet_many: lista de paths vacía")
+    out = dfs[0]
+    for df in dfs[1:]:
+        out = out.unionByName(df, allowMissingColumns=True)
+    return out
+
+
+###############################################################################
 # Decoradores dinámicos: escribir a disco / recargar de disco
 ###############################################################################
 
@@ -330,7 +400,7 @@ def _reload_or_recompute_parquet(self, func: Callable,
         if save is not None:
             save(computed)
         else:
-            computed.write.mode("overwrite").parquet(str(path))
+            save_parquet(computed, str(path))
         result = self.sqlContext.read.parquet(str(path))
         logger.info("%s data saved on %s", label.capitalize(), path)
     return result

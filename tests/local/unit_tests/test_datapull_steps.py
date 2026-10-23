@@ -95,8 +95,8 @@ class FakeDataPull:
         return [2, 4]
     def _perform_extract(self, *a, **kw):
         self.calls.append(("extract", a, kw))
-    def _perform_weeks(self, *a):
-        self.calls.append(("weeks", a))
+    def _perform_weeks(self, *a, **kw):
+        self.calls.append(("weeks", a, kw))
     def _perform_mt(self, *a):
         self.calls.append(("mt", a))
     def _perform_groupby(self, **kw):

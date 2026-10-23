@@ -1,0 +1,1561 @@
+{
+    "bureau_pull": {
+        "extract": {
+            "libname": [
+                "global_temp"
+            ],
+            "table_name": [
+                "adv_colocacion_1_t_m"
+            ],
+            "select_variables": [
+                "cliente as numcliente, fe_informacion, a5, sdovenamex, sdodepotro, lineamex, pagamex, mop0tcamex"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                3
+            ],
+            "name_mis": [
+                "fe_informacion"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "a5",
+                    "sdovenamex",
+                    "sdodepotro",
+                    "lineamex",
+                    "pagamex",
+                    "mop0tcamex"
+                ],
+                "source": [
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro"
+                ],
+                "metodo": [
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_historic"
+                ],
+                "grouped": [
+                    [
+                        "numcliente",
+                        "vintage_date"
+                    ]
+                ],
+                "valor": [
+                    "1"
+                ],
+                "id_variables": [
+                    "historico"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "adv_colocacion_1_t_m_historic",
+                    "liabilities_test2_historic",
+                    "credit_card_processed_data_historic"
+                ],
+                "source": [
+                    "bureau",
+                    "liabilities",
+                    "credit_card"
+                ],
+                "sources": [
+                    "bureau",
+                    "liabilities",
+                    "credit_card"
+                ],
+                "mobs_tipo": [
+                    "mobs_bureau"
+                ]
+            }
+        },
+        "group_by": {
+            "table_name": "adv_colocacion_1_t_m_historic",
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "query_dict": {
+                "variable": [
+                    "a5",
+                    "sdovenamex",
+                    "sdodepotro",
+                    "lineamex",
+                    "pagamex",
+                    "mop0tcamex"
+                ],
+                "agg": [
+                    "sum",
+                    "sum",
+                    "sum",
+                    "max",
+                    "sum",
+                    "max"
+                ],
+                "feature": [
+                    "a5",
+                    "buro_sdovenamex",
+                    "buro_sdodepotro",
+                    "buro_lineamex",
+                    "buro_pagamex",
+                    "buro_mop0tcamex"
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "bureau_pull",
+            "table_name": "adv_colocacion_1_t_m_historic",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "mt",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "liabilities": {
+        "extract": {
+            "libname": [
+                "global_temp"
+            ],
+            "table_name": [
+                "onus_capt_snap_t_m"
+            ],
+            "select_variables": [
+                "num_cliente as numcliente, inf_dt, cast(saldo_total as double) as saldo_total, cast(saldo_pgom as double) as saldo_pgom, producto_pgom"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                1
+            ],
+            "name_mis": [
+                "inf_dt"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "saldo_total",
+                    "saldo_pgom"
+                ],
+                "source": [
+                    "liabilities",
+                    "liabilities"
+                ],
+                "metodo": [
+                    "historico",
+                    "historico"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_historic"
+                ],
+                "grouped": [
+                    [
+                        "numcliente",
+                        "vintage_date"
+                    ]
+                ],
+                "valor": [
+                    "1"
+                ],
+                "id_variables": [
+                    "historico"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "liabilities_test2_historic",
+                    "credit_card_processed_data_historic"
+                ],
+                "source": [
+                    "liabilities",
+                    "credit_card"
+                ],
+                "sources": [
+                    "liabilities",
+                    "credit_card"
+                ],
+                "mobs_tipo": [
+                    "mobs_liabilities"
+                ]
+            }
+        },
+        "group_by": {
+            "table_name": "onus_capt_snap_t_m_historic",
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "sel_cols": [
+                "saldo_pgom"
+            ],
+            "pgom_cols": [
+                "saldo_pgom",
+                "producto_pgom",
+                "vintage_date",
+                "tfrom"
+            ],
+            "filter_cols": [
+                "saldo_pgom"
+            ],
+            "query_dict": {
+                "variable": [
+                    "saldo_pgom"
+                ],
+                "agg": [
+                    "sum"
+                ]
+            },
+            "PGMT_QUERY_DICT": {
+                "variable": [
+                    "saldo_pgom"
+                ],
+                "agg": [
+                    "sum"
+                ]
+            },
+            "maes_new_cols": [
+                "sdo_maes"
+            ],
+            "perf_new_cols": [
+                "sdo_perf"
+            ],
+            "peje_new_cols": [
+                "sdo_peje"
+            ],
+            "cheq_new_cols": [
+                "sdo_cheq"
+            ],
+            "otro_new_cols": [
+                "sdo_otro"
+            ],
+            "pgom_new_cols": [
+                "sdo_pgom"
+            ]
+        },
+        "pivoting": {
+            "source": "liabilities",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "mt",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "payroll_income": {
+        "extract": {
+            "libname": [
+                "global_temp"
+            ],
+            "table_name": [
+                "asigna_nomina_dt1_t_m"
+            ],
+            "select_variables": [
+                "process_date, num_cliente, num_cliente_2, num_cliente_3, cast(sum_importe as double) as importe_tefs, cast(sum_importe_1 as double) as importe_tef_1, cast(sum_importe_2 as double) as importe_tef_2"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "process_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "importe_tefs",
+                    "importe_tef_1",
+                    "importe_tef_2"
+                ],
+                "source": [
+                    "payroll_income",
+                    "payroll_income",
+                    "payroll_income"
+                ],
+                "metodo": [
+                    "Real 0",
+                    "Real 0",
+                    "Real 0"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_value"
+                ],
+                "grouped": [
+                    ""
+                ],
+                "valor": [
+                    "Real 0"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "missing_treatment/asigna_nomina_dt1_t_m_historic"
+                ],
+                "source": [
+                    "payroll_income"
+                ],
+                "sources": [
+                    "payroll_income"
+                ],
+                "mobs_tipo": [
+                    "mobs_payroll_income"
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "payroll_income",
+            "table_name": "asigna_nomina_dt1_t_m_historic",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "process_date",
+                "tfrom_date"
+            ]
+        },
+        "group_by": {
+            "rename": {
+                "enable": "True",
+                "columns_to_rename": {
+                    "sum_importe": "income_tefs",
+                    "sum_importe_1": "income_tef_1",
+                    "sum_importe_2": "income_tef_2"
+                }
+            },
+            "fix_1": {
+                "enable": "True",
+                "months_to_fix_1": [
+                    5,
+                    11,
+                    12
+                ],
+                "prefix": "fix_1",
+                "prefixes_to_apply": [
+                    "None"
+                ],
+                "prefixes_to_drop": [
+                    "None"
+                ]
+            },
+            "fix_2": {
+                "enable": "True",
+                "prefix": "fix_2",
+                "prefixes_to_apply": [
+                    "fix_1"
+                ],
+                "prefixes_to_drop": [
+                    "fix_1"
+                ]
+            },
+            "cap_and_floor": {
+                "enable": "true",
+                "q_floor": 0,
+                "q_cap": 0.995,
+                "error": 1e-05,
+                "prefix": "capped",
+                "prefixes_to_apply": [
+                    "fix_2"
+                ],
+                "prefixes_to_drop": [
+                    "fix_2"
+                ]
+            },
+            "normalize": {
+                "enable": "True",
+                "prefix": "norm",
+                "prefixes_to_apply": [
+                    "capped"
+                ],
+                "prefixes_to_drop": [
+                    "capped"
+                ]
+            }
+        },
+        "steps_list": [
+            "extract",
+            "mt",
+            "pivoting",
+            "groupby",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "payroll_streaks": {
+        "extract": {
+            "libname": [
+                "global_temp",
+                "global_temp"
+            ],
+            "table_name": [
+                "asigna_nomina_dt1_t_m",
+                "nomina_dt1_t_m"
+            ],
+            "select_variables": [
+                "process_date, num_cliente, num_cliente_2, num_cliente_3, cast(tef as double) as tef, cast(tef_1 as double) as tef_1, cast(tef_2 as double) as tef_2",
+                "process_date, cast(fecha as date) as fecha, num_cliente, num_cliente_2, num_cliente_3, cast(tef as double) as tef, cast(importe as double) as importe"
+            ],
+            "type_date": [
+                "",
+                ""
+            ],
+            "retraso": [
+                0,
+                0
+            ],
+            "name_mis": [
+                "process_date",
+                "process_date"
+            ],
+            "table_pivote": [
+                "master_data",
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente",
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage",
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente",
+                "numcliente"
+            ]
+        },
+        "weeks": {
+            "tfrom_method": "payroll",
+            "date_column_for_weekly_tfrom": [
+                "process_date",
+                "fecha"
+            ],
+            "type_of_date_column": [
+                "monthly",
+                "daily"
+            ],
+            "sql_date_format": [
+                "yyyy-MM-dd",
+                "yyyy-MM-dd"
+            ],
+            "drop_columns_at_the_end": [
+                [],
+                [
+                    "fecha"
+                ]
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "importe"
+                ],
+                "source": [
+                    "payroll_streaks"
+                ],
+                "metodo": [
+                    "Real 0"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_value"
+                ],
+                "grouped": [
+                    "",
+                    ""
+                ],
+                "valor": [
+                    "Real 0"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "extract/asigna_nomina_dt1_t_m_historic"
+                ],
+                "source": [
+                    "payroll_streaks"
+                ],
+                "sources": [
+                    "payroll_streaks"
+                ],
+                "mobs_tipo": [
+                    "mobs_payroll_streaks"
+                ]
+            }
+        },
+        "group_by": {
+            "parameters": {
+                "weeks_per_month": 4
+            },
+            "rename": {
+                "enable": "True",
+                "columns_to_rename": {
+                    "paid_in_week": "pattern"
+                }
+            },
+            "raw_pattern": {
+                "enable": "True",
+                "prefix": "raw",
+                "remove_previous_prefix": "False",
+                "prefixes_to_apply": [
+                    "None"
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_weekly": {
+                "enable": "True",
+                "prefix": "srt_shr_w",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_monthly": {
+                "enable": "False",
+                "prefix": "srt_shr_m",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_fortnightly": {
+                "enable": "False",
+                "prefix": "srt_shr_f",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern": {
+                "enable": "True",
+                "prefix": "srt_shr",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_weekly": {
+                "enable": "True",
+                "prefix": "shr_w",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_monthly": {
+                "enable": "False",
+                "prefix": "shr_m",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_fortnightly": {
+                "enable": "False",
+                "prefix": "shr_f",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern": {
+                "enable": "True",
+                "prefix": "shr",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_monthly_optimist": {
+                "enable": "False",
+                "prefix": "srt_shr_m_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_fortnightly_optimist": {
+                "enable": "False",
+                "prefix": "srt_shr_f_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_optimist": {
+                "enable": "False",
+                "prefix": "srt_shr_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_monthly_optimist": {
+                "enable": "False",
+                "prefix": "shr_m_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_fortnightly_optimist": {
+                "enable": "False",
+                "prefix": "shr_f_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_optimist": {
+                "enable": "False",
+                "prefix": "shr_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "payment_type_pattern": {
+                "enable": "False",
+                "prefix": "type_of_payment_is",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "unusual_pattern": {
+                "enable": "True",
+                "prefix": "unusual",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "reverse_pattern": {
+                "enable": "True",
+                "prefix": "rev",
+                "remove_previous_prefix": "False",
+                "prefixes_to_apply": [
+                    "raw",
+                    "srt_shr_w",
+                    "srt_shr",
+                    "shr_w",
+                    "shr"
+                ],
+                "prefixes_to_drop": []
+            },
+            "inverse_pattern": {
+                "enable": "True",
+                "prefix": "inv",
+                "remove_previous_prefix": "False",
+                "prefixes_to_apply": [
+                    "raw",
+                    "srt_shr_w",
+                    "srt_shr",
+                    "shr_w",
+                    "shr",
+                    "rev",
+                    "unusual"
+                ],
+                "prefixes_to_drop": [
+                    "pattern"
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "payroll_streaks",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date"
+            ]
+        },
+        "fe": {
+            "ignore_this_value_when_calculating_mt_features": 9.0,
+            "frequency_sufix": "w"
+        },
+        "steps_list": [
+            "extract",
+            "weeks",
+            "mt",
+            "groupby",
+            "pivoting",
+            "fe",
+            "va"
+        ]
+    },
+    "adobe_bancanet": {
+        "extract": {
+            "libname": [
+                "gcgdlkmxpsd_dch_db"
+            ],
+            "table_name": [
+                "adobeanalytics_hit_data_mexicoprod_t_d"
+            ],
+            "select_variables": [
+                "post_visid_high, post_visid_low, visit_num, post_evar5, date_time, file_date, post_evar1, post_evar3, pagename, prop11, post_clickmaplinkbyregion, evar25, post_evar25, visit_page_num"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "file_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ],
+            "adobe": {
+                "hash_id_db": "gcgdlkmxpsd_cams_db.int_xs_b001_albnxfcrm_snap_t_m",
+                "clickstream_filters": [
+                    {
+                        "key": "pagename",
+                        "page_names": [
+                            "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Creditopersonal",
+                            "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Disponiblebanamex",
+                            "MX|BNP3|SESION|FINAL"
+                        ]
+                    },
+                    {
+                        "key": "post_evar25",
+                        "page_names": [
+                            "MX|BNP|Dashboard|Overlay|Con Disponible Banamex",
+                            "MX|BNP|Dashboard|Overlay|Logra m"
+                        ]
+                    },
+                    {
+                        "key": "post_clickmaplinkbyregion",
+                        "page_names": [
+                            "Iniciar sesi"
+                        ]
+                    }
+                ],
+                "event_filter": "",
+                "use_event_filter": false,
+                "keep_columns": [
+                    "numcliente",
+                    "session_id",
+                    "file_date",
+                    "date_time",
+                    "pagename",
+                    "post_evar1",
+                    "post_evar3",
+                    "post_clickmaplinkbyregion",
+                    "evar25",
+                    "post_evar25",
+                    "prop11",
+                    "visit_page_num"
+                ]
+            }
+        },
+        "weeks": {
+            "tfrom_method": "force_4_weeks",
+            "date_column_for_weekly_tfrom": [
+                "file_date"
+            ],
+            "type_of_date_column": [
+                "daily"
+            ],
+            "sql_date_format": [
+                "yyyy-MM-dd"
+            ],
+            "drop_columns_at_the_end": [
+                []
+            ]
+        },
+        "missing_treatment": {
+            "mobs": {
+                "table_name": [
+                    "extract/adobeanalytics_hit_data_mexicoprod_t_d_historic"
+                ],
+                "source": [
+                    "adobe"
+                ],
+                "sources": [
+                    "adobe"
+                ],
+                "mobs_tipo": [
+                    "mobs_adobe"
+                ]
+            }
+        },
+        "group_by": {
+            "prefix": "bnt",
+            "time_vars": [
+                "T_inicio",
+                "T_vista",
+                "T_session"
+            ],
+            "time_stats": [
+                "sum",
+                "mean",
+                "min",
+                "max",
+                "stddev"
+            ],
+            "flags": {
+                "PIL_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains_any",
+                        "value": [
+                            "Logra",
+                            "PERSONAL"
+                        ]
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "PIL_interested": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Creditopersonal|CAPTURA"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith",
+                        "value": "OfertasCitibanamex"
+                    }
+                ],
+                "LOP_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|Con Disponible Banamex"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "LOP_interested": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Disponiblebanamex|CAPTURA"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith",
+                        "value": "OfertasCitibanamex"
+                    }
+                ],
+                "CLI_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains",
+                        "value": "Aumenta tu l"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "HIP_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains",
+                        "value": "Hipoteca"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "NOM_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains",
+                        "value": "Nomina"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ]
+            },
+            "domains": {
+                "weekly": {
+                    "enabled": true
+                },
+                "fortnightly": {
+                    "enabled": true
+                },
+                "last_days": {
+                    "enabled": true,
+                    "windows": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        30,
+                        45,
+                        60,
+                        75,
+                        90,
+                        105,
+                        120,
+                        135,
+                        150,
+                        165,
+                        180
+                    ],
+                    "flag_stats": [
+                        "sum"
+                    ],
+                    "time_stats": [
+                        "sum",
+                        "mean"
+                    ]
+                },
+                "daily_seq": {
+                    "enabled": true,
+                    "days": 14
+                }
+            }
+        },
+        "pivoting": {
+            "source": "adobe_bancanet",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date"
+            ],
+            "drop_null_values": true,
+            "keep_pivot_clients": true
+        },
+        "fe": {
+            "ignore_this_value_when_calculating_mt_features": -99999,
+            "frequency_sufix": "w"
+        },
+        "steps_list": [
+            "extract",
+            "weeks",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "adobe_mobile": {
+        "extract": {
+            "libname": [
+                "gcgdlkmxpsd_dch_db"
+            ],
+            "table_name": [
+                "adobeanalytics_hit_data_mxmprod_t_d"
+            ],
+            "select_variables": [
+                "post_visid_high, post_visid_low, visit_num, post_evar5, CAST(TRIM(date_time) AS TIMESTAMP) AS date_time, file_date, UPPER(TRIM(pagename)) AS pagename, UPPER(TRIM(post_evar3)) AS post_evar3, post_evar1, prop11, evar25, evar30, post_evar63, post_evar25, visit_page_num"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "file_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ],
+            "adobe": {
+                "hash_id_db": "gcgdlkmxpsd_cams_db.int_xs_b001_albnxfcrm_snap_t_m",
+                "clickstream_filters": [
+                    {
+                        "key": "pagename",
+                        "page_names": [
+                            "MX|Mobile|Dashboard|Productos|MOB-"
+                        ]
+                    },
+                    {
+                        "key": "post_evar63",
+                        "page_names": [
+                            "MX|Mobile|Dashboard|DIS",
+                            "MX|Mobile|CPA"
+                        ]
+                    },
+                    {
+                        "key": "evar30",
+                        "page_names": [
+                            "zzzzvvvv"
+                        ]
+                    }
+                ],
+                "event_filter": "",
+                "use_event_filter": false,
+                "keep_columns": [
+                    "numcliente",
+                    "session_id",
+                    "file_date",
+                    "date_time",
+                    "pagename",
+                    "post_evar1",
+                    "post_evar3",
+                    "evar25",
+                    "evar30",
+                    "post_evar63",
+                    "post_evar25",
+                    "prop11",
+                    "visit_page_num"
+                ]
+            }
+        },
+        "weeks": {
+            "tfrom_method": "force_4_weeks",
+            "date_column_for_weekly_tfrom": [
+                "file_date"
+            ],
+            "type_of_date_column": [
+                "daily"
+            ],
+            "sql_date_format": [
+                "yyyy-MM-dd"
+            ],
+            "drop_columns_at_the_end": [
+                []
+            ]
+        },
+        "missing_treatment": {
+            "mobs": {
+                "table_name": [
+                    "extract/adobeanalytics_hit_data_mxmprod_t_d_historic"
+                ],
+                "source": [
+                    "adobe"
+                ],
+                "sources": [
+                    "adobe"
+                ],
+                "mobs_tipo": [
+                    "mobs_adobe"
+                ]
+            }
+        },
+        "group_by": {
+            "prefix": "mob",
+            "time_vars": [
+                "T_inicio",
+                "T_vista",
+                "T_session"
+            ],
+            "time_stats": [
+                "sum",
+                "mean",
+                "min",
+                "max",
+                "stddev"
+            ],
+            "flags": {
+                "Flag_interest_LOP": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "DIS"
+                    }
+                ],
+                "Flag_interest_PIL": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "CP"
+                    }
+                ],
+                "Flag_interest_NOM": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "CN"
+                    }
+                ],
+                "Flag_interest_CLI": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "CLI"
+                    }
+                ],
+                "Flag_interest_HIP": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "HIP"
+                    }
+                ],
+                "Flag_interest_TDC": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "TDC"
+                    }
+                ],
+                "Flag_interest_BAL": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "BAL"
+                    }
+                ]
+            },
+            "domains": {
+                "weekly": {
+                    "enabled": true
+                },
+                "fortnightly": {
+                    "enabled": true
+                },
+                "last_days": {
+                    "enabled": true,
+                    "windows": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        30,
+                        45,
+                        60,
+                        75,
+                        90,
+                        105,
+                        120,
+                        135,
+                        150,
+                        165,
+                        180
+                    ],
+                    "flag_stats": [
+                        "sum"
+                    ],
+                    "time_stats": [
+                        "sum",
+                        "mean"
+                    ]
+                },
+                "daily_seq": {
+                    "enabled": true,
+                    "days": 14
+                }
+            }
+        },
+        "pivoting": {
+            "source": "adobe_mobile",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date"
+            ],
+            "drop_null_values": true,
+            "keep_pivot_clients": true
+        },
+        "fe": {
+            "ignore_this_value_when_calculating_mt_features": -99999,
+            "frequency_sufix": "w"
+        },
+        "steps_list": [
+            "extract",
+            "weeks",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "need_crd_acct_nbr": [
+        "rev_balance",
+        "pnl",
+        "giros_credito",
+        "pnl_new"
+    ],
+    "need_contratos": [
+        "liabilities",
+        "mokitara"
+    ],
+    "lag_ecm_pivot": 2,
+    "lag_liabilities_pivot": 2,
+    "mis_col_liabilities_pivot": "inf_dt",
+    "query_ecm": "SELECT proc_dt, numcliente, crd_acct_nbr FROM global_temp.ecm",
+    "queries_liabilities": [
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_maestra FROM global_temp.liabilities_test2 where snapshot='maestra'",
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perfiles FROM global_temp.liabilities_test2 where snapshot='perfiles'",
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perf_ejec FROM global_temp.liabilities_test2 where snapshot='perfiles ejecutivo'",
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_cheques FROM global_temp.liabilities_test2 where snapshot='cheques'",
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_otros FROM global_temp.liabilities_test2 where snapshot='otros'"
+    ],
+    "mobs_preparation": {
+        "select_variables": [
+            "bigint(num_cliente) as numcliente, inf_dt, to_date(fec_apertura) as fec_apertura",
+            "bigint(num_cliente) as numcliente, mob, mis_dt, fec_apertura",
+            "cliente as numcliente, to_date(fe_informacion) as fe_informacion, a5"
+        ],
+        "libname": [
+            "global_temp",
+            "global_temp",
+            "global_temp"
+        ],
+        "table_name": [
+            "liabilities_test2",
+            "credit_card_processed_data",
+            "adv_colocacion_1_t_m"
+        ],
+        "type_date": [
+            "",
+            "",
+            ""
+        ],
+        "retraso": [
+            1,
+            1,
+            3
+        ],
+        "name_mis": [
+            "inf_dt",
+            "mis_dt",
+            "fe_informacion"
+        ],
+        "table_pivote": [
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data"
+        ],
+        "key_pivote": [
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente"
+        ],
+        "name_vintage_pivote": [
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage"
+        ],
+        "key_source": [
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente"
+        ]
+    },
+    "list_no_mobs": [
+        "incremental_features",
+        "raw_features",
+        "rmeans_features",
+        "rt_features",
+        "vp_features"
+    ],
+    "rev_balance": {
+        "extract": {
+            "libname": [
+                "global_temp"
+            ],
+            "table_name": [
+                "ccp_t_m"
+            ],
+            "select_variables": [
+                "proc_dt, crd_acct_nbr, bigint(num_cliente) as numcliente, cast(eir as double) as eir, monthsonbooks"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "proc_dt"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "crd_acct_nbr"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "crd_acct_nbr"
+            ]
+        },
+        "group_by": {
+            "table_names": {
+                "epp": "epp",
+                "plan": "plan",
+                "cpp": "ccp_t_m_historic",
+                "catPromosID": "global_temp.cat_promos"
+            },
+            "primaryKey": [
+                "crd_acct_nbr",
+                "vintage_date",
+                "tfrom"
+            ],
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "querys_dict": {
+                "epp_dict": {}
+            }
+        },
+        "pivoting": {
+            "source": "rev_balance",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "pivoting",
+            "fe",
+            "va"
+        ]
+    }
+}

@@ -25,7 +25,7 @@ from pyspark.sql.functions import col, greatest, least,  when, lit
 from pyspark.sql.types import DoubleType
 from .base import (columns_with_prefix, columns_with_prefixes,
                    parse_config_bool, sort_df_columns)
-from ..steps import cached_property, dynamic, path_delete
+from ..steps import cached_property, dynamic, path_delete, save_parquet
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -632,10 +632,13 @@ class PayrollIncomeAggregate:
         for k, vintage_date in enumerate(self.vintage_dates):
             t_froms_with_fix = [tfrom for tfrom in self.tfroms if tfrom_to_month(tfrom, vintage_date) in months_to_apply_fix_1]
             # Usar un query SQL para filtrar los datos
+            # sin CAST: la comparación directa deja a Spark coercionar el
+            # literal a date y podar la partición vintage_date= (con CAST
+            # se escaneaban todas las particiones por cada vintage)
             query = f"""
                 SELECT *
                 FROM temp_table
-                WHERE CAST({self.vintage_column} AS STRING) = '{str(vintage_date)}'
+                WHERE {self.vintage_column} = '{str(vintage_date)}'
                 """
             filtered = self.sqlContext.sql(query)
             for input_col_name in columns_to_apply:
@@ -834,7 +837,7 @@ class PayrollIncomeAggregate:
         Returns:
             None
         """
-        df_save.write.mode(self.mode).parquet(path)
+        save_parquet(df_save, path, self.mode)
     #
     @staticmethod
     def _delete_intermediate(path:str) -> None:

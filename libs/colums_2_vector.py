@@ -16,6 +16,8 @@ from pyspark.ml.feature import VectorAssembler
 import os
 from typing import Any, Dict
 
+from .steps import save_parquet
+
 
 class ColumnsToVector:
     """Ensambla las columnas de features en un ``features_vector``.
@@ -51,7 +53,7 @@ class ColumnsToVector:
         path : str
             Path donde almacenar los datos.
         """
-        df_save.write.mode(self.mode).parquet(path)
+        save_parquet(df_save, path, self.mode)
 
     def run(self) -> None:
         """Ejecuta el empaquetado: lee las features, las pone en un
@@ -76,4 +78,6 @@ class ColumnsToVector:
         final_features_df = assembler.transform(df_in)
         final_features_df = final_features_df.select("numcliente","vintage_date", "features_vector")
         final_features_df = final_features_df.withColumnRenamed("vintage_date","vintage")
-        final_features_df.write.mode(self.mode).parquet(os.path.join(self.write_path,"vector_assembler"))
+        save_parquet(final_features_df,
+                     os.path.join(self.write_path, "vector_assembler"),
+                     self.mode)

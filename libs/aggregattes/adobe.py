@@ -52,7 +52,7 @@ from pyspark.sql.functions import (
 from pyspark.sql.functions import first as spark_first, last as spark_last
 
 from .base import BaseAggregate
-from ..steps import dynamic, path_delete
+from ..steps import dynamic, path_delete, read_parquet_many
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -155,7 +155,7 @@ class AdobeAggregate(BaseAggregate):
                  if t.endswith("_historic")
                  else str(PosixPath(self.previous_path).joinpath(t + "_historic"))
                  for t in self.tables]
-        return self.sqlContext.read.parquet(*paths)
+        return read_parquet_many(self.sqlContext, paths)
 
     def _flag_exprs(self) -> List[Column]:
         """Columnas 0/1 por flag según las reglas AND del config."""

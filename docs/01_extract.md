@@ -64,6 +64,23 @@ incompletas antes de seguir.
 Punto de entrada que ejecuta todo lo anterior de extremo a extremo (es lo que invoca
 `DataPull._perform_extract`).
 
+### Reanudación (`is_dynamic`)
+
+Con `is_dynamic=True` (lo que pasa `ExtractStep` desde `main_dynamic`), cada
+artefacto se recarga si su directorio tiene `_SUCCESS`:
+
+- `<table>_YYYYMM` — parquet mensual (particionado por la columna de
+  vintage del pivot): no se reejecuta la query a Hive, los controles del
+  correo se reconstruyen desde el parquet. Sirven además como fuente de
+  `_create_cohorts` — el antiguo `<table>_full` intermedio ya no existe:
+  los cohortes leen los mensuales directamente con poda por vintage.
+- `<table>_vintage_YYYYMM` — cohorte por vintage (prefijo `_vintage_`
+  para no colisionar con los mensuales).
+- `<table>_historic` — salida final: si existe, la tabla entera se salta.
+
+Un kill a mitad de tabla solo reejecuta las queries de los meses que
+falten. Con `is_dynamic=False` (pipeline legado) todo se recomputa.
+
 ## Salida
 
 ```

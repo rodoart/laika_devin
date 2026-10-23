@@ -84,3 +84,11 @@ observaciones (ver [05](05_mobs_vector_assembly.md)).
 
 **Salida:** `{working_path}/{year_id}/{source}/missing_treatment/` — mismas tablas con
 series completas y valores imputados según la regla configurada por columna.
+
+### Reanudación (`is_dynamic`)
+
+`WeeklyTFrom(is_dynamic=True)` (lo que pasa `WeeksStep` desde `main_dynamic`)
+propaga el flag a cada `WeeklyTFromParquetReTagger`: sus propiedades
+`filtered` y `filled_columns` están decoradas con `@dynamic`, así que el
+intermedio `filtered_<table>` y la salida `weekly_extract/<table>` se
+recargan por tabla si tienen `_SUCCESS`, sin releer el extract.

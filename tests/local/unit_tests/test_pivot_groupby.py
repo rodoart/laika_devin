@@ -74,7 +74,10 @@ class TestColumnsToVector:
         c2v.run()
 
         out = spark.read.parquet((tmp_path / "vector_assembler").as_posix())
-        assert out.columns == ["numcliente", "vintage", "features_vector"]
+        # ``vintage`` es columna de particion -> Spark la mueve al final
+        # del esquema al releer el parquet particionado
+        assert set(out.columns) == {"numcliente", "vintage",
+                                    "features_vector"}
         row = out.first()
         assert list(row.features_vector.toArray()) == [1.0, 2.0, 3.0]
         assert row.numcliente == "1"

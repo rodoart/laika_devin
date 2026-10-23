@@ -15,6 +15,8 @@ import pandas as pd
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import when
 
+from ..steps import save_parquet
+
 
 def parse_config_bool(value: Any, name: str = "value",
                       none_is_false: bool = False) -> bool:
@@ -129,8 +131,9 @@ class BaseAggregate:
         return expr.otherwise(default)
 
     def _save_parquet(self, df_save: DataFrame, path: str) -> None:
-        """Guarda el DataFrame como parquet con ``self.mode``."""
-        df_save.write.mode(self.mode).parquet(path)
+        """Guarda el DataFrame como parquet con ``self.mode``,
+        particionado por vintage/tfrom si aplica."""
+        save_parquet(df_save, path, self.mode)
 
     def _create_groupby_query(self, query_dict: Dict[str, Any],
                               group_by: List[str],

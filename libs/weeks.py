@@ -21,7 +21,7 @@ from pyspark.sql.functions import (
 )
 
 from .aggregattes.payroll_income import cached_property
-from .steps import dynamic, path_delete
+from .steps import dynamic, path_delete, save_parquet
 
 # Functions
 
@@ -985,6 +985,9 @@ class WeeklyTFrom:
         weeks_dict (Dict[str, Union[str, List[str]]]): Diccionario con información de las semanas.
         n_mis (int): Número de mis.
         sqlContext (SparkSession): Contexto de Spark.
+        is_dynamic (bool): ``True`` -> reanudable por tabla: cada
+            ``weekly_extract/<table>`` ya escrito se recarga en vez de
+            recomputarse.
     """
     def __init__(
         self,
@@ -993,6 +996,7 @@ class WeeklyTFrom:
         weeks_dict:Dict[str, Union[str,List[str]]],
         n_mis:int,
         sqlContext:SparkSession,
+        is_dynamic:bool = False,
     ) -> None:
         self.extracted_tables = extracted_tables
         self.extracted_path = extracted_path
@@ -1000,6 +1004,7 @@ class WeeklyTFrom:
         self.weeks_dict = weeks_dict
         self.n_mis = int(n_mis)
         self.sqlContext = sqlContext
+        self.is_dynamic = bool(is_dynamic)
 
     def run(self) -> None:
         """
@@ -1027,7 +1032,7 @@ class WeeklyTFrom:
                 output_path=output_path,
                 n_mis=self.n_mis,
                 sqlContext=self.sqlContext,
-                is_dynamic=False
+                is_dynamic=self.is_dynamic
             )
             weekly_tfrom_object.run()
 
@@ -1454,7 +1459,7 @@ class WeeklyTFromParquetReTagger:
         Returns:
             None
         """
-        df_save.write.mode(self.mode).parquet(path)
+        save_parquet(df_save, path, self.mode)
 
     @staticmethod
     def _delete_intermediate(path:str) -> None:

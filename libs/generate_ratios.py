@@ -18,7 +18,7 @@ import os
 import re
 import logging
 
-from .steps import path_exists
+from .steps import path_exists, save_parquet
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -60,7 +60,7 @@ class GenerateRatios:
         path : str
             Path donde almacenar los datos.
         """
-        df_save.write.mode(self.mode).parquet(path)
+        save_parquet(df_save, path, self.mode)
 
     def run(self) -> None:
         """Calcula los ratios según la fuente del constructor."""
@@ -233,7 +233,7 @@ class GenerateRatios:
                     how='left').drop('aux_id')
 
         path_write_pivot = os.path.join(path_write, "aux_ratios")
-        pivot.write.mode(self.mode).parquet(path_write_pivot)
+        save_parquet(pivot, path_write_pivot, self.mode)
         pivot = self.sqlContext.read.parquet(path_write_pivot)
         return (pivot)
 

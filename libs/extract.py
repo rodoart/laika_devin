@@ -20,6 +20,7 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 import pyspark.sql.functions as F
 from random import randint
+import logging
 from multiprocessing.pool import ThreadPool
 from cytoolz.functoolz import partial
 import os
@@ -28,7 +29,9 @@ import re
 from .extract_special_treatments.default import ExtractSpecialTreatment
 from .extract_special_treatments.payroll_streaks import PayrollStreaksExtractSpecialTreatment
 from .extract_special_treatments.adobe import AdobeExtractSpecialTreatment
-from .steps import path_exists, path_delete
+from .steps import path_exists, path_delete, save_parquet, \
+    read_parquet_many
+from .hive_path import is_successful
 
 class Extract():
     #: Fuentes a las que se aplica tratamiento especial en la extracción.
@@ -60,13 +63,20 @@ class Extract():
         ``overwrite``.
     name : str
         Nombre con el que guardar el paso; por defecto ``extract``.
+    is_dynamic : bool
+        ``True`` -> extract reanudable: cada parquet intermedio ya
+        escrito (mes ``<table>_YYYYMM``, ``<table>_full``, cohorte de
+        vintage ``<table>_vintage_YYYYMM`` y ``<table>_historic``) se
+        recarga en vez de recomputarse. ``False`` -> recomputa todo
+        (comportamiento del pipeline legado).
     """
     FORMAT_TIME = "%Y-%m-%d"
 
     def __init__(self, pivot_table: DataFrame, working_path: str, n_mis: int,
                  sources_cat: Dict[str, Any], source: str,
                  sqlContext: SparkSession, number_threads: int = 32,
-                 mode: str = "overwrite", name: str = "extract") -> None:
+                 mode: str = "overwrite", name: str = "extract",
+                 is_dynamic: bool = False) -> None:
         self.pivot_table: DataFrame = pivot_table
         self.working_path: str = working_path
         self.sources_cat: Dict[str, Any] = sources_cat
@@ -80,6 +90,7 @@ class Extract():
         self.controls_out: List[pd.DataFrame] = []
         self.controls_out_f: List[pd.DataFrame] = []
         self.name: str = name
+        self.is_dynamic: bool = is_dynamic
 
     def _create_queries(self, list_dates: List[str], table_name: str,
                         database: str, type_date: str, name_mis: str,
@@ -263,9 +274,11 @@ class Extract():
             range_vin.append((min_date.strftime(self.FORMAT_TIME), max_date.strftime(self.FORMAT_TIME)))
         return range_vin
 
-    def _write_parquet(self, df: DataFrame, path: str,
-                       file_name: str) -> Tuple[()]:
-        """Escribe un parquet.
+    def _write_parquet(self, df: DataFrame, path: str, file_name: str,
+                       partition_cols: Optional[List[str]] = None
+                       ) -> Tuple[()]:
+        """Escribe un parquet, particionado por vintage/tfrom si aplica
+        (ver :func:`libs.steps.save_parquet`).
 
         Parameters
         ----------
@@ -275,8 +288,12 @@ class Extract():
             Path donde se va a escribir el parquet.
         file_name : str
             Nombre del parquet.
+        partition_cols : Optional[List[str]]
+            Columnas de particionado explícitas (p.ej. ``["tfrom_date"]``
+            para ``<table>_full``). ``None`` = autodetección.
         """
-        df.write.mode(self.mode).parquet(os.path.join(path,file_name))
+        save_parquet(df, os.path.join(path, file_name), self.mode,
+                     partition_cols)
         return()
 
     def _evaluate_path(self, path: str) -> bool:
@@ -291,7 +308,8 @@ class Extract():
                         vintage_ranges: List[Tuple[str, str]],
                         key_pivote: str, save_path: str, name_vintage: str,
                         table_name: str, pivot: DataFrame,
-                        sqlContext: SparkSession) -> List[str]:
+                        sqlContext: SparkSession,
+                        history_paths: List[str]) -> List[str]:
         """Crea las cohortes por cada vintage.
 
         Parameters
@@ -313,6 +331,9 @@ class Extract():
             Tabla pivot.
         sqlContext : SparkSession
             Tu sqlContext.
+        history_paths : list
+            Paths de los cohortes mensuales ``<table>_YYYYMM`` ya
+            escritos (particionados por ``name_vintage``).
 
         Returns
         -------
@@ -320,17 +341,33 @@ class Extract():
             Paths con todas las cohortes creadas
             (``<table>_<YYYYMM>`` por vintage).
         """
-        df_history = sqlContext.read.parquet(os.path.join(save_path, table_name + "_full"))
+        df_history = read_parquet_many(sqlContext, history_paths)
+        # tfrom_date llega como string desde los mensuales; el cast a
+        # date preserva el tipo que daba el antiguo ``_full`` particionado
+        df_history = df_history.withColumn(
+            "tfrom_date", F.to_date("tfrom_date"))
         path_aux_list=[]
         for k in range(len(vintages_dates)):
             vintage = vintages_dates[k]
-            df_history = df_history.withColumn("AUX_VTG", F.to_date(F.lit(vintage)))
-            df_final = df_history.filter(df_history.tfrom_date.between(vintage_ranges[k][0],vintage_ranges[k][1]))\
-            .where(F.datediff(F.col(name_vintage), F.col("AUX_VTG")) == 0)
+            # ``_vintage_`` en el nombre evita la colisión con los
+            # cohortes mensuales ``<table>_YYYYMM`` (mismo nombre cuando
+            # el mes coincide con el vintage)
+            cohort_name = table_name + "_vintage_" + vintage.strftime("%Y%m")
+            path_aux = os.path.join(save_path, cohort_name)
+            path_aux_list.append(path_aux)
+            if self.is_dynamic and is_successful(path_aux):
+                logging.info(f"Vintage cohort {cohort_name} already written, reloading")
+                continue
+            # ``vintage == lit`` además del datediff: mismo conjunto de
+            # filas pero permite podar las particiones vintage= de los
+            # cohortes mensuales
+            df_final = df_history.withColumn("AUX_VTG", F.to_date(F.lit(vintage)))\
+            .filter(df_history.tfrom_date.between(vintage_ranges[k][0],vintage_ranges[k][1]))\
+            .where(F.datediff(F.col(name_vintage), F.col("AUX_VTG")) == 0)\
+            .where(F.col(name_vintage) == F.lit(vintage))
             df_final = df_final.withColumn("vintage_date", F.lit(vintage)).withColumn("tfrom_ini", F.lit(vintage_ranges[k][1]))\
             .withColumn("tfrom", F.months_between(F.col("tfrom_ini"), F.col("tfrom_date"))).drop("tfrom_ini","AUX_VTG")
-            self._write_parquet(df_final, save_path, table_name+ "_" + vintage.strftime("%Y%m"))
-            path_aux_list.append(os.path.join(save_path, table_name+ "_" + vintage.strftime("%Y%m")))
+            self._write_parquet(df_final, save_path, cohort_name)
         return path_aux_list
 
     def _join_full_cohorts(self, save_path: str, path_aux_list: List[str],
@@ -356,7 +393,7 @@ class Extract():
         str
             Path donde se escribió la cohorte final.
         """
-        df_final = sqlContext.read.parquet(*path_aux_list)
+        df_final = read_parquet_many(sqlContext, path_aux_list)
         if name_vintage_pivote in df_final.columns:
             df_final = df_final.drop(name_vintage_pivote)
         self._write_parquet(df_final, save_path, table_name + "_historic")
@@ -430,6 +467,27 @@ class Extract():
         ("vintage_date"),F.desc("tfrom_date")).toPandas()
         return controls
 
+    def _controls_in_from_parquet(self, path_output: str,
+                                  name_mis: str) -> pd.DataFrame:
+        """Controles de entrada recalculados desde un parquet ya
+        persistido.
+
+        Se usa al reanudar el extract (``is_dynamic``): evita reejecutar
+        la query a Hive solo para llenar los controles del correo. Si no
+        se puede reconstruir (columna ausente, parquet ilegible) devuelve
+        un dataframe vacío.
+        """
+        try:
+            match = re.search(r'\((.*?)\)', name_mis)
+            if match:
+                name_mis = match.group(1)
+            df = self.sqlContext.read.parquet(path_output)
+            if name_mis in df.columns:
+                return df.groupBy(name_mis).count().toPandas()
+        except Exception:
+            pass
+        return pd.DataFrame()
+
     def create_html_controls(self, message_start: str, message_style: str,
                              message_end: str,
                              table_id: str = "default") -> str:
@@ -462,7 +520,8 @@ class Extract():
 
     def _create_month_cohort(self, master_list: List[Any], df_pivot: DataFrame,
                              name_mis: str, key_pivote: str, key_source: str,
-                             save_path: str) -> Tuple[str, pd.DataFrame]:
+                             save_path: str,
+                             name_vintage: str) -> Tuple[str, pd.DataFrame]:
         """Crea las cohortes mensuales de toda la información.
 
         Parameters
@@ -480,6 +539,9 @@ class Extract():
             Nombre de la clave en la fuente.
         save_path : str
             Path donde guardar.
+        name_vintage : str
+            Columna de vintage del pivot — los mensuales se particionan
+            por ella para que ``_create_cohorts`` pode por vintage.
 
         Returns
         -------
@@ -490,10 +552,16 @@ class Extract():
         query = master_list[0]
         table_name = master_list[1]
         date = master_list[2]
-        df = self.sqlContext.sql(query)
         match = re.search(r'\((.*?)\)', name_mis)
         if match:
             name_mis = match.group(1)
+        out_path = os.path.join(save_path, table_name)
+        # Reanudación: el parquet mensual ya está escrito completo -> no
+        # se reejecuta la query a Hive; solo se reconstruyen los controles
+        if self.is_dynamic and is_successful(out_path):
+            logging.info(f"Month cohort {table_name} already written, reloading")
+            return (out_path, self._controls_in_from_parquet(out_path, name_mis))
+        df = self.sqlContext.sql(query)
         df = df.withColumn(name_mis, F.col(name_mis).cast("string"))
         if self.source in self.special_treatment_sources:
             df = self._special_treatment(df, table_name, date, query).run()
@@ -503,10 +571,19 @@ class Extract():
             df_temp = df_pivot.join(df, [key_source], "left")
         else:
             df_temp = df_pivot.join(df,(df_pivot[key_pivote] == df[key_source]),"left")
+            # join por expresión conserva la clave de AMBOS lados; con
+            # key_source == key_pivote (p.ej. crd_acct_nbr en rev_balance)
+            # la columna queda duplicada y el write falla
+            if key_source == key_pivote:
+                df_temp = df_temp.drop(df[key_source])
         if "numcliente" in df.columns and "numcliente" in df_pivot.columns:
             df_temp = df_temp.drop(df.numcliente)
         df_temp = df_temp.withColumn("tfrom_date", F.lit(date))
-        self._write_parquet(df_temp, save_path, table_name)
+        # particionado por la columna de vintage del pivot: permite a
+        # _create_cohorts leer solo la partición del vintage en curso
+        # (tfrom_date es un solo valor por mensual -> no aporta)
+        self._write_parquet(df_temp, save_path, table_name,
+                            partition_cols=[name_vintage])
         return (os.path.join(save_path, table_name), controls)
 
     def collect_history(self) -> Tuple[()]:
@@ -541,6 +618,16 @@ class Extract():
             key_pivote = sources_cat["key_pivote"][k]
             name_vintage_pivote = sources_cat["name_vintage_pivote"][k]
             key_source = sources_cat["key_source"][k]
+            # Reanudación a nivel tabla: el ``<table>_historic`` final ya
+            # existe -> se recarga entera; solo se recalculan controles
+            historic_path = os.path.join(save_path, table_name + "_historic")
+            if self.is_dynamic and is_successful(historic_path):
+                logging.info(f"Table {table_name} historic already written, reloading")
+                self.controls_in.append(self._controls_in_from_parquet(historic_path, name_mis))
+                self.controls_out.append(self._controls_output(path_output = historic_path, sqlContext = sqlContext))
+                self.controls_out_f.append(self._controls_notnull_output(key_pivote = key_pivote, path_output = historic_path,sqlContext =
+                sqlContext))
+                continue
             #List of dates and queries
             vintages_dates = self._get_vintages_dates(pivot = pivot_table, name_vintage_date = name_vintage_pivote,\
                         table_key = table_pivote, sqlContext = sqlContext)
@@ -560,28 +647,33 @@ class Extract():
             lista_aux = []
             master_lists = [[queries[k], tables[k], list_dates[k]] for k in range(len(queries))]
             fun_month_cohorts = partial(self._create_month_cohort, df_pivot = df_pivot, name_mis = name_mis, key_pivote = key_pivote,\
-                        key_source = key_source, save_path = save_path)
+                        key_source = key_source, save_path = save_path,\
+                        name_vintage = name_vintage_pivote)
             lista_aux.append(thread_pool.map(fun_month_cohorts, master_lists))
             self.controls_in.append(self._append_pandas(*[tuple_aux[1] for tuple_aux in lista_aux[0]]))
-            df_full = sqlContext.read.parquet(*[tuple_aux[0] for tuple_aux in lista_aux[0]])
-            self._write_parquet(df_full,save_path, table_name + "_full")
+            # El ``<table>_full`` intermedio desapareció: los mensuales en
+            # disco (particionados por vintage) son el checkpoint de
+            # reanudación y ``_create_cohorts`` los lee con poda.
             paths_delete += [tuple_aux[0] for tuple_aux in lista_aux[0]]
             path_aux_list = self._create_cohorts(vintages_dates = vintages_dates, vintage_ranges = vintage_ranges, key_pivote =
             key_pivote,\
                         save_path = save_path, name_vintage = name_vintage_pivote, table_name = table_name,\
-                        pivot = pivot_table, sqlContext = sqlContext)
-            paths_delete.append(os.path.join(save_path, table_name + "_full"))
+                        pivot = pivot_table, sqlContext = sqlContext,\
+                        history_paths = [tuple_aux[0] for tuple_aux in lista_aux[0]])
             path_output = self._join_full_cohorts(save_path = save_path, path_aux_list = path_aux_list, table_name = table_name,
             name_vintage_pivote = name_vintage_pivote, sqlContext = sqlContext)
             paths_delete += path_aux_list
             fun_delete = partial(self._delete_intermediate)
-            # dedupe: un cohorte de vintage puede colisionar con un cohorte
-            # mensual (<table>_YYYYMM) -> dos threads borrarian el mismo
-            # dir y rmtree falla con FileNotFoundError
+            # dedupe por seguridad: dos threads no deben borrar el mismo
+            # dir (rmtree falla con FileNotFoundError)
             thread_pool.map(fun_delete, list(dict.fromkeys(paths_delete)))
             self.controls_out.append(self._controls_output(path_output = path_output, sqlContext = sqlContext))
             self.controls_out_f.append(self._controls_notnull_output(key_pivote = key_pivote, path_output = path_output,sqlContext =
             sqlContext))
-        thread_pool.close()
-        df_pivot.unpersist()
+        # Si TODAS las tablas se recargaron (is_dynamic), ni thread_pool
+        # ni df_pivot llegaron a crearse -> no hay nada que cerrar
+        if 'thread_pool' in locals() and thread_pool is not None:
+            thread_pool.close()
+        if 'df_pivot' in locals() and df_pivot is not None:
+            df_pivot.unpersist()
         return()

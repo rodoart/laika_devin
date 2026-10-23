@@ -21,6 +21,7 @@ from pyspark.sql.functions import col, when
 
 from ..aggregattes.payroll_income import cached_property
 from ..hive_path import is_successful
+from ..steps import save_parquet
 
 # Log configuration
 logging.basicConfig(format='%(asctime)s | %(message)s',
@@ -339,7 +340,7 @@ class PreviousFixerPayroll:
         Returns:
             None
         """
-        df_save.write.mode(self.mode).parquet(path)
+        save_parquet(df_save, path, self.mode)
 
 
 class PreviousFixerPayrollIncome(PreviousFixerPayroll):

@@ -216,6 +216,77 @@ def run_pipeline() -> None:
             sys.exit(f"pipeline failed for {source}")
 
 
+def resume_scenario() -> None:
+    """Simula un kill a mitad del extract de bancanet y verifica la
+    reanudación.
+
+    1. Borra ``extract/`` y mata la corrida justo antes de escribir
+       ``<table>_historic`` (monkeypatch de ``_join_full_cohorts``):
+       quedan en disco los parquets mensuales y los cohortes
+       de vintage — el estado de un run matado a medias.
+    2. Re-ejecuta ``run_source`` con un builder **sin** las vistas
+       ``global_temp`` (sin "Hive"): cualquier reejecución de las queries
+       mensuales lanzaría ``AnalysisException``. Solo funciona si cada
+       parquet ya escrito se recarga (meses, cohortes,
+       ``pivot_prepared``).
+    3. Además borra ``mobs``/``vector_assembler`` para comprobar que el
+       resto de la cadena reanuda desde donde falta.
+    """
+    from datapull import DataPull
+    from libs import extract as extract_mod
+    from libs.paths import PathsConfig
+    from main_dynamic import build_session_builder, run_source
+
+    rigid = json.loads((CONFIG_DIR / "configuration.json").read_text())
+    custom = json.loads((CONFIG_DIR / "config_custom.json").read_text())
+    src_b = WORKDIR_DYN / YEAR_ID / "adobe_bancanet"
+    real_build = build_session_builder(local=True)
+
+    def builder_with_views():
+        spark = real_build()
+        register_views(spark)
+        return spark
+
+    # --- 1) kill simulado tras los parquets mensuales -------------------
+    shutil.rmtree(src_b / "extract")
+    killed = {"called": False}
+    orig_join = extract_mod.Extract._join_full_cohorts
+
+    def boom(self, *a, **kw):
+        killed["called"] = True
+        raise RuntimeError("simulated kill mid-extract")
+
+    extract_mod.Extract._join_full_cohorts = boom
+    try:
+        run_source(DataPull(rigid, custom, builder_with_views),
+                   "adobe_bancanet", paths=PathsConfig(),
+                   is_dynamic=True, step_filter=None,
+                   cleanup=False, send_email=False)
+    finally:
+        extract_mod.Extract._join_full_cohorts = orig_join
+    assert killed["called"], "el kill simulado nunca se ejecutó"
+    # quedaron meses + cohortes de vintage, sin _historic
+    extract_dir = src_b / "extract"
+    months = [p for p in extract_dir.iterdir()
+              if p.name.startswith("adobe_t_20")]
+    assert months, "no quedaron parquets mensuales tras el kill"
+    assert not (extract_dir / "adobe_t_historic").exists()
+
+    # --- 2) re-ejecución sin vistas: solo puede recargar parquets -------
+    for d in ("mobs", "vector_assembler"):
+        shutil.rmtree(src_b / d, ignore_errors=True)
+    ok = run_source(DataPull(rigid, custom, real_build),
+                    "adobe_bancanet", paths=PathsConfig(),
+                    is_dynamic=True, step_filter=None,
+                    cleanup=False, send_email=False)
+    if not ok:
+        sys.exit("resume de adobe_bancanet falló (¿re-executó queries "
+                 "mensuales sin vistas?)")
+    assert (extract_dir / "adobe_t_historic" / "_SUCCESS").exists(), \
+        "el _historic no se reconstruyó en la reanudación"
+    print("RESUME OK — extract reanudado desde parquets mensuales")
+
+
 # ---------------------------------------------------------------------------
 # verificación
 # ---------------------------------------------------------------------------
@@ -360,6 +431,40 @@ def verify() -> None:
     check("va: todos los clientes del pivot",
           va.select("numcliente").distinct().count() == 5)
 
+    # --- resume --------------------------------------------------------------
+    check("resume: pivot_prepared persistido",
+          (WORKDIR_DYN / YEAR_ID / "pivot_prepared" / "_SUCCESS").exists())
+    check("resume: _historic reconstruido tras kill",
+          (src_b / "extract" / "adobe_t_historic" / "_SUCCESS").exists())
+    check("resume: mobs re-computados tras borrado",
+          (src_b / "mobs" / "imputate_mobs" / "raw_features"
+           / "_SUCCESS").exists())
+
+    # --- particionado vintage/tfrom -------------------------------------
+    def _has_part_dirs(base: Path, prefix: str) -> bool:
+        return base.exists() and any(
+            p.is_dir() and p.name.startswith(prefix + "=")
+            for p in base.iterdir())
+
+    def _has_nested_parts(base: Path, outer: str, inner: str) -> bool:
+        return base.exists() and any(
+            _has_part_dirs(p, inner) for p in base.iterdir()
+            if p.is_dir() and p.name.startswith(outer + "="))
+
+    check("parquet: _historic particionado por vintage_date+tfrom",
+          _has_nested_parts(src_b / "extract" / "adobe_t_historic",
+                            "vintage_date", "tfrom"))
+    check("parquet: weekly_extract particionado por tfrom",
+          _has_nested_parts(src_b / "weekly_extract" / "adobe_t_historic",
+                            "vintage_date", "tfrom"))
+    check("parquet: groupby particionado",
+          _has_nested_parts(src_b / "groupby", "vintage_date", "tfrom"))
+    check("parquet: pivot wide particionado por vintage_date",
+          _has_part_dirs(src_b / "pivot", "vintage_date"))
+    check("parquet: pivot_prepared particionado por vintage",
+          _has_part_dirs(WORKDIR_DYN / YEAR_ID / "pivot_prepared",
+                         "vintage"))
+
     # --- mobile -------------------------------------------------------------
     hist_m = _read(spark, src_m, "extract", "adobe_mob_t_historic")
     check("mobile: extract resuelve numcliente",
@@ -408,6 +513,7 @@ def main() -> None:
     if WORKDIR_DYN.exists():
         shutil.rmtree(WORKDIR_DYN)
     run_pipeline()
+    resume_scenario()
     verify()
 
 

@@ -23,7 +23,7 @@ import logging
 import types
 from itertools import groupby as it_groupby
 
-from .steps import dynamic, path_exists
+from .steps import dynamic, path_exists, save_parquet
 from .hive_path import is_successful
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
@@ -311,8 +311,9 @@ class FeatureEngineering:
 
     def _save_parquet(self, df_save: DataFrame, path: str) -> None:
         """Guarda ``df_save`` como parquet con ``self.mode`` (protocolo de
-        :func:`libs.steps.dynamic`)."""
-        df_save.write.mode(self.mode).parquet(path)
+        :func:`libs.steps.dynamic`). Particionado por vintage/tfrom si
+        el df los tiene."""
+        save_parquet(df_save, path, self.mode)
 
     def _write_parquet(self, df: DataFrame, path: str,
                        file_name: str) -> Tuple[()]:
@@ -332,7 +333,7 @@ class FeatureEngineering:
         -------
         None
         """
-        df.write.mode(self.mode).parquet(os.path.join(path, file_name))
+        save_parquet(df, os.path.join(path, file_name), self.mode)
         return()
 
     def mt_transformations(self) -> 'StandardMethodsMT':
@@ -634,13 +635,26 @@ class FeatureEngineering:
             return(r_mean)
         #print("Running rmeans transformation")
         logging.info("Running Rmeans transformations")
-        n = len(self.lista_metodo[0]) // self.period
-        m = 1
+        # n por variable: dominios dispersos (adobe ld/dseq) tienen
+        # longitudes distintas; y se deduplica por nombre/ventana — una
+        # lista truncada puede repetir nombre y columnas -> AnalysisException
         lista_rmeans = []
-        while 2*m <= n:
-            lista_rmeans += [[self.lista_metodo[k][:m * self.period],self.lista_metodo[k][m * self.period:2 * m *self.period],self.
-            lista_metodo[k][0][:self.lista_metodo[k][0].rindex("_")]] for k in range(len(self.lista_metodo))]
-            m += 1
+        seen = set()
+        for cols in self.lista_metodo:
+            n = len(cols) // self.period
+            stem = cols[0][:cols[0].rindex("_")]
+            m = 1
+            while 2*m <= n:
+                x = cols[:m * self.period]
+                y = cols[m * self.period:2 * m * self.period]
+                name = f"{stem}_{len(x)}"
+                if x and y and name not in seen:
+                    seen.add(name)
+                    lista_rmeans.append([x, y, stem])
+                m += 1
+        if not lista_rmeans:
+            logging.info("Rmeans: sin ventanas validas, se omite")
+            return
         self.sqlContext.udf.register("rmeans", rmeans, DoubleType())
         query = "select id_msf_tools_v2_12315, " + ",".join(["rmeans(array(" + ",".join(inner_list[0]) + "),array(" + ",".join
         (inner_list[1]) + ")) as rmeans_" +\
@@ -668,12 +682,24 @@ class FeatureEngineering:
             return(const_inc)
         #print("Running incremental transformations")
         logging.info("Running Incremental transformations")
-        n = len(self.lista_metodo[0])
-        m = 1
+        # n por variable + dedupe por nombre/ventana (dominios dispersos:
+        # ventanas truncadas repiten nombre y columnas -> AnalysisException)
         lista_inc = []
-        while self.period * m < n-1:
-            lista_inc += [self.lista_metodo[k][:self.period * m + 1] for k in range(len(self.lista_metodo))]
-            m += 1
+        seen = set()
+        for cols in self.lista_metodo:
+            n = len(cols)
+            stem = cols[0][:cols[0].rindex("_")]
+            m = 1
+            while self.period * m < n-1:
+                window = cols[:self.period * m + 1]
+                name = f"i{len(window)-1}_{stem}"
+                if len(window) >= 2 and name not in seen:
+                    seen.add(name)
+                    lista_inc.append(window)
+                m += 1
+        if not lista_inc:
+            logging.info("Incremental: sin ventanas validas, se omite")
+            return
         self.sqlContext.udf.register("incremental", incremental, DoubleType())
         query = self.SELECT_ID + ','.join(["incremental(array(" + ','.join(inner_hist) + self.CLOSE_AS + "i" + str(len(inner_hist)
         -1) + "_" +\
@@ -1209,13 +1235,24 @@ class StandardMethodsMT(ExternalTransformations):
             return(r_mean)
         #print("Running rmeans_mt transformation")
         logging.info("Running Rmeans_mt transformations")
-        n = len(self.lista_metodo[0]) // self.period
-        m = 1
+        # n por variable + dedupe por nombre/ventana (ver _rmeansTransformation)
         lista_rmeans_mt = []
-        while 2*m <= n:
-            lista_rmeans_mt += [[self.lista_metodo[k][:m * self.period],self.lista_metodo[k][m * self.period:2 * m *self.period],
-            self.lista_metodo[k][0][:self.lista_metodo[k][0].rindex("_")]] for k in range(len(self.lista_metodo))]
-            m += 1
+        seen = set()
+        for cols in self.lista_metodo:
+            n = len(cols) // self.period
+            stem = cols[0][:cols[0].rindex("_")]
+            m = 1
+            while 2*m <= n:
+                x = cols[:m * self.period]
+                y = cols[m * self.period:2 * m * self.period]
+                name = f"{stem}_{len(x)}"
+                if x and y and name not in seen:
+                    seen.add(name)
+                    lista_rmeans_mt.append([x, y, stem])
+                m += 1
+        if not lista_rmeans_mt:
+            logging.info("Rmeans_mt: sin ventanas validas, se omite")
+            return
         self.sqlContext.udf.register("rmeans_mt", rmeans_mt, DoubleType())
         query = "select id_msf_tools_v2_12315, " + ",".join(["rmeans_mt(array(" + ",".join(inner_list[0]) + "),array(" + ",".join(inner_list[1]) + ")) as rmeans_mt_" + inner_list[2] + "_" + str(len(inner_list[0])) +  self.frequency_sufix for inner_list in lista_rmeans_mt])+ self.FROM_DF
         df_r_means = self.sqlContext.sql(query)
@@ -1244,12 +1281,23 @@ class StandardMethodsMT(ExternalTransformations):
             return(const_inc)
         #print("Running incremental_mt transformations")
         logging.info("Running Incremental_mt transformations")
-        n = len(self.lista_metodo[0])
-        m = 1
+        # n por variable + dedupe por nombre/ventana (ver _incrementalTransformation)
         lista_inc = []
-        while self.period * m < n-1:
-            lista_inc += [self.lista_metodo[k][:self.period * m + 1] for k in range(len(self.lista_metodo))]
-            m += 1
+        seen = set()
+        for cols in self.lista_metodo:
+            n = len(cols)
+            stem = cols[0][:cols[0].rindex("_")]
+            m = 1
+            while self.period * m < n-1:
+                window = cols[:self.period * m + 1]
+                name = f"i{len(window)-1}_{stem}"
+                if len(window) >= 2 and name not in seen:
+                    seen.add(name)
+                    lista_inc.append(window)
+                m += 1
+        if not lista_inc:
+            logging.info("Incremental_mt: sin ventanas validas, se omite")
+            return
         self.sqlContext.udf.register("incremental_mt", incremental_mt, DoubleType())
         query = self.SELECT_ID + ','.join(["incremental_mt(array(" + ','.join(inner_hist) + self.CLOSE_AS + "i" + str(len
         (inner_hist)-1) + "_" +\

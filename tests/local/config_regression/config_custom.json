@@ -1,0 +1,32 @@
+{
+    "sources": [
+        "payroll_streaks",
+        "payroll_income",
+        "bureau_pull",
+        "liabilities",
+        "rev_balance"
+    ],
+    "working_path": "D:/projects/laika_devin/tests/local/workdir_regression_dyn",
+    "year_id": "202601",
+    "n_mis": "6",
+    "period": "3",
+    "pivot_path": "D:/projects/laika_devin/tests/local/workdir_regression/fixtures/pivot",
+    "lista_trans": [
+        "sum",
+        "mean",
+        "min",
+        "max",
+        "std",
+        "sum_mt",
+        "mean_mt",
+        "min_mt",
+        "max_mt",
+        "trend_mt"
+    ],
+    "email_sender": "local",
+    "email_receivers": [
+        "local"
+    ],
+    "n_threads": "2",
+    "write_mode": "overwrite"
+}

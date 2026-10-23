@@ -16,6 +16,8 @@ import os
 import logging
 from typing import Any, Dict, List, Optional
 
+from .steps import save_parquet
+
 logging.basicConfig(format='%(asctime)s | %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
 
@@ -62,7 +64,7 @@ class GeneratePivot:
         path : str
             Path donde almacenar los datos.
         """
-        df_save.write.mode(self.mode).parquet(path)
+        save_parquet(df_save, path, self.mode)
 
     def pivot_data(self) -> None:
         """Pasa de formato largo a ancho y guarda en ``pivot``.
@@ -139,5 +141,5 @@ class GeneratePivot:
         df_wide = df_long.groupBy(
             "numcliente", "vintage_date").pivot("fecha_").avg("value")
         head, _ = os.path.split(path)
-        df_wide.write.mode("overwrite").parquet(os.path.join(head, "pivot"))
+        save_parquet(df_wide, os.path.join(head, "pivot"), "overwrite")
         df_wide.unpersist()

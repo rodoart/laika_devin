@@ -39,8 +39,8 @@ from pyspark.sql.functions import (
 from pyspark.sql.types import *
 from pyspark.sql.window import Window
 
-from ..hive_path import is_successful
-from ..steps import path_delete
+from ..hive_path import is_successful, mkdir
+from ..steps import path_delete, path_exists, save_parquet
 from .adobe import PreviousFixerAdobe
 from .payroll_income import PreviousFixerPayrollIncome, get_months
 from .payroll_streaks import PreviousFixerPayrollStreaks
@@ -449,9 +449,16 @@ class Mobs:
                 continue
             print(f"inicia imputacion {feature}")
             self.valor_previo4(features_path,feature,join_mobs,pathwrite,lst_months,sql_context)
-        for feature in feat_list[1]:  # Copia de features
-            print(f"inicia copia {feature}")
-            self._copy_feature(features_path, feature, pathwrite, sql_context)
+        # Passthrough: en vez de duplicar el parquet (raw_features es el
+        # df más grande del pipeline) se crea un marcador
+        # ``_passthrough/<feature>`` y el vector assembler lo resuelve
+        # leyendo directamente de ``features/``. Los fixers payroll/adobe
+        # nunca copiaron los passthrough (no escriben marcadores) — el
+        # contrato del VA se mantiene.
+        for feature in feat_list[1]:
+            marker = os.path.join(pathwrite, "_passthrough", feature)
+            if not self.is_dynamic or not path_exists(marker):
+                mkdir(marker, "-p")
         self._delete_intermediate_list(pathwrite, list(set(df_paths)))
     def valor_previo4(self, features_path: str, feature: str,
                       mobs_info: DataFrame, pathwrite: str,
@@ -513,7 +520,7 @@ class Mobs:
         if num_iteracion == len(lista_meses)-1:
             df_exit = df_exit.drop('mobs')
         path_ = os.path.join(pathwrite,feature)
-        df_exit.write.mode("overwrite").parquet(path_)
+        save_parquet(df_exit, path_)
     ###############################################################
     # Helper methods
     ###############################################################
@@ -556,7 +563,7 @@ class Mobs:
         file_name: string
             Name of the parquet
         """
-        df.write.mode(self.mode).parquet(os.path.join(path, file_name))
+        save_parquet(df, os.path.join(path, file_name), self.mode)
 
     def _get_dataframes(self, origin_path: str, table_names: List[str],
                         sql_context: Optional[SparkSession] = None) -> List[DataFrame]:

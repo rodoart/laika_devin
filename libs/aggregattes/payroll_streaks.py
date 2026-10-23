@@ -22,7 +22,7 @@ from .payroll_income import cached_property
 from ..weeks import WeekOfMonthPayroll
 from .base import (columns_with_prefix, columns_with_prefixes,
                    parse_config_bool, sort_df_columns)
-from ..steps import dynamic, path_delete
+from ..steps import dynamic, path_delete, save_parquet
 
 
 # PRINCIPAL CLASS
@@ -282,7 +282,7 @@ class PayrollStreaksAggregate:
         """
         Guarda los datos en formato parquet en la ubicación deseada.
         """
-        df_save.write.mode(self.mode).parquet(path)
+        save_parquet(df_save, path, self.mode)
 
     #
     def _delete_intermediate(self, path: str) -> None:

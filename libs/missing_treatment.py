@@ -32,7 +32,7 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.window import Window
 
-from .steps import path_delete
+from .steps import path_delete, save_parquet
 
 logging.basicConfig(format='%(asctime)s | %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S%p', level=logging.INFO)
@@ -189,9 +189,9 @@ class MissingTreatment:
             wp_mov_avg_l = Window.partitionBy(grouped).orderBy(col("tfrom")).rangeBetween((kmiss)*-1, -1)
             df = df.withColumn(variable,
             when(
-                ((col("null_count") == 3) & (col("tfrom") + kmiss) <= (int(n_mis)-1)) & (col(variable).isNull()), avg(col(variable)).over(wp_mov_avg_b)
+                ((col("null_count") == 3) & ((col("tfrom") + kmiss) <= (int(n_mis)-1))) & (col(variable).isNull()), avg(col(variable)).over(wp_mov_avg_b)
             ).when(
-                ((col("null_count") == 3) & (col("tfrom") + kmiss) > (int(n_mis)-1)) & (col(variable).isNull()), avg(col(variable)).over(wp_mov_avg_l)
+                ((col("null_count") == 3) & ((col("tfrom") + kmiss) > (int(n_mis)-1))) & (col(variable).isNull()), avg(col(variable)).over(wp_mov_avg_l)
             ).otherwise(col(variable)))
             return(df)
 
@@ -213,9 +213,10 @@ class MissingTreatment:
                         df=moving_average(df,variable,grouped,kmiss,self.n_mis)
                         df=df.union(unuse_df)
                     df = df.drop("null_count")
-                    df.write.mode("overwrite").parquet(dir_temp2)
-                    tempdf=sql_context.read.parquet(dir_temp2)
-                    tempdf.write.mode("overwrite").parquet(dir_temp1)
+                    # checkpoint por variable (trunca el lineage); antes
+                    # se copiaba verbatim temp2->temp1: un write extra
+                    # completo del dataset por variable
+                    save_parquet(df, dir_temp1)
                     df=sql_context.read.parquet(dir_temp1)
             return (df)
 
@@ -292,10 +293,10 @@ class MissingTreatment:
                                 f'percentile_approx({variable}, 0.5)')
                             df = df.withColumn(variable, when(col(variable).isNull(), percentile.over(
                                 window_spec)).otherwise(col(variable))).sort(["tfrom"])
-                    df.write.mode("overwrite").parquet(dir_temp2)
-                    tempdf=sql_context.read.parquet(dir_temp2)
-                    tempdf.write.mode("overwrite").parquet(dir_temp1)
-                    df=sql_context.read.parquet(dir_temp1)
+                        # checkpoint solo cuando el fill se aplicó; antes
+                        # escribia temp2+temp1 aun sin nulos (df intacto)
+                        save_parquet(df, dir_temp1)
+                        df=sql_context.read.parquet(dir_temp1)
         return (df)
 
     def fill_snap(self, df: DataFrame, grouped: List[str]) -> DataFrame:
@@ -433,7 +434,7 @@ class MissingTreatment:
         file_name: string
             Name of the parquet
         """
-        df.write.mode(self.mode).parquet(os.path.join(path, file_name))
+        save_parquet(df, os.path.join(path, file_name), self.mode)
 
     def _get_dataframes(self, origin_path: str, table_names: List[str],
                         sql_context: Optional[SparkSession] = None) -> List[DataFrame]:
