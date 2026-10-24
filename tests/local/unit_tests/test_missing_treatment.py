@@ -106,3 +106,61 @@ class TestFillMethods:
         assert vals[("1", 0)] == 9.0    # primer no-nulo del cliente 1
         assert vals[("1", 1)] == 9.0
         assert vals[("2", 0)] == 7.0    # no era nulo -> se queda
+
+
+# ---------------------------------------------------------------------------
+# run_mt: regresión cross-table con partitionOverwriteMode=dynamic
+# ---------------------------------------------------------------------------
+class TestRunMtDynamicOverwrite:
+    def test_temp_checkpoint_no_contamina_entre_tablas(self, spark, tmp_path):
+        """Bug prod: en cluster la sesión nace con
+        partitionOverwriteMode=dynamic. El temp_0 compartido retenía las
+        particiones de la tabla anterior que la siguiente no cubría
+        (asigna tfrom {0,4} vs nomina {2,6}) -> el output de nomina
+        salía con schema de asigna (perdía ``importe``/``fecha``).
+        """
+        conf = "spark.sql.sources.partitionOverwriteMode"
+        prev = spark.conf.get(conf, "static")
+        spark.conf.set(conf, "dynamic")
+        try:
+            extract_dir = tmp_path / "extract"
+            asigna = spark.createDataFrame(
+                [(1, "2026-06-01", 0.0), (2, "2026-06-01", 4.0)],
+                ["numcliente", "vintage_date", "tfrom"])
+            nomina = spark.createDataFrame(
+                [(3, "2026-06-01", 2.0, 100.5), (4, "2026-06-01", 6.0, None)],
+                ["numcliente", "vintage_date", "tfrom", "importe"])
+            for name, df in (("asigna_historic", asigna),
+                             ("nomina_historic", nomina)):
+                df.write.mode("overwrite") \
+                    .partitionBy("vintage_date", "tfrom") \
+                    .parquet(str(extract_dir / name))
+
+            mt_dict = {
+                "missing_treatment": {
+                    "fill_variables": {"variable": ["importe"],
+                                       "metodo": ["real0"]},
+                    "fill_methods": {
+                        "id_variables": ["snapshot"],
+                        "metodo": ["fill_value"],
+                        "grouped": [""],
+                        "valor": ["Real 0"],
+                    },
+                }
+            }
+            mt = MissingTreatment(year="202401", mt_dict=mt_dict,
+                                  source="src", n_mis=4, n_threads=1)
+            mt.run_mt(str(extract_dir),
+                      ["asigna_historic", "nomina_historic"],
+                      str(tmp_path), spark)
+
+            out_dir = (tmp_path / "202401" / "src" / "missing_treatment"
+                       / "nomina_historic")
+            out = spark.read.parquet(str(out_dir))
+            assert "importe" in out.columns
+            rows = {r.numcliente: r for r in out.collect()}
+            assert sorted(rows) == [3, 4]
+            assert rows[3].importe == 100.5
+            assert rows[4].importe == 0.0   # fill_value real0
+        finally:
+            spark.conf.set(conf, prev)

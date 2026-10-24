@@ -124,10 +124,14 @@ class MissingTreatment:
                     if key in method:
                         df = fill(df)
                         break
+                # temp por tabla+método: un checkpoint compartido entre
+                # tablas puede mezclar schemas distintos si un write
+                # dinámico deja particiones del writer anterior
+                temp_name = f"temp_{item_df}_{item_method}"
                 if(intermedium):
-                    self.__write_parquet(df, mt_dir, f"temp_{item_method}")
-                    list_dir.append(os.path.join(mt_dir, f"temp_{item_method}"))
-                df=sql_context.read.parquet(os.path.join(mt_dir, f"temp_{item_method}"))
+                    self.__write_parquet(df, mt_dir, temp_name)
+                    list_dir.append(os.path.join(mt_dir, temp_name))
+                df=sql_context.read.parquet(os.path.join(mt_dir, temp_name))
             self.__write_parquet(df, mt_dir, f"{tables_mt[item_df]}")
 
         for dir in list_dir:

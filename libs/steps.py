@@ -344,10 +344,23 @@ def save_parquet(df: DataFrame, path: PathLike, mode: str = "overwrite",
         # infer schema"). Sin particionar sí quedan part-files vacíos
         # con schema y la recarga funciona.
         parts = []
-    writer = df.write.mode(mode)
-    if parts:
-        writer = writer.partitionBy(*parts)
-    writer.parquet(str(path))
+    # overwrite debe ser TOTAL: en el cluster la sesión nace con
+    # partitionOverwriteMode=dynamic (session.py) y sin este pin un
+    # write "overwrite" solo reemplaza las particiones presentes en el
+    # df — sobreviven particiones ajenas (p.ej. el temp_0 compartido
+    # del mt mezclaba asigna+nomina). El único writer dinámico real es
+    # extract._write_month_partitions, que maneja el conf él mismo.
+    conf = "spark.sql.sources.partitionOverwriteMode"
+    spark = df.sparkSession
+    prev = spark.conf.get(conf, "static")
+    spark.conf.set(conf, "static")
+    try:
+        writer = df.write.mode(mode)
+        if parts:
+            writer = writer.partitionBy(*parts)
+        writer.parquet(str(path))
+    finally:
+        spark.conf.set(conf, prev)
 
 
 def read_parquet_many(sqlContext: SparkSession,

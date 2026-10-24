@@ -10,7 +10,7 @@ Script containing the class and functions for the feature engineering in datapul
 import os
 import numpy as np
 import pandas as pd
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 import pyspark.sql.functions as F
 from pyspark.sql import DataFrame, SparkSession
 import zlib
@@ -274,17 +274,20 @@ class FeatureEngineering:
         return_features = list()
         for feature in variables:
             features = self._filter_columns_feature(cols_df, feature)
+            # tfroms presentes, ordenados. Las ventanas son prefijos
+            # posicionales: en dominios densos 0..k equivalen a
+            # range(n_periodo*periodo); en dispersos o desplazados
+            # (fuente laggeada: tfroms >= 8 sin 0..7) el rango absoluto
+            # nunca toca las keys y list_mvars quedaba vacío.
+            keys = sorted(features, key=int)
             cont = 0
             n_periodo = 0
-            while cont < len(features):
+            while cont < len(keys):
                 cont += 1
                 if cont % periodo == 0:
                     n_periodo += 1
-                    # solo tfroms presentes: dominios dispersos (adobe)
-                    # no tienen todas las columnas 0..k
-                    list_aux = [features[str(k)]
-                                for k in range(n_periodo * periodo)
-                                if str(k) in features]
+                    list_aux = [features[k]
+                                for k in keys[:n_periodo * periodo]]
                     # saltar ventanas que no añaden columnas nuevas
                     # (mismo último tfrom -> mismo stat y nombre duplicado)
                     if list_aux and (not return_features
@@ -510,6 +513,13 @@ class FeatureEngineering:
         """
         # print(f"Running {name} transformations")
         logging.info("Running %s transformations", name)
+        var_lists = {"list_mvars": self.list_mvars,
+                     "lista_metodo": self.lista_metodo}[list_vars]
+        if not var_lists:
+            # poca data: dominio de tfroms vacío o desplazado — la query
+            # saldría "select id, from df" (SQL inválido)
+            logging.info("%s: sin variables, se omite", name)
+            return
         df_tmp = self._defineUdfTransformation(key, transformation, list_vars, tipo)
         self._write_parquet(df_tmp, self.path, name + '_features')
         df_tmp.unpersist()
@@ -976,7 +986,9 @@ class FeatureEngineering:
         self._runUdfTransformation(name, keys, transformations, "list_mvars", DoubleType())
     #
     def assign_weights(self, last_weight: float) -> FloatArray1D:
-        max_leng_mvars = max(len(x) for x in self.list_mvars)
+        # list_mvars puede venir vacío si el df no tiene columnas
+        # <var>_<tfrom> válidas (p.ej. pivot sin variables numéricas)
+        max_leng_mvars = max((len(x) for x in self.list_mvars), default=0)
         weights = np.linspace(1, last_weight, max_leng_mvars)
         return weights
     #
