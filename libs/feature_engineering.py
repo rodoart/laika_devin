@@ -1,3 +1,4 @@
+
 """
 Project: Feature Engineering (Refactorization) (PEP 8, Python3.6 and OOP)
 Developer: Gil Rodriguez & Brayan Borquez & Rodolfo Arturo Gonzalez
@@ -2061,6 +2062,11 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
             len_previous_mt = len(x)
             x = [val for val in x if val != ignore_value]
             len_after_mt = len(x)
+            if len_after_mt == 0:
+                # ventana entera en ignore_value -> sin datos (misma
+                # convención -99999 que el resto de UDFs _mt); sin el
+                # guard la división revienta la task (ZeroDivisionError)
+                return -99999.0
             first_month_index = round(4/(len_previous_mt/len_after_mt))
             sum_first_month = sum(x[:first_month_index])
             sum_else = sum(x[first_month_index:])
