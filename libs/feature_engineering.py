@@ -1913,7 +1913,8 @@ class OnesAndZerosMethodsMT(ExternalTransformations):
         """
         ignore_value = self.parent.ignore_this_value_when_calculating_mt_features
         default = self.parent.default_non_found_value
-        range_ = range(2,8)
+        # solo streaks de longitud 2, 3 y 5 (antes 2..7 -> 6x columnas)
+        range_ = (2, 3, 5)
         def create_streak_function(length: int, default: float, ignore_value: float) -> Callable[..., float]:
             def first_lo1_streak_onz_mt(x: Sequence[float]) -> float:
                 x = [val for val in x if val != ignore_value]

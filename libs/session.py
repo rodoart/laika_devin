@@ -116,6 +116,32 @@ class SparkSessionBuilder:
             .config("spark.executor.memoryOverhead", "2000m")
             .config("spark.driver.memory", "12g")
             .config("spark.network.timeout", "7200s")
+            # Resiliencia (tuning del toolbox minerva): heartbeats y RPC
+            # holgados para que tareas Python/UDF largas no declaren
+            # executors perdidos
+            .config("spark.executor.heartbeatInterval", "60s")
+            .config("spark.rpc.askTimeout", "7200s")
+            .config("spark.rpc.lookupTimeout", "7200s")
+            # YARN: evita que el ApplicationMaster se declare perdido
+            # con tasks lentas y reintenta la app entera si cae
+            .config("spark.yarn.am.waitTime", "300s")
+            .config("spark.yarn.maxAppAttempts", "4")
+            # Dynamic allocation: no matar executors "idle" que están en
+            # shuffle-read lento (FetchFailed -> job abortado)
+            .config("spark.dynamicAllocation.executorIdleTimeout", "300s")
+            .config("spark.dynamicAllocation.cachedExecutorIdleTimeout", "600s")
+            # El listener bus no se satura con jobs grandes
+            .config("spark.scheduler.listenerbus.eventqueue.capacity", "20000")
+            .config("spark.sql.broadcastTimeout", "1200s")
+            # Speculative execution: relanza tasks colgadas por skew
+            # (la etapa fe corre UDFs Python con skew de clientes)
+            .config("spark.speculation", "true")
+            .config("spark.speculation.multiplier", "3")
+            .config("spark.speculation.quantile", "0.9")
+            # Compresión de shuffle: menos presión de red y memoria
+            .config("spark.shuffle.mapStatus.compression.codec", "lz4")
+            .config("spark.io.compression.codec", "lz4")
+            .config("spark.shuffle.compress", "true")
             .config("spark.yarn.stagingDir", self.hdfs_uri(os.environ["PYSPARK_STAGING_DIR_HDFS"]))
             .config("spark.eventLog.enabled", "true")
             .config("spark.eventLog.dir", self.hdfs_uri(os.environ["PYSPARK_LOGS_DIR_HDFS"]))
@@ -124,6 +150,8 @@ class SparkSessionBuilder:
             .config("spark.sql.autoBroadcastJoinThreshold", "-1")
             .config("spark.sql.adaptive.enabled", "true")
             .config("spark.sql.adaptive.skewJoin.enabled", "true")
+            # coalesce: menos partitions vacios tras el shuffle de AQE
+            .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
             # autoBroadcastJoinThreshold=-1 tambien apaga el broadcast en
             # runtime de AQE; este umbral lo reactiva solo cuando un lado
             # del join resulta chico en ejecucion (output identico)
@@ -134,6 +162,13 @@ class SparkSessionBuilder:
             .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
             .enableHiveSupport()
         )
+        # Stack JVM mayor para los UDFs recursivos (kolmogorov/patterns);
+        # tmpdir fuera de /tmp solo si la env var existe en el deploy
+        java_tmp = os.environ.get("PYSPARK_JAVA_IO_TEMP_DIR_LINUX")
+        jopts = "-Xss16m" + (f" -Djava.io.tmpdir={java_tmp}" if java_tmp else "")
+        builder = (builder
+            .config("spark.executor.extraJavaOptions", jopts)
+            .config("spark.driver.extraJavaOptions", jopts))
         # Venv empaquetado distribuido a los executors via YARN archives.
         venv_archive = os.environ.get("PYSPARK_VENV_TAR_GZ_HDFS")
         if venv_archive:
