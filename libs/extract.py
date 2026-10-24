@@ -327,6 +327,44 @@ class Extract():
             df_temp = df_temp.drop(df.numcliente)
         return df_temp
 
+    def _max_tfrom_date(self, df: DataFrame, df_pivot: DataFrame,
+                        key_pivote: str, key_source: str,
+                        name_vintage_pivote: str, retraso: int,
+                        date: str, wk: Dict[str, Any]) -> Any:
+        """Max de ``wk["date_col"]`` del mes — bounds de la ventana semanal.
+
+        Equivalente a ``_month_base(_join_month_pivot(df, df_pivot,
+        ...)).agg(max(to_date(date_col)))`` pero mucho más barato:
+
+        - Solo se proyectan ``key_source`` + la fecha del lado datos:
+          la poda de columnas de Catalyst recorta el scan del mes a 2
+          columnas (la tabla adobe de hits es muy ancha).
+        - ``inner`` en vez de ``left``: para un ``max`` las filas del
+          pivot sin match (fecha ``null``) no ganan nunca y las filas de
+          datos fuera del pivot se descartan igual en ambos joins.
+        - El filtro de ventana por vintage replica exactamente el
+          ``between`` de ``_month_base`` (``lit(date)`` es la constante
+          del bucket mensual comparada contra los bounds por fila).
+        """
+        dat = df.select(
+            F.col(key_source).alias("__k"),
+            F.to_date(F.col(wk["date_col"]), wk["date_format"])
+                .alias("__d"))
+        piv = df_pivot.select(
+            F.col(key_pivote).alias("__k"),
+            F.col(name_vintage_pivote).alias("__v")).distinct()
+        vintage = F.to_date(F.col("__v"))
+        tfrom_ini = F.date_sub(
+            F.add_months(F.date_add(vintage, 1), -retraso), 1)
+        tfrom_min = F.date_sub(
+            F.add_months(F.date_add(vintage, 1),
+                         -(retraso + self.n_mis - 1)), 1)
+        return (dat.join(piv, "__k", "inner")
+                   .filter(F.to_date(F.lit(date))
+                           .between(tfrom_min, tfrom_ini))
+                   .agg(F.max("__d"))
+                   .collect()[0][0])
+
     def _month_base(self, df_temp: DataFrame, date: str,
                     name_vintage_pivote: str, retraso: int) -> DataFrame:
         """Filas del mes ya acotadas al rango temporal de su vintage.
@@ -629,14 +667,10 @@ class Extract():
                     df_b, _ = self._run_month_query(
                         master_list[0], name_mis, master_list[1],
                         master_list[2])
-                    base_b = self._month_base(
-                        self._join_month_pivot(
-                            df_b, df_pivot, key_pivote, key_source),
-                        master_list[2], name_vintage_pivote, retraso)
-                    max_tfrom_date = base_b.agg(
-                        F.max(F.to_date(F.col(wk["date_col"]),
-                                        wk["date_format"]))
-                    ).collect()[0][0]
+                    max_tfrom_date = self._max_tfrom_date(
+                        df_b, df_pivot, key_pivote, key_source,
+                        name_vintage_pivote, retraso, master_list[2],
+                        wk)
                     if max_tfrom_date is not None:
                         # la ventana usa el n_mis AMPLIADO (+1 weeks):
                         # el viejo WeeksStep también subía n_mis antes

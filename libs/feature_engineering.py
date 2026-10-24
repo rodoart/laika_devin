@@ -275,20 +275,25 @@ class FeatureEngineering:
         return_features = list()
         for feature in variables:
             features = self._filter_columns_feature(cols_df, feature)
-            # tfroms presentes, ordenados. Las ventanas son prefijos
-            # posicionales: en dominios densos 0..k equivalen a
-            # range(n_periodo*periodo); en dispersos o desplazados
-            # (fuente laggeada: tfroms >= 8 sin 0..7) el rango absoluto
-            # nunca toca las keys y list_mvars quedaba vacío.
+            # Índice normalizado por el mínimo tfrom presente: el rango
+            # absoluto range(n_periodo*periodo) solo ve las keys si el
+            # dominio arranca en 0 — con una fuente laggeada (tfroms
+            # {8..11} sin 0..7) nunca las tocaba y list_mvars quedaba
+            # vacío (crash en assign_weights). Con dominios desde 0
+            # (incluidos los dispersos) la normalización es identidad y
+            # las ventanas quedan idénticas al comportamiento original.
             keys = sorted(features, key=int)
+            norm = {int(k) - int(keys[0]): k for k in keys} \
+                if keys else {}
             cont = 0
             n_periodo = 0
             while cont < len(keys):
                 cont += 1
                 if cont % periodo == 0:
                     n_periodo += 1
-                    list_aux = [features[k]
-                                for k in keys[:n_periodo * periodo]]
+                    list_aux = [features[norm[k]]
+                                for k in range(n_periodo * periodo)
+                                if k in norm]
                     # saltar ventanas que no añaden columnas nuevas
                     # (mismo último tfrom -> mismo stat y nombre duplicado)
                     if list_aux and (not return_features
