@@ -58,7 +58,7 @@ PIVOT_ROWS = [
 
 SOURCES = ["payroll_streaks", "payroll_income", "bureau_pull",
            "liabilities", "rev_balance", "channels", "financiera",
-           "giros_credito"]
+           "giros_credito", "corporate"]
 
 # ``credit_card_processed_data`` de prod NO trae ``fec_apertura``
 # (select_variables[1] = 'numcliente, mob, mis_dt') — es el crash del
@@ -175,8 +175,8 @@ def write_fixtures(spark) -> None:
     ).write.mode("overwrite").parquet(str(FIXTURES / "adv_colocacion"))
 
     # --- liabilities_test2 (mobs_preparation + queries_liabilities) -----
-    # pagomatico: la 6a query de queries_liabilities extrae id_cuenta16
-    # (key_pivote de la tabla snapshot_pagomatico_t_m de liabilities).
+    # el mapping numcliente->id_cuenta16 lo da la 6a query sobre
+    # snapshot_pagomatico_t_m (fixture propio mas abajo).
     lrows = []
     snaps = ["maestra", "perfiles", "perfiles_ejecutivo", "cheques",
              "otros"]
@@ -193,6 +193,40 @@ def write_fixtures(spark) -> None:
         lrows, ["num_cliente", "inf_dt", "fec_apertura", "num_contrato",
                 "id_cuenta16", "snapshot"]
     ).write.mode("overwrite").parquet(str(FIXTURES / "liabilities_test2"))
+
+    # --- snapshot_pagomatico_t_m (6a query de queries_liabilities) ------
+    # El key_pivote id_cuenta16 del extract de liabilities la exige en el
+    # pivot preparado; la query lee la tabla real de prod.
+    spark.createDataFrame(
+        [("2025-06-28", "101", "CTA16-101-P0"),
+         ("2025-07-28", "101", "CTA16-101-P1"),
+         ("2025-07-28", "105", "CTA16-105-P0"),
+         ("2025-08-28", "106", "CTA16-106-P0")],
+        ["mis_date", "num_cliente", "id_cuenta16"]
+    ).write.mode("overwrite").parquet(
+        str(FIXTURES / "snapshot_pagomatico_t_m"))
+
+    # --- cust_corp_profile_dt1_t_m (corporate extract) ------------------
+    # seg + pct_*: el aggregate calcula cat_*_seg con _nested_when (el
+    # crash del mail); pct fuera de rango cae al default -99999.
+    crows = []
+    for i, mo in enumerate(_months("2025-02", "2025-08")):
+        crows.append((mo[:8] + "28", "101",
+                      ["PENSIONADOS", "GOBIERNO", "EMPRESAS"][i % 3],
+                      "ind_a", 1, i % 2, i % 5, i % 2, i % 5,
+                      10 + i, 20 + i, 30 + i, 40 + i, 50 + i, 60 + i))
+        crows.append((mo[:8] + "28", "105", "EMPRESAS", "ind_b",
+                      2, 1, 4, 0, 2, 11 + i, 21 + i, 31 + i, 41 + i,
+                      51 + i, 61 + i))
+    # pct fuera de rango -> cat = -99999
+    crows.append(("2025-08-28", "106", "OTRO", "ind_c", 3, 7, 9, 7, 9,
+                  12, 22, 32, 42, 52, 62))
+    spark.createDataFrame(
+        crows, ["process_date", "num_cliente", "seg", "f_group_industry",
+                "cat_tef", "pct_ind_i2", "pct_ind_i5", "pct_iv2",
+                "pct_iv5", "t_altas_i2", "t_bajas_i2", "t_act_i2",
+                "t_altas_a2", "t_bajas_a2", "t_act_a2"]
+    ).write.mode("overwrite").parquet(str(FIXTURES / "cust_corp"))
 
     # --- credit_card_processed_data (mobs_preparation) -----------------
     if CREDIT_CARD_FEC:
@@ -356,6 +390,8 @@ VIEWS = {
     "total_multi_cte_t_m": "total_multi",
     "int_nxs_se_finaypns_snap_t_m": "finaypns",
     "int_xs_mgrs_mgiros_hist_t_m": "mgiros",
+    "cust_corp_profile_dt1_t_m": "cust_corp",
+    "snapshot_pagomatico_t_m": "snapshot_pagomatico_t_m",
 }
 
 
@@ -719,6 +755,74 @@ def make_config() -> None:
                        "va"],
     }
 
+    # ---- corporate: bloque sintetico (subset de vars prod) --------------
+    # steps_list sin "ratios": bug latente compartido con b7d2ecc — los
+    # nombres que genera _make_dicts_aux_corporate (sum_t_bajas_a_2_3m,
+    # t_act_i_2_0) no coinciden con los que produce fe (sum_t_bajas_a2_3m,
+    # t_act_i2_0); prod tampoco pasaria ese step.
+    rigid["corporate"] = {
+        "extract": {
+            "libname": ["global_temp"],
+            "table_name": ["cust_corp_profile_dt1_t_m"],
+            "select_variables": [
+                "process_date, num_cliente as numcliente, seg,"
+                " f_group_industry, cast(cat_tef as double),"
+                " cast(pct_ind_i2 as double), cast(pct_ind_i5 as double),"
+                " cast(pct_iv2 as double), cast(pct_iv5 as double),"
+                " cast(t_altas_i2 as double), cast(t_bajas_i2 as double),"
+                " cast(t_act_i2 as double), cast(t_altas_a2 as double),"
+                " cast(t_bajas_a2 as double), cast(t_act_a2 as double)"],
+            "type_date": [""],
+            "retraso": [0],
+            "name_mis": ["process_date"],
+            "table_pivote": ["master_data"],
+            "key_pivote": ["numcliente"],
+            "name_vintage_pivote": ["vintage"],
+            "key_source": ["numcliente"],
+        },
+        "missing_treatment": {
+            "fill_variables": {"variable": ["t_bajas_i2"],
+                               "source": ["corporate"],
+                               "metodo": ["Real 0"]},
+            "fill_methods": {"metodo": ["fill_value"],
+                             "grouped": [""],
+                             "valor": ["Real 0"],
+                             "id_variables": ["Real"]},
+        },
+        "group_by": {
+            "table_name": "cust_corp_profile_dt1_t_m_historic",
+            # conditions: el aggregate la lee pero usa las hardcodeadas
+            # (transcripcion literal de prod)
+            "conditions": [
+                "p = col('seg').isin('PENSIONADOS')",
+                "g = col('seg').isin('GOBIERNO')",
+                "ind_i2_0 = col('pct_ind_i2') == 0",
+                "ind_i2_1 = col('pct_ind_i2') == 1",
+                "ind_i5_0 = col('pct_ind_i5') == 0",
+                "ind_i5_1 = col('pct_ind_i5') == 1",
+                "ind_i5_2 = col('pct_ind_i5') == 2",
+                "ind_i5_3 = col('pct_ind_i5') == 3",
+                "ind_i5_4 = col('pct_ind_i5') == 4",
+                "iv_i2_0 = col('pct_iv2') == 0",
+                "iv_i2_1 = col('pct_iv2') == 1",
+                "iv_i5_0 = col('pct_iv5') == 0",
+                "iv_i5_1 = col('pct_iv5') == 1",
+                "iv_i5_2 = col('pct_iv5') == 2",
+                "iv_i5_3 = col('pct_iv5') == 3",
+                "iv_i5_4 = col('pct_iv5') == 4"],
+            "new_columns": ["cat_ind_i2_seg", "cat_iv2_seg",
+                            "cat_ind_i5_seg", "cat_iv5_seg"],
+            "drop_columns": ["f_group_industry", "seg"],
+        },
+        "pivoting": {
+            "source": "corporate",
+            "table_name": "cust_corp_profile_dt1_t_m_historic",
+            "pivot_key": ["numcliente", "vintage_date", "tfrom",
+                          "tfrom_date", "process_date"],
+        },
+        "steps_list": ["extract", "groupby", "mt", "pivoting", "fe", "va"],
+    }
+
     # ---- claves globales que apuntan a fixtures -------------------------
     mp = rigid["mobs_preparation"]
     mp["libname"] = ["global_temp"] * 3
@@ -733,6 +837,8 @@ def make_config() -> None:
     rigid["queries_liabilities"] = [
         q.replace("gcprcmsbx_work.liabilities_test2",
                   "global_temp.liabilities_test2")
+         .replace("gcgd1kmxpsd_prd_db.snapshot_pagomatico_t_m",
+                  "global_temp.snapshot_pagomatico_t_m")
         for q in rigid["queries_liabilities"]]
 
     (CONFIG_DIR / "configuration.json").write_text(

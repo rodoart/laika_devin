@@ -122,12 +122,12 @@ class BaseAggregate:
 
     @staticmethod
     def _nested_when(pairs: Any, default: Any = -99999) -> "Any":
-        """Construye ``when(c1,v1).otherwise(when(c2,v2)...).otherwise(default)``
+        """Construye ``when(c1,v1).when(c2,v2)....otherwise(default)``
         a partir de pares ``(condicion, valor)``."""
         pairs = list(pairs)
         expr = when(pairs[0][0], pairs[0][1])
         for cond, val in pairs[1:]:
-            expr = expr.otherwise(when(cond, val))
+            expr = expr.when(cond, val)
         return expr.otherwise(default)
 
     def _save_parquet(self, df_save: DataFrame, path: str) -> None:

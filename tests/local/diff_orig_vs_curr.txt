@@ -2,20 +2,20 @@ Prueba de diferencias — datapull ORIGINAL (b7d2ecc, worktree parcheado
 solo con fixes de transcripcion) vs pipeline ACTUAL, sobre los mismos
 fixtures deterministas de tests/local/regression_e2e.py.
 
-Fuentes (8): payroll_streaks, payroll_income, bureau_pull, liabilities,
-rev_balance, channels, financiera, giros_credito.
+Fuentes (9): payroll_streaks, payroll_income, bureau_pull, liabilities,
+rev_balance, channels, financiera, giros_credito, corporate.
 Workdirs: tests/local/workdir_orig vs tests/local/workdir_curr.
 
-Resultado (207 parquets comparados):
-  OK    179  schema + valores identicos
-  TYPE   18  mismos valores, solo dtype (tfrom_date/vintage_date
+Resultado (223 parquets comparados):
+  OK    190  schema + valores identicos
+  TYPE   21  mismos valores, solo dtype (tfrom_date/vintage_date
              string->date en extract/mt/mobs_preparation/mobs)
-  ORDER   8  vector_assembler: mismo multiset por fila — el orden de
+  ORDER   9  vector_assembler: mismo multiset por fila — el orden de
              columnas es no-determinista en AMBAS versiones
              (list(set(...)); dos runs del mismo codigo difieren)
-  FILL    1  rev_balance/features/raw_features: null -> 0 (post-fill
+  FILL    2  raw_features null -> 0 (rev_balance + corporate): post-fill
              coherente con el docstring "null filled"; ademas corrige
-             el crash de resume con arrays None en los UDF _mt)
+             el crash de resume con arrays None en los UDF _mt
   DIFF    1  pivot_prepared: el actual conserva ``id_cuenta16``
              (el original la produce via la 6a query de
              queries_liabilities pero la descarta en la proyeccion
@@ -51,7 +51,7 @@ Fixes adicionales del tercer mail (fotos 2026-10-27):
   - liabilities extract Column 'id_cuenta16' does not exist: en prod
     queries_liabilities tiene solo 5 queries — ninguna produce
     id_cuenta16 — y _pivot_cols_needed la descartaba de todas formas.
-    Se agrego la query de snapshot='pagomatico' a la config y
+    Se agrego la query de snapshot_pagomatico_t_m a la config y
     id_cuenta16 a cols_pivot. En prod liabilities NUNCA habia pasado
     de la tabla 6 (siempre fue un mail source).
   - rev_balance groupby Column 'promoId' does not exist: el archivo
@@ -59,6 +59,29 @@ Fixes adicionales del tercer mail (fotos 2026-10-27):
     promoId) pero en su entorno el rename no produce nodo en el plan.
     Se reemplazo por select con alias explicitos (equivalente,
     inmune al quirk de withColumnRenamed de su Spark).
+
+Cuarto mail (corporate + pendientes, fotos 2026-10-27):
+  - corporate groupby IllegalArgumentException "otherwise() can only
+    be applied once": el refactor _nested_when (libs/aggregattes/
+    base.py) encadenaba .otherwise(when()) sobre una expresion ya
+    cerrada. El original anidaba when().otherwise(when()) a mano.
+    Fix: _nested_when ahora encadena .when() — semanticamente
+    identico y cubierto por test_aggregates.py. Las 9 fuentes del
+    e2e (corporate incluida) dan valores identicos orig vs curr.
+  - queries_liabilities: foto del config prod confirmo SOLO 5
+    queries (maestra, perfiles, perfiles_ejecutivo, cheques, otros).
+    La 6a query se cambio a leer la tabla real
+    snapshot_pagomatico_t_m (mis_date -> inf_dt, num_cliente,
+    id_cuenta16) en vez del snapshot 'pagomatico' de
+    liabilities_test2 (que podria no existir/cubrir en prod).
+  - rev_balance: foto del gap (lineas ~4199-4295) transcrita —
+    epp_dict.ofertas, mobs completo, id_variables=["Real"] (estaba
+    mal ["historico","Real"]); source queda 73x"buro" (literal prod).
+  - corporate: seccion completa transcrita a config/configuration.json
+    (extract type_date [""], 89 fill_variables, source/metodo,
+    fill_methods, pivoting, group_by con conditions/new_columns/
+    drop_columns, ratios, steps_list extract->groupby->mt->pivoting->
+    fe->ratios->va). 0 __GAP__ restantes en la config.
 
 Notas:
   - El original no era ejecutable tal cual: el worktree lleva parches

@@ -947,11 +947,29 @@
                     "1"
                 ],
                 "id_variables": [
-                    "historico",
                     "Real"
                 ]
             },
-            "mobs": "__GAP__"
+            "mobs": {
+                "table_name": [
+                    "liabilities_test2_historic",
+                    "credit_card_processed_data_historic",
+                    "adv_colocacion_1_t_m_historic"
+                ],
+                "source": [
+                    "liabilities",
+                    "credit_card",
+                    "bureau"
+                ],
+                "sources": [
+                    "bureau",
+                    "liabilities",
+                    "credit_card"
+                ],
+                "mobs_tipo": [
+                    "mobs_bureau"
+                ]
+            }
         },
         "group_by": {
             "table_names": {
@@ -971,7 +989,58 @@
                 "tfrom"
             ],
             "querys_dict": {
-                "epp_dict": "__GAP__"
+                "epp_dict": {
+                    "ofertas": [
+                        [
+                            0,
+                            1,
+                            "7",
+                            "T0"
+                        ],
+                        [
+                            0,
+                            2,
+                            "03",
+                            "T0"
+                        ],
+                        [
+                            0,
+                            2,
+                            "1T",
+                            "T0"
+                        ],
+                        [
+                            0,
+                            5,
+                            "40BAL",
+                            "Balcon"
+                        ],
+                        [
+                            0,
+                            3,
+                            "40B",
+                            "Disponible"
+                        ],
+                        [
+                            0,
+                            2,
+                            "SE",
+                            "Efectivo"
+                        ],
+                        [
+                            0,
+                            2,
+                            "2P",
+                            "PPP"
+                        ],
+                        [
+                            0,
+                            2,
+                            "6R",
+                            "RES"
+                        ]
+                    ]
+                }
             }
         },
         "pivoting": {
@@ -4156,6 +4225,405 @@
             "va"
         ]
     },
+    "corporate": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_cus_db"
+            ],
+            "table_name": [
+                "cust_corp_profile_dt1_t_m"
+            ],
+            "select_variables": [
+                "process_date, num_cliente as numcliente, cast(cat_tef as double),cast(tot_cli as double),cast(tot_val as double),cast(tot_baja as double),cast(tot_alta as double),cast(maxg as double),cast(t_altas_i2 as double),cast(t_bajas_i2 as double),cast(t_act_i2 as double),cast(t_altas_i4 as double),cast(t_bajas_i4 as double),cast(t_act_i4 as double),cast(t_altas_i5 as double),cast(t_bajas_i5 as double),cast(t_act_i5 as double),cast(t_altas_i10 as double),cast(t_bajas_i10 as double),cast(t_act_i10 as double),cast(t_altas_a2 as double),cast(t_bajas_a2 as double),cast(t_act_a2 as double),cast(t_altas_a4 as double),cast(t_bajas_a4 as double),cast(t_act_a4 as double),cast(t_altas_a5 as double),cast(t_bajas_a5 as double),cast(t_act_a5 as double),cast(t_altas_a10 as double),cast(t_bajas_a10 as double),cast(t_act_a10 as double),cast(t_ind_altas_i2 as double),cast(t_ind_bajas_i2 as double),cast(t_ind_act_i2 as double),cast(t_ind_altas_i4 as double),cast(t_ind_bajas_i4 as double),cast(t_ind_act_i4 as double),cast(t_ind_altas_i5 as double),cast(t_ind_bajas_i5 as double),cast(t_ind_act_i5 as double),cast(t_ind_altas_i10 as double),cast(t_ind_bajas_i10 as double),cast(t_ind_act_i10 as double),cast(t_altas_ab as double),cast(t_bajas_ab as double),cast(t_act_ab as double),cast(pct_se2 as double),cast(pct_se4 as double),cast(pct_se5 as double),cast(pct_se10 as double),cast(pct_sn2 as double),cast(pct_sn4 as double),cast(pct_sn5 as double),cast(pct_sn10 as double),cast(pct_pt2 as double),cast(pct_pt4 as double),cast(pct_pt5 as double),cast(pct_pt10 as double),cast(pct_ag2 as double),cast(pct_ag4 as double),cast(pct_ag5 as double),cast(pct_ag10 as double),cast(tot_alta_i2 as double),cast(tot_act_i2 as double),cast(tot_baja_i2 as double),cast(tot_alta_i4 as double),cast(tot_act_i4 as double),cast(tot_baja_i4 as double),cast(tot_alta_i5 as double),cast(tot_act_i5 as double),cast(tot_baja_i5 as double),cast(tot_alta_i10 as double),cast(tot_act_i10 as double),cast(tot_baja_i10 as double),cast(arch_corp_3m as double),cast(arch_corp_12m as double),cast(antig as double) as bnmx_company_seniority,f_group_industry,seg,cast(pct_ind_i2 as double),cast(pct_ind_i4 as double),cast(pct_ind_i5 as double),cast(pct_ind_i10 as double),cast(pct_i2 as double),cast(pct_i4 as double),cast(pct_i5 as double),cast(pct_i10 as double), cast(pct_iv2 as double),cast(pct_iv4 as double),cast(pct_iv5 as double),cast(pct_iv10 as double)"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "process_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "cat_tef",
+                    "tot_cli",
+                    "tot_val",
+                    "tot_baja",
+                    "tot_alta",
+                    "maxg",
+                    "t_altas_i2",
+                    "t_bajas_i2",
+                    "t_act_i2",
+                    "t_altas_i4",
+                    "t_bajas_i4",
+                    "t_act_i4",
+                    "t_altas_i5",
+                    "t_bajas_i5",
+                    "t_act_i5",
+                    "t_altas_i10",
+                    "t_bajas_i10",
+                    "t_act_i10",
+                    "t_altas_a2",
+                    "t_bajas_a2",
+                    "t_act_a2",
+                    "t_altas_a4",
+                    "t_bajas_a4",
+                    "t_act_a4",
+                    "t_altas_a5",
+                    "t_bajas_a5",
+                    "t_act_a5",
+                    "t_altas_a10",
+                    "t_bajas_a10",
+                    "t_act_a10",
+                    "t_ind_altas_i2",
+                    "t_ind_bajas_i2",
+                    "t_ind_act_i2",
+                    "t_ind_altas_i4",
+                    "t_ind_bajas_i4",
+                    "t_ind_act_i4",
+                    "t_ind_altas_i5",
+                    "t_ind_bajas_i5",
+                    "t_ind_act_i5",
+                    "t_ind_altas_i10",
+                    "t_ind_bajas_i10",
+                    "t_ind_act_i10",
+                    "t_altas_ab",
+                    "t_bajas_ab",
+                    "t_act_ab",
+                    "pct_se2",
+                    "pct_se4",
+                    "pct_se5",
+                    "pct_se10",
+                    "pct_sn2",
+                    "pct_sn4",
+                    "pct_sn5",
+                    "pct_sn10",
+                    "pct_pt2",
+                    "pct_pt4",
+                    "pct_pt5",
+                    "pct_pt10",
+                    "pct_ag2",
+                    "pct_ag4",
+                    "pct_ag5",
+                    "pct_ag10",
+                    "tot_alta_i2",
+                    "tot_act_i2",
+                    "tot_baja_i2",
+                    "tot_alta_i4",
+                    "tot_act_i4",
+                    "tot_baja_i4",
+                    "tot_alta_i5",
+                    "tot_act_i5",
+                    "tot_baja_i5",
+                    "tot_alta_i10",
+                    "tot_act_i10",
+                    "tot_baja_i10",
+                    "bnmx_company_seniority",
+                    "arch_corp_3m",
+                    "arch_corp_12m",
+                    "antig",
+                    "pct_ind_i2",
+                    "pct_ind_i4",
+                    "pct_ind_i5",
+                    "pct_ind_i10",
+                    "pct_i2",
+                    "pct_i4",
+                    "pct_i5",
+                    "pct_i10",
+                    "pct_iv2",
+                    "pct_iv4",
+                    "pct_iv5",
+                    "pct_iv10"
+                ],
+                "source": [
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate"
+                ],
+                "metodo": [
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_value"
+                ],
+                "grouped": [
+                    ""
+                ],
+                "valor": [
+                    "Real 0"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "corporate",
+            "table_name": "cust_corp_profile_dt1_t_m_historic",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date",
+                "process_date"
+            ]
+        },
+        "group_by": {
+            "table_name": "cust_corp_profile_dt1_t_m_historic",
+            "conditions": [
+                "p = col('seg').isin('PENSIONADOS')",
+                "g = col('seg').isin('GOBIERNO')",
+                "ind_i2_0 = col('pct_ind_i2') == 0",
+                "ind_i2_1 = col('pct_ind_i2') == 1",
+                "ind_i5_0 = col('pct_ind_i5') == 0",
+                "ind_i5_1 = col('pct_ind_i5') == 1",
+                "ind_i5_2 = col('pct_ind_i5') == 2",
+                "ind_i5_3 = col('pct_ind_i5') == 3",
+                "ind_i5_4 = col('pct_ind_i5') == 4",
+                "iv_i2_0 = col('pct_iv2') == 0",
+                "iv_i2_1 = col('pct_iv2') == 1",
+                "iv_i5_0 = col('pct_iv5') == 0",
+                "iv_i5_1 = col('pct_iv5') == 1",
+                "iv_i5_2 = col('pct_iv5') == 2",
+                "iv_i5_3 = col('pct_iv5') == 3",
+                "iv_i5_4 = col('pct_iv5') == 4"
+            ],
+            "new_columns": [
+                "cat_ind_i2_seg",
+                "cat_iv2_seg",
+                "cat_ind_i5_seg",
+                "cat_iv5_seg"
+            ],
+            "drop_columns": [
+                "f_group_industry",
+                "seg"
+            ]
+        },
+        "ratios": {
+            "raw_name": "raw_features",
+            "percentiles": [
+                2,
+                4,
+                5,
+                10
+            ],
+            "lista_fe": [
+                "avgmov",
+                "max",
+                "min",
+                "mean"
+            ],
+            "keep_var": "id_msf_tools_v2_12315",
+            "prefix": "ratio",
+            "list_raw_n_features": [
+                "avgmov_features",
+                "max_features",
+                "mean_features",
+                "min_features",
+                "sum_features"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "mt",
+            "pivoting",
+            "fe",
+            "ratios",
+            "va"
+        ]
+    },
     "need_crd_acct_nbr": [
         "rev_balance",
         "pnl",
@@ -4176,7 +4644,7 @@
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perf_ejec FROM gcprcmsbx_work.liabilities_test2 where snapshot='perfiles_ejecutivo'",
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_cheques FROM gcprcmsbx_work.liabilities_test2 where snapshot='cheques'",
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_otros FROM gcprcmsbx_work.liabilities_test2 where snapshot='otros'",
-        "SELECT inf_dt,num_cliente as numcliente,id_cuenta16 FROM gcprcmsbx_work.liabilities_test2 where snapshot='pagomatico'"
+        "SELECT mis_date as inf_dt,cast(num_cliente as double) as numcliente,id_cuenta16 FROM gcgd1kmxpsd_prd_db.snapshot_pagomatico_t_m"
     ],
     "mobs_preparation": {
         "select_variables": [

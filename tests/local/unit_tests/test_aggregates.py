@@ -9,6 +9,7 @@ import pytest
 from libs.aggregattes.channels import ChannelsAggregate
 from libs.aggregattes.bureau_cohort import BureauCohortAggregate
 from libs.aggregattes.product_data import ProductDataAggregate
+from libs.aggregattes.corporate import CorporateAggregate
 
 
 # ---------------------------------------------------------------------------
@@ -113,3 +114,61 @@ class TestProductDataQuery:
             query_dict, ["numcliente"], "tempProd")
         assert "FROM tempProd" in q
         assert "GROUP BY numcliente" in q
+
+
+# ---------------------------------------------------------------------------
+# BaseAggregate._nested_when + CorporateAggregate.aggregate
+# ---------------------------------------------------------------------------
+class TestNestedWhen:
+    def test_chains_multiple_pairs(self, spark):
+        """``otherwise()`` solo puede aplicarse una vez sobre un when —
+        encadenar pares con ``.otherwise(when(...))`` lanza
+        IllegalArgumentException (crash del mail de corporate). La
+        cadena debe construirse con ``.when()``."""
+        from pyspark.sql.functions import col
+        expr = CorporateAggregate._nested_when(
+            [(col("a") == 0, 1), (col("a") == 1, 2), (col("a") == 2, 3)],
+            default=-99999)
+        df = spark.createDataFrame([(0,), (1,), (2,), (7,)], ["a"])
+        out = df.withColumn("cat", expr)
+        assert [r.cat for r in out.orderBy("a").collect()] == \
+            [1, 2, 3, -99999]
+
+    def test_corporate_aggregate_end_to_end(self, spark, tmp_path):
+        """``aggregate()`` evalúa los 4 cat_*_seg: 6-15 pares por
+        columna (seg × nivel) — exactamente el IllegalArgumentException
+        del mail."""
+        tbl = tmp_path / "extract" / "corp_table"
+        spark.createDataFrame(
+            [("PENSIONADOS", 0, 3, 1, 2, "ind_a"),
+             ("GOBIERNO", 1, 0, 0, 4, "ind_b"),
+             ("OTRO", 1, 4, 7, 9, "ind_c")],
+            ["seg", "pct_ind_i2", "pct_ind_i5", "pct_iv2", "pct_iv5",
+             "f_group_industry"]
+        ).write.mode("overwrite").parquet(tbl.as_posix())
+
+        agg_dict = {
+            "table_name": "corp_table",
+            "conditions": [],
+            "new_columns": ["cat_ind_i2_seg", "cat_iv2_seg",
+                            "cat_ind_i5_seg", "cat_iv5_seg"],
+            "drop_columns": ["f_group_industry", "seg"],
+        }
+        agg = CorporateAggregate(
+            previous_path=(tmp_path / "extract").as_posix(),
+            agg_dict=agg_dict, sqlContext=spark)
+        agg.aggregate()
+
+        out = spark.read.parquet(
+            (tmp_path / "groupby" / "corp_table").as_posix())
+        rows = [r.asDict() for r in out.collect()]
+        # PENSIONADOS: grupo 0 -> nivel+1; GOBIERNO: grupo 1; resto: 2
+        pens = next(r for r in rows if r["cat_ind_i2_seg"] == 1)
+        gob = next(r for r in rows if r["cat_ind_i2_seg"] == 4)
+        otro = next(r for r in rows if r["cat_ind_i2_seg"] == 6)
+        assert pens["cat_ind_i5_seg"] == 4 and pens["cat_iv2_seg"] == 2
+        assert gob["cat_ind_i5_seg"] == 6 and gob["cat_iv5_seg"] == 10
+        assert otro["cat_ind_i5_seg"] == 15
+        assert otro["cat_iv2_seg"] == -99999  # pct_iv2=7 fuera de rango
+        assert "seg" not in out.columns
+        assert "f_group_industry" not in out.columns
