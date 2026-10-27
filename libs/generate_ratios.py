@@ -133,9 +133,21 @@ class GenerateRatios:
         keep_var = self.ratios_dict["keep_var"]
         prefix = self.ratios_dict["prefix"]
         df_fe_all.createOrReplaceTempView("temp")
+        # Mismo guard que ratios_pnl: si la lista_trans que corrio fe no
+        # cubre algun stat de lista_fe (p.ej. "min"), las columnas no
+        # existen y la query truena — se omiten esos pares
+        filter_columns = set(df_fe_all.columns)
+        pairs = [(item["numerador"], item["denominador"])
+                 for _, item in corp_dict.iterrows()
+                 if item["numerador"] in filter_columns
+                 and item["denominador"] in filter_columns]
+        if len(pairs) != len(corp_dict):
+            logging.warning("%s - ratios_corporate: %s de %s pares omitidos por columnas inexistentes en features",
+                            self.source, len(corp_dict) - len(pairs), len(corp_dict))
         cociente = ",".join(["case when {1} = 0 then -1 else {0}/{1} end as {2}_{0}_{1}".format(
-            item["numerador"], item["denominador"], prefix) for index, item in corp_dict.iterrows()])
-        query = "select {0}, {1} from temp ".format(keep_var, cociente)
+            numerador, denominador, prefix) for numerador, denominador in pairs])
+        query = "select {0}{1} from temp ".format(
+            keep_var, ", "+cociente if cociente else "")
         df_final = self.sqlContext.sql(query)
         ratios_path = os.path.join(self.previous_path, "ratios_features")
         self._save_parquet(df_final, ratios_path)

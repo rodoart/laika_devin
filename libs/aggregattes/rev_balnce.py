@@ -50,8 +50,12 @@ class RevBalanceAggregate(BaseAggregate):
         import pyspark.sql.functions as fn
         promoID = sqlContext.sql(
             "select * from {0}".format(agg_dict['table_names']['catPromosID']))
+        # La columna del catalogo de prod es "promo id" (con espacio);
+        # se acepta tambien "promo_id" por tablas/fixtures legacy
+        promo_col = "promo id" if "promo id" in promoID.columns \
+            else "promo_id"
         promoID = promoID.select(
-            fn.col("promo_id").alias("promoId"),
+            promoID[promo_col].alias("promoId"),
             fn.col("grupo").alias("oferta"))
 
         epp_df = sqlContext.read.parquet(

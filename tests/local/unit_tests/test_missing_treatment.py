@@ -109,6 +109,60 @@ class TestFillMethods:
 
 
 # ---------------------------------------------------------------------------
+# fill_debito (liabilities)
+# ---------------------------------------------------------------------------
+class TestFillDebito:
+    def _mt_debito(self):
+        return MissingTreatment(
+            year="202401",
+            mt_dict={
+                "missing_treatment": {
+                    "fill_variables": {"variable": ["v"],
+                                       "metodo": ["real0"]},
+                    "fill_methods": {
+                        "id_variables": ["Historico"],
+                        "metodo": ["fill_debito"],
+                        "grouped": [["numcliente", "num_contrato",
+                                     "vintage_date"]],
+                        "valor": [["vintage_date", "tfrom_date", "tfrom",
+                                   "fec_apertura", "fec_ult_mov",
+                                   "proc_dt"]],
+                    },
+                }
+            },
+            source="liabilities", n_mis=4, n_threads=1)
+
+    def _df(self, spark):
+        return spark.createDataFrame(
+            [(1, "c1", "2026-06-30", 0, 0, 0, 10.0, 1.0),
+             (1, "c1", "2026-06-30", 1, 0, 0, 10.0, None),
+             (2, "c2", "2026-06-30", 0, 0, 0, 5.0, 3.0)],
+            ["numcliente", "num_contrato", "vintage_date", "tfrom",
+             "indapertura", "indcancelada", "sdo_capital", "v"])
+
+    def test_output_sin_columnas_duplicadas(self, spark):
+        """Bug prod: 'select *, case...as v' dejaba cada variable de
+        lista_fin duplicada y el parquet writer tronaba con
+        'Found duplicate column(s) when inserting into'."""
+        out = self._mt_debito().fill_debito(
+            self._df(spark), ["numcliente", "num_contrato",
+                              "vintage_date"], spark)
+        names = [c.lower() for c in out.columns]
+        assert len(names) == len(set(names))
+        out.write.mode("overwrite").parquet(
+            "file:///tmp/fill_debito_dup_check")
+        assert "v" in out.columns
+
+    def test_fill_cero_cuando_mflg_sdo_es_cero(self, spark):
+        out = self._mt_debito().fill_debito(
+            self._df(spark), ["numcliente", "num_contrato",
+                              "vintage_date"], spark)
+        rows = {(r.numcliente, r.tfrom): r.v for r in out.collect()}
+        assert rows[(1, 0)] == 1.0    # valor original se conserva
+        assert rows[(2, 0)] == 3.0
+
+
+# ---------------------------------------------------------------------------
 # run_mt: regresión cross-table con partitionOverwriteMode=dynamic
 # ---------------------------------------------------------------------------
 class TestRunMtDynamicOverwrite:

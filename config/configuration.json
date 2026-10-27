@@ -660,9 +660,9 @@
                 "int_crd_plan_snapshot_c_t_m"
             ],
             "select_variables": [
-                "informationdate, NUMCLIENTE as numcliente, CRD_ACCT_NBR as crd_acct_nbr, cast(int_rev as double) as eir, cast(mob as double) as monthsombooks",
-                "mis_dt, crd_acct_nbr, epp_orig_loan_amt as original_balance, loan_outstnd_bal_lcy as current_balance, loan_stat as estatus, promo_id, curr_int_rte as tasa, loan_tnr as plazo, loan_open_mob_nbr as plazo_actual, loan_dt as fecha_aceptacion",
-                "mis_dt, crd_acct_nbr, plan_nbr, curr_bal_lcyamt as current_balance, int_bnp_lcyamt as int_grav_exent, calc_rte as tasa"
+                "informationdate, NUMCLIENTE as numcliente,CRD_ACCT_NBR as crd_acct_nbr, cast(int_rev as double) as eir,cast(mob as double) as monthsonbooks",
+                "mis_dt,crd_acct_nbr,epp_orig_loan_amt as original_balance,loan_outstnd_bal_lcy as current_balance,loan_stat as estatus,promo_id,curc_int_rte as tasa,loan_tnr as plazo,loan_open_mob_nbr as plazo_actual,loan_dt as fecha_aceptacion",
+                "mis_dt,crd_acct_nbr,plan_nbr,curc_bal_icyamt as current_balance,int_bnp_icyamt as int_grav_exent,calc_rte as tasa"
             ],
             "type_date": [
                 "-",
@@ -1012,19 +1012,19 @@
                         [
                             0,
                             5,
-                            "40BAL",
+                            "4DBAL",
                             "Balcon"
                         ],
                         [
                             0,
                             3,
-                            "40B",
+                            "4DB",
                             "Disponible"
                         ],
                         [
                             0,
                             2,
-                            "SE",
+                            "5E",
                             "Efectivo"
                         ],
                         [
@@ -4322,18 +4322,18 @@
                     "pct_ag4",
                     "pct_ag5",
                     "pct_ag10",
-                    "tot_alta_i2",
                     "tot_act_i2",
                     "tot_baja_i2",
-                    "tot_alta_i4",
+                    "tot_alta_i2",
                     "tot_act_i4",
                     "tot_baja_i4",
-                    "tot_alta_i5",
+                    "tot_alta_i4",
                     "tot_act_i5",
                     "tot_baja_i5",
-                    "tot_alta_i10",
+                    "tot_alta_i5",
                     "tot_act_i10",
                     "tot_baja_i10",
+                    "tot_alta_i10",
                     "bnmx_company_seniority",
                     "arch_corp_3m",
                     "arch_corp_12m",

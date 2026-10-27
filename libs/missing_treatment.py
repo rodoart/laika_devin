@@ -386,9 +386,14 @@ class MissingTreatment:
         aux_exc = set(aux_exc)
         lista_fin = [c for c in df.columns if c not in aux_exc]
         paso1.createOrReplaceTempView("df_aux_flags")
-        # Fill 0 para bandera=0
-        text_fill = "select *,"+",".join(["case when MFlg_SDO=0 and "+item+" is null then 0 else "+item+" end as "+item for item in lista_fin])+\
-            " from df_aux_flags"
+        # Fill 0 para bandera=0. Cada columna se proyecta una sola vez
+        # (las de lista_fin van con su CASE): "select *, ... as item"
+        # dejaba nombres duplicados y el writer de parquet tronaba con
+        # "Found duplicate column(s)". Se conserva el orden del schema.
+        fill_exprs = {item: "case when MFlg_SDO=0 and {0} is null then 0 else {0} end as {0}".format(
+            item) for item in lista_fin}
+        text_fill = "select "+",".join(fill_exprs.get(column, column)
+            for column in paso1.columns)+" from df_aux_flags"
         df_fill = sql_context.sql(text_fill)
         return (df_fill)
     ###############################################################
