@@ -262,8 +262,22 @@ class Mobs:
         Spark data frame
             Containing the mobs for credit_card
         """
-        return self._seniority_mobs(
-            tables_path, table_names, 'credit_card', sql_context)[0]
+        dfs = self._get_dataframes(
+            tables_path, table_names, sql_context=sql_context)
+        if "fec_apertura" in dfs[0].columns:
+            # tabla con fecha de apertura: seniority por meses entre
+            # apertura y corte (mismo path que liabilities)
+            return self._calculate_separated_mobs(
+                dfs, _SENIORITY_QUERY, 'credit_card', _seniority_calc())[0]
+        # mobs_preparation selecciona ``mob`` (antigüedad precalculada
+        # del snapshot) en vez de fec_apertura: la antigüedad al vintage
+        # es mob + tfrom — mismo patrón que bureau (a5 + tfrom)
+        df_mobs = dfs[0].select("numcliente", "mob", "tfrom", "vintage_date")
+        return df_mobs.withColumn(
+            "mobs", col("mob").cast("int") + col("tfrom").cast("int")).\
+            groupBy("numcliente", "vintage_date").\
+            agg(max("mobs").alias("mobs_credit_card")).\
+            fillna(0, subset=["mobs_credit_card"])
 
     def bureau_mobs(self, tables_path: str, list_tables: List[str],
                     sql_context: Optional[SparkSession] = None) -> DataFrame:

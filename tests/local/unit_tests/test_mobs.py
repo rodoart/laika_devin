@@ -239,3 +239,38 @@ class TestMobsClass:
 
     def test_get_months_accepts_strings(self):
         assert self._mobs()._get_months("6") == [6, 12]
+
+
+# ---------------------------------------------------------------------------
+# credit_card_mobs — la tabla mobs_preparation trae ``mob`` precalculado
+# (sin fec_apertura): seniority = mob + tfrom. Con fec_apertura se usa la
+# query de seniority compartida con liabilities.
+# ---------------------------------------------------------------------------
+class TestCreditCardMobs:
+    def _mobs(self):
+        return Mobs.__new__(Mobs)
+
+    def test_mob_column_path(self, spark, tmp_path):
+        df = spark.createDataFrame(
+            [(1, 5.0, "2026-05-01", "2026-08-01", 3.0),
+             (1, 8.0, "2026-08-01", "2026-08-01", 0.0),
+             (2, 2.0, "2026-08-01", "2026-08-01", 0.0)],
+            ["numcliente", "mob", "mis_dt", "vintage_date", "tfrom"])
+        df.write.parquet(str(tmp_path / "credit_card_processed_data_historic"))
+        out = self._mobs().credit_card_mobs(
+            str(tmp_path), ["credit_card_processed_data_historic"], spark)
+        res = {(r.numcliente, r.mobs_credit_card) for r in out.collect()}
+        assert res == {(1, 8), (2, 2)}
+
+    def test_fec_apertura_path(self, spark, tmp_path):
+        df = spark.createDataFrame(
+            [(1, "2026-01-01", "2026-08-01", "2026-08-01", 0.0),
+             (1, "2026-01-01", "2026-05-01", "2026-08-01", 3.0)],
+            ["numcliente", "fec_apertura", "tfrom_date",
+             "vintage_date", "tfrom"])
+        df.write.parquet(str(tmp_path / "cc_legacy"))
+        out = self._mobs().credit_card_mobs(
+            str(tmp_path), ["cc_legacy"], spark)
+        res = {(r.numcliente, r.mobs_credit_card) for r in out.collect()}
+        # months_between(ago, ene)=7 > months_between(may, ene)=4
+        assert res == {(1, 7)}

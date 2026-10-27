@@ -73,7 +73,7 @@ class FeatureEngineering:
         self.mode = mode
         self.is_dynamic = is_dynamic
         self.hdfs = {"raw_features": os.path.join(self.path, "raw_features")}
-        self.df = self._raw_features(df)
+        self.df = self._fill_na_zero(self._raw_features(df))
         self.list_mvars = self._get_mvars(period)
         self.lista_metodo = self._get_lista_metodo()
 

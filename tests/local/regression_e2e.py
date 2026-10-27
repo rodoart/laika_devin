@@ -156,7 +156,7 @@ def write_fixtures(spark) -> None:
 
     # --- liabilities_test2 (mobs_preparation + queries_liabilities) -----
     lrows = []
-    snaps = ["maestra", "perfiles", "perfiles ejecutivo", "cheques",
+    snaps = ["maestra", "perfiles", "perfiles_ejecutivo", "cheques",
              "otros"]
     for i, mo in enumerate(_months("2025-02", "2025-08")):
         lrows.append(("101", mo[:8] + "28", "2020-01-15",

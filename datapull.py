@@ -871,12 +871,27 @@ class DataPull():
         logging.info(f"Preparing Pivot for sources: {sources}")
         path_new_pivot = os.path.join(self.config_custom["working_path"], self.config_custom["year_id"], "pivot_prepared")
         self._path_new_pivot = path_new_pivot
+        cols_pivot = ['numcliente', 'vintage']
+        if self._check_crd_acct_nbr(sources):
+            cols_pivot += ['crd_acct_nbr']
+        if self._check_contratos(sources):
+            cols_pivot += ['num_contrato_maestra', 'num_contrato_perfiles',
+            'num_contrato_perf_ejec', 'num_contrato_cheques', 'num_contrato_otros']
         # is_successful (dir + _SUCCESS): una escritura matada a medias
-        # deja el dir sin _SUCCESS y se recomputa, no se recarga rota
+        # deja el dir sin _SUCCESS y se recomputa, no se recarga rota.
+        # Además hay que validar el schema: el pivot_prepared es
+        # compartido entre fuentes y pudo escribirse sin las columnas
+        # de enriquecimiento que necesita la fuente actual (p.ej. una
+        # corrida previa de una fuente sin need_crd_acct_nbr).
         if _fs_is_successful(path_new_pivot):
-            logging.info("Pivot was already prepared")
-            #print("Pivot already prepared!")
-            return self.sqlContext.read.parquet(path_new_pivot)
+            prepared = self.sqlContext.read.parquet(path_new_pivot)
+            missing_cols = [c for c in cols_pivot if c not in prepared.columns]
+            if not missing_cols:
+                logging.info("Pivot was already prepared")
+                #print("Pivot already prepared!")
+                return prepared
+            logging.info("pivot_prepared exists but misses %s for the "
+                         "current sources; re-preparing", missing_cols)
         pivot = self.sqlContext.read.parquet(self.config_custom["pivot_path"])
         vintages = self._get_vintages_dates(pivot)
         n_mis = self.config_custom["n_mis"]
@@ -916,12 +931,6 @@ class DataPull():
                 pivots_aux_list.append(pivot_aux)
             # Unimos todos los pivots de vintages
             pivot = reduce(DataFrame.unionAll, pivots_aux_list)
-        cols_pivot = ['numcliente', 'vintage']
-        if self._check_crd_acct_nbr(sources):
-            cols_pivot += ['crd_acct_nbr']
-        if self._check_contratos(sources):
-            cols_pivot += ['num_contrato_maestra', 'num_contrato_perfiles',
-            'num_contrato_perf_ejec', 'num_contrato_cheques', 'num_contrato_otros']
         # Siempre se persiste ``pivot_prepared`` — también cuando no hace
         # falta enriquecer (cols_pivot == 2): es lo que hace la
         # preparación REANUDABLE. Sin esto, cada acceso a ``self.pivot``

@@ -93,7 +93,7 @@ class FinancieraAggregate(BaseAggregate):
         reading_path = self._table_path()
         financiera = self.sqlContext.read.parquet(reading_path)
         mapping_expr = create_map([lit(x) for x in chain(*cves_dict.items())])
-        financiera = financiera.withColumn("b1", mapping_expr[col("cve_ajp")])
+        financiera = financiera.withColumn("b1", mapping_expr[col("cve_ayp")])
         financiera_aux = financiera.select(
             "numcliente", "saldo", "saldoaj", "vintage_date", "tfrom", "b1")
         financiera_aux = financiera_aux.withColumn('b1', lower(col('b1')))

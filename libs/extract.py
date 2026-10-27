@@ -126,7 +126,8 @@ class Extract():
         n = len(list_dates)
         queries = []
         tables_list = []
-        if type_date:
+        # "-" = sin formato de sufijo (mobs_preparation) -> rama WHERE name_mis
+        if type_date and type_date != "-":
             meses={
             1:"ene",
             2:"feb",
