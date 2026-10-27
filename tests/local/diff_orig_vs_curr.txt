@@ -1,0 +1,42 @@
+Prueba de diferencias — datapull ORIGINAL (b7d2ecc, worktree parcheado
+solo con fixes de transcripcion) vs pipeline ACTUAL, sobre los mismos
+fixtures deterministas de tests/local/regression_e2e.py.
+
+Fuentes (8): payroll_streaks, payroll_income, bureau_pull, liabilities,
+rev_balance, channels, financiera, giros_credito.
+Workdirs: tests/local/workdir_orig vs tests/local/workdir_curr.
+
+Resultado (207 parquets comparados):
+  OK    180  schema + valores identicos
+  TYPE   18  mismos valores, solo dtype (tfrom_date/vintage_date
+             string->date en extract/mt/mobs_preparation/mobs)
+  ORDER   8  vector_assembler: mismo multiset por fila — el orden de
+             columnas es no-determinista en AMBAS versiones
+             (list(set(...)); dos runs del mismo codigo difieren)
+  FILL    1  rev_balance/features/raw_features: null -> 0 (post-fill
+             coherente con el docstring "null filled"; ademas corrige
+             el crash de resume con arrays None en los UDF _mt)
+  DIFF    0  diferencias reales de valores
+  FALTA   0
+  EXTRA   0
+
+Reproduccion del escenario de los mails (tmp/_mail_repro.py, config
+prod-fiel sin fec_apertura en credit_card):
+  Fase 1 channels solo -> pivot_prepared plano [numcliente, vintage] +
+     calculate_mobs produce mobs_credit_card/max_liab_cc via mob+tfrom
+     (crash bureau_pull/channels mobs del mail: resuelto)
+  Fase 2 giros_credito + liabilities sobre el pivot envenenado ->
+     schema check detecta columnas faltantes, re-prepara a
+     [numcliente, vintage, crd_acct_nbr, num_contrato_*] y ambas
+     fuentes completan (crash extract del mail: resuelto)
+
+Notas:
+  - El original no era ejecutable tal cual: el worktree lleva parches
+    SOLO de typos de transcripcion (array(genexpr), CLOSE_AS ") as ",
+    _setattr_, self.parent, cont+=1 del VA, cve_ajp->cve_ayp, etc.) —
+    sin ellos b7d2ecc ni siquiera corre. No alteran semantica.
+  - credit_card_processed_data de prod NO trae fec_apertura; el
+    harness la incluye por defecto (REG_CREDIT_CARD_FEC=1) para que el
+    original pueda correr la etapa mobs (su credit_card_mobs exige la
+    columna). El path nuevo mob+tfrom se verifica en la repro del mail
+    y en tests/local/unit_tests/test_mobs.py.

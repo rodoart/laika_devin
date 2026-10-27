@@ -4,7 +4,10 @@
         "payroll_income",
         "bureau_pull",
         "liabilities",
-        "rev_balance"
+        "rev_balance",
+        "channels",
+        "financiera",
+        "giros_credito"
     ],
     "working_path": "D:/projects/laika_devin/tests/local/workdir_regression_dyn",
     "year_id": "202601",

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -56,7 +57,17 @@ PIVOT_ROWS = [
 ]
 
 SOURCES = ["payroll_streaks", "payroll_income", "bureau_pull",
-           "liabilities", "rev_balance"]
+           "liabilities", "rev_balance", "channels", "financiera",
+           "giros_credito"]
+
+# ``credit_card_processed_data`` de prod NO trae ``fec_apertura``
+# (select_variables[1] = 'numcliente, mob, mis_dt') — es el crash del
+# mail (``credit_card_mobs`` exigia fec_apertura). El datapull original
+# b7d2ecc tiene el mismo requisito, asi que para el diff orig-vs-curr el
+# fixture la incluye (path seniority compartido). Con
+# ``CREDIT_CARD_FEC=False`` la config y el fixture quedan prod-fieles y
+# se ejercita el path nuevo ``mob + tfrom`` (solo corre en el actual).
+CREDIT_CARD_FEC = os.environ.get("REG_CREDIT_CARD_FEC", "1") == "1"
 
 
 def _months(start: str, end: str):
@@ -170,12 +181,24 @@ def write_fixtures(spark) -> None:
     ).write.mode("overwrite").parquet(str(FIXTURES / "liabilities_test2"))
 
     # --- credit_card_processed_data (mobs_preparation) -----------------
-    spark.createDataFrame(
-        [("101", "2025-04-28", 40, "2018-03-10"),
-         ("105", "2025-05-28", 25, "2019-11-20"),
-         ("106", "2025-06-28", 9, "2023-01-05")],
-        ["num_cliente", "mis_dt", "mob", "fec_apertura"]
-    ).write.mode("overwrite").parquet(str(FIXTURES / "credit_card"))
+    if CREDIT_CARD_FEC:
+        spark.createDataFrame(
+            [("101", "2025-04-28", 40, "2018-03-10"),
+             ("105", "2025-05-28", 25, "2019-11-20"),
+             ("106", "2025-06-28", 9, "2023-01-05")],
+            ["num_cliente", "mis_dt", "mob", "fec_apertura"]
+        ).write.mode("overwrite").parquet(
+            str(FIXTURES / "credit_card"))
+    else:
+        # prod-fiel: la tabla no trae fec_apertura (crash del mail —
+        # ejercita el path ``mob + tfrom`` de credit_card_mobs)
+        spark.createDataFrame(
+            [("101", "2025-04-28", 40),
+             ("105", "2025-05-28", 25),
+             ("106", "2025-06-28", 9)],
+            ["num_cliente", "mis_dt", "mob"]
+        ).write.mode("overwrite").parquet(
+            str(FIXTURES / "credit_card"))
 
     # --- onus_capt_snap (extract de liabilities) -------------------------
     orows = []
@@ -254,6 +277,57 @@ def write_fixtures(spark) -> None:
         ["proc_dt", "numcliente", "crd_acct_nbr"]
     ).write.mode("overwrite").parquet(str(FIXTURES / "ecm"))
 
+    # --- total_multi_cte (channels extract) -----------------------------
+    # columnas utiles del select reducido del harness
+    trows = []
+    for i, mo in enumerate(_months("2025-02", "2025-08")):
+        trows.append((mo[:8] + "28", 101, 1, 3 + i, 1, 1,
+                      2 + i, 1, 1, 0, 5 + i, 0))
+        trows.append((mo[:8] + "28", 105, 0, 1 + i, 0, 1,
+                      1, 2, 0, 1, 2, 1))
+    trows.append(("2025-05-28", 103, 1, 2, 0, 0, 1, 1, 1, 1, 3, 0))
+    spark.createDataFrame(
+        trows, ["proc_dt", "NUM_CLIENTE", "ATM", "TNX_ATM", "BNET_EMP",
+                "BNET_PERS", "TNX_BNET_EMPR", "TNX_BANCANET_PERS", "IVR",
+                "CSR", "TNX_IVR", "TNX_CSR"]
+    ).write.mode("overwrite").parquet(str(FIXTURES / "total_multi"))
+
+    # --- finaypns (financiera extract) ----------------------------------
+    # cve_ayp -> b1 via cves_dict del aggregate: 2030 adela, 1011
+    # cheques, 1055 tarjetas, 8000 na; 9999 queda sin mapeo (b1 null ->
+    # no suma en ningun feature)
+    frows = []
+    for i, mo in enumerate(_months("2025-02", "2025-08")):
+        frows.append((mo[:8] + "28", "101", 2030, 1000 + i * 10))
+        frows.append((mo[:8] + "28", "101", 1011, 500 + i * 5))
+        frows.append((mo[:8] + "28", "105", 1055, 200 + i * 3))
+    frows.append(("2025-06-28", "103", 8000, 150))
+    frows.append(("2025-07-28", "103", 9999, 999))
+    spark.createDataFrame(
+        frows, ["proc_dt", "numcliente", "cve_ayp", "saldo"]
+    ).write.mode("overwrite").parquet(str(FIXTURES / "finaypns"))
+
+    # --- mgiros (giros_credito extract) ---------------------------------
+    # macrogiro pasa por quita_acentos (lower + sin acentos) -> c2; la
+    # cuenta se resuelve a numcliente via el pivot enriquecido con ecm
+    grows = []
+    for i, mo in enumerate(_months("2025-03", "2025-09")):
+        grows.append((mo[:8] + "28", "A1", "AEROLÍNEAS", "vuelos",
+                      1200 + i * 10, 2))
+        grows.append((mo[:8] + "28", "A1", "gasolina", "combustible",
+                      800, 4))
+        grows.append((mo[:8] + "28", "A6", "Alojamiento", "hotel c",
+                      3000, 1))
+    grows.append(("2025-07-28", "A3", "Restaurantes", "comida", 450, 3))
+    # c2 null -> fillna 'sin clasificar' en el aggregate
+    grows.append(("2025-08-28", "A3", None, "misc", 300, 1))
+    # cuenta fuera del ecm: la fila no matchea el pivot (left join)
+    grows.append(("2025-07-28", "AX", "aerolineas", "vuelos", 999, 1))
+    spark.createDataFrame(
+        grows, ["proc_dt", "id_cuenta16", "macrogiro", "giro",
+                "purchase", "purchasetx"]
+    ).write.mode("overwrite").parquet(str(FIXTURES / "mgiros"))
+
 
 VIEWS = {
     "asigna_nomina_dt1_t_m": "asigna",
@@ -265,6 +339,9 @@ VIEWS = {
     "ccp_t_m": "ccp",
     "cat_promos": "cat_promos",
     "ecm": "ecm",
+    "total_multi_cte_t_m": "total_multi",
+    "int_nxs_se_finaypns_snap_t_m": "finaypns",
+    "int_xs_mgrs_mgiros_hist_t_m": "mgiros",
 }
 
 
@@ -451,11 +528,189 @@ def make_config() -> None:
         "steps_list": ["extract", "groupby", "pivoting", "fe", "va"],
     }
 
+    # ---- channels: bloque sintetico (subset del query_str prod) --------
+    rigid["channels"] = {
+        "extract": {
+            "libname": ["global_temp"],
+            "table_name": ["total_multi_cte_t_m"],
+            "select_variables": [
+                "cast(last_day(to_date(proc_dt)) as string) as proc_dt,"
+                "cast(NUM_CLIENTE as double) as numcliente,"
+                "cast(ATM as double) as atm,"
+                "cast(TNX_ATM as double) as tnx_atm,"
+                "cast(BNET_EMP as double) as bnet_emp,"
+                "cast(BNET_PERS as double) as bnet_pers,"
+                "cast(TNX_BNET_EMPR as double) as tnx_bnet_empr,"
+                "cast(TNX_BANCANET_PERS as double) as tnx_bancanet_pers,"
+                "cast(IVR as double) as ivr,"
+                "cast(CSR as double) as csr,"
+                "cast(TNX_IVR as double) as tnx_ivr,"
+                "cast(TNX_CSR as double) as tnx_csr"],
+            "type_date": [""],
+            "retraso": [2],
+            "name_mis": ["proc_dt"],
+            "table_pivote": ["master_data"],
+            "key_pivote": ["numcliente"],
+            "name_vintage_pivote": ["vintage"],
+            "key_source": ["numcliente"],
+        },
+        "missing_treatment": {
+            "fill_variables": {"variable": ["atm", "tnx_atm"],
+                               "source": ["channels", "channels"],
+                               "metodo": ["Real 0", "Real 0"]},
+            "fill_methods": {"metodo": ["fill_value"],
+                             "grouped": ["numcliente"],
+                             "valor": ["Real 0"],
+                             "id_variables": [""]},
+            "mobs": {
+                "table_name": ["liabilities_test2_historic",
+                               "credit_card_processed_data_historic",
+                               "adv_colocacion_1_t_m_historic"],
+                "source": ["liabilities", "credit_card", "bureau"],
+                "sources": ["bureau", "liabilities", "credit_card"],
+                "mobs_tipo": ["max_liab_cc"],
+            },
+        },
+        "group_by": {
+            "table_name": "total_multi_cte_t_m_historic",
+            "group_by_key": ["numcliente", "vintage_date", "tfrom"],
+            "query_str": (
+                "select cast(numcliente as string), atm, tnx_atm,"
+                " bnet_emp, bnet_pers, tnx_bnet_empr, tnx_bancanet_pers,"
+                " ivr, csr, tnx_ivr, tnx_csr, vintage_date, tfrom"
+                " from channels"),
+            "query_dict": {
+                "flags": {"bnet": ["bnet_emp", "bnet_pers"],
+                          "audiom": ["ivr", "csr"]},
+                "sums": {"tnx_bnet": ["tnx_bnet_empr",
+                                     "tnx_bancanet_pers"],
+                         "tnx_audiom": ["tnx_ivr", "tnx_csr"]},
+            },
+        },
+        "pivoting": {
+            "source": "channels",
+            "pivot_key": ["numcliente", "vintage_date", "tfrom"],
+        },
+        "steps_list": ["extract", "groupby", "pivoting", "fe", "mobs",
+                       "va"],
+    }
+
+    # ---- financiera: bloque sintetico (subset de productos prod) -------
+    rigid["financiera"] = {
+        "extract": {
+            "libname": ["global_temp"],
+            "table_name": ["int_nxs_se_finaypns_snap_t_m"],
+            "select_variables": [
+                "proc_dt, numcliente, cast(cve_ayp as double) as cve_ayp,"
+                " cast(saldo as double) as saldo, 0.0 as saldoaj"],
+            "type_date": [""],
+            "retraso": [2],
+            "name_mis": ["proc_dt"],
+            "table_pivote": ["master_data"],
+            "key_pivote": ["numcliente"],
+            "name_vintage_pivote": ["vintage"],
+            "key_source": ["numcliente"],
+        },
+        "missing_treatment": {
+            "fill_variables": {"variable": ["a5"],
+                               "source": ["buro"],
+                               "metodo": ["historico"]},
+            "fill_methods": {"metodo": ["fill_historic"],
+                             "grouped": [["numcliente", "vintage_date"]],
+                             "valor": ["1"],
+                             "id_variables": ["historico"]},
+            "mobs": {
+                "table_name": ["liabilities_test2_historic",
+                               "credit_card_processed_data_historic",
+                               "adv_colocacion_1_t_m_historic"],
+                "source": ["liabilities", "credit_card", "bureau"],
+                "sources": ["bureau", "liabilities", "credit_card"],
+                "mobs_tipo": ["mobs_bureau"],
+            },
+        },
+        "group_by": {
+            "table_name": "int_nxs_se_finaypns_snap_t_m_historic",
+            "group_by_key": ["numcliente", "vintage_date", "tfrom"],
+            "query_dict": {
+                "variable": [["adela"], ["cheques"], ["tarjetas"],
+                             ["tarjetas", "adela"],
+                             ["cheques", "debito", "na"]],
+                "agg": ["sum"] * 5,
+                "feature": ["adela_b1", "cheques_b1", "tarjetas_b1",
+                            "assets_b1", "liabilities_b1"],
+            },
+        },
+        "pivoting": {
+            "source": "financiera",
+            "pivot_key": ["numcliente", "vintage_date", "tfrom"],
+        },
+        "steps_list": ["extract", "groupby", "pivoting", "fe", "mobs",
+                       "va"],
+    }
+
+    # ---- giros_credito: bloque sintetico (subset del mapa prod) --------
+    # key_pivote=crd_acct_nbr: ejercita el pivot enriquecido con ecm —
+    # es el crash del mail (pivot_prepared sin crd_acct_nbr)
+    rigid["giros_credito"] = {
+        "extract": {
+            "libname": ["global_temp"],
+            "table_name": ["int_xs_mgrs_mgiros_hist_t_m"],
+            "select_variables": [
+                "proc_dt, id_cuenta16 as crd_acct_nbr,"
+                " quita_acentos(macrogiro) as c2,"
+                " quita_acentos(giro) as c3,"
+                " cast(purchase as double) as purchase,"
+                " cast(purchasetx as double) as purchasetx"],
+            "type_date": [""],
+            "retraso": [2],
+            "name_mis": ["proc_dt"],
+            "table_pivote": ["p"],
+            "key_pivote": ["crd_acct_nbr"],
+            "name_vintage_pivote": ["vintage"],
+            "key_source": ["crd_acct_nbr"],
+        },
+        "missing_treatment": {
+            "fill_variables": {"variable": ["a5"],
+                               "source": ["buro"],
+                               "metodo": ["historico"]},
+            "fill_methods": {"metodo": ["fill_historic"],
+                             "grouped": [["numcliente", "vintage_date"]],
+                             "valor": ["1"],
+                             "id_variables": ["historico"]},
+            "mobs": {
+                "table_name": ["liabilities_test2_historic",
+                               "credit_card_processed_data_historic",
+                               "adv_colocacion_1_t_m_historic"],
+                "source": ["liabilities", "credit_card", "bureau"],
+                "sources": ["bureau", "liabilities", "credit_card"],
+                "mobs_tipo": ["mobs_bureau"],
+            },
+        },
+        "group_by": {
+            "table_name": "int_xs_mgrs_mgiros_hist_t_m_historic",
+            "group_by_key": ["numcliente", "vintage_date", "tfrom"],
+            "query_dict": {
+                "aerolineas": "airline",
+                "alojamiento": "hotel",
+                "gasolina": "gasoline",
+                "restaurantes": "restaurant",
+                "sin clasificar": "unclassified",
+            },
+        },
+        "pivoting": {
+            "source": "giros_credito",
+            "pivot_key": ["numcliente", "vintage_date", "tfrom"],
+        },
+        "steps_list": ["extract", "groupby", "pivoting", "fe", "mobs",
+                       "va"],
+    }
+
     # ---- claves globales que apuntan a fixtures -------------------------
     mp = rigid["mobs_preparation"]
     mp["libname"] = ["global_temp"] * 3
     mp["select_variables"][1] = (
-        "bigint(num_cliente) as numcliente, mob, mis_dt, fec_apertura")
+        "bigint(num_cliente) as numcliente, mob, mis_dt"
+        + (", fec_apertura" if CREDIT_CARD_FEC else ""))
     mp["select_variables"][2] = (
         "cliente as numcliente, to_date(fe_informacion) as fe_informacion,"
         " a5")
