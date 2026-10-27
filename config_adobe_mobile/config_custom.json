@@ -1,0 +1,30 @@
+{
+    "sources": [
+        "adobe_mobile"
+    ],
+    "working_path": "/data/gcgamdlmxpysp/work/hive/gcgamdlmxpysp_work/pricing_models/adobe/datapull_out",
+    "year_id": "202306",
+    "n_mis": "12",
+    "period": "4",
+    "pivot_path": "/data/gcgamdlmxpysp/work/hive/gcgamdlmxpysp_work/pricing_models/adobe/pivote_test/C4_2023",
+    "lista_trans": [
+        "sum_mt",
+        "mean_mt",
+        "std_mt",
+        "max_mt",
+        "min_mt",
+        "trend_mt",
+        "longest_1_streak_onz_mt",
+        "first_1_onz_mt",
+        "transitions_onz_mt",
+        "first_streaks_onz_mt",
+        "entropy_onz_mt",
+        "kolmogorov_complexity_onz_mt"
+    ],
+    "email_sender": "rm36973",
+    "email_receivers": [
+        "rm36973"
+    ],
+    "n_threads": "4",
+    "write_mode": "overwrite"
+}

@@ -1848,6 +1848,137 @@
             "va"
         ]
     },
+    "corporate": {
+        "extract": {
+            "libname": [
+                "global_temp"
+            ],
+            "table_name": [
+                "cust_corp_profile_dt1_t_m"
+            ],
+            "select_variables": [
+                "process_date, num_cliente as numcliente, seg, f_group_industry, cast(cat_tef as double), cast(pct_ind_i2 as double), cast(pct_ind_i5 as double), cast(pct_iv2 as double), cast(pct_iv5 as double), cast(t_altas_i2 as double), cast(t_bajas_i2 as double), cast(t_act_i2 as double), cast(t_altas_a2 as double), cast(t_bajas_a2 as double), cast(t_act_a2 as double), cast(t_bajas_ab as double), cast(t_act_ab as double), cast(tot_baja_i2 as double), cast(tot_act_i2 as double), cast(t_ind_bajas_i2 as double), cast(t_ind_act_i2 as double)"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "process_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "t_bajas_i2"
+                ],
+                "source": [
+                    "corporate"
+                ],
+                "metodo": [
+                    "Real 0"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_value"
+                ],
+                "grouped": [
+                    ""
+                ],
+                "valor": [
+                    "Real 0"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            }
+        },
+        "group_by": {
+            "table_name": "cust_corp_profile_dt1_t_m_historic",
+            "conditions": [
+                "p = col('seg').isin('PENSIONADOS')",
+                "g = col('seg').isin('GOBIERNO')",
+                "ind_i2_0 = col('pct_ind_i2') == 0",
+                "ind_i2_1 = col('pct_ind_i2') == 1",
+                "ind_i5_0 = col('pct_ind_i5') == 0",
+                "ind_i5_1 = col('pct_ind_i5') == 1",
+                "ind_i5_2 = col('pct_ind_i5') == 2",
+                "ind_i5_3 = col('pct_ind_i5') == 3",
+                "ind_i5_4 = col('pct_ind_i5') == 4",
+                "iv_i2_0 = col('pct_iv2') == 0",
+                "iv_i2_1 = col('pct_iv2') == 1",
+                "iv_i5_0 = col('pct_iv5') == 0",
+                "iv_i5_1 = col('pct_iv5') == 1",
+                "iv_i5_2 = col('pct_iv5') == 2",
+                "iv_i5_3 = col('pct_iv5') == 3",
+                "iv_i5_4 = col('pct_iv5') == 4"
+            ],
+            "new_columns": [
+                "cat_ind_i2_seg",
+                "cat_iv2_seg",
+                "cat_ind_i5_seg",
+                "cat_iv5_seg"
+            ],
+            "drop_columns": [
+                "f_group_industry",
+                "seg"
+            ]
+        },
+        "pivoting": {
+            "source": "corporate",
+            "table_name": "cust_corp_profile_dt1_t_m_historic",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date",
+                "process_date"
+            ]
+        },
+        "ratios": {
+            "raw_name": "raw_features",
+            "percentiles": [
+                2
+            ],
+            "lista_fe": [
+                "max",
+                "min",
+                "mean"
+            ],
+            "keep_var": "id_msf_tools_v2_12315",
+            "prefix": "ratio",
+            "list_raw_n_features": [
+                "max_features",
+                "mean_features",
+                "min_features",
+                "sum_features"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "mt",
+            "pivoting",
+            "fe",
+            "ratios",
+            "va"
+        ]
+    },
     "need_crd_acct_nbr": [
         "rev_balance",
         "pnl",
@@ -1868,12 +1999,12 @@
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perf_ejec FROM global_temp.liabilities_test2 where snapshot='perfiles_ejecutivo'",
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_cheques FROM global_temp.liabilities_test2 where snapshot='cheques'",
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_otros FROM global_temp.liabilities_test2 where snapshot='otros'",
-        "SELECT inf_dt,num_cliente as numcliente,id_cuenta16 FROM global_temp.liabilities_test2 where snapshot='pagomatico'"
+        "SELECT mis_date as inf_dt,cast(num_cliente as double) as numcliente,id_cuenta16 FROM global_temp.snapshot_pagomatico_t_m"
     ],
     "mobs_preparation": {
         "select_variables": [
             "bigint(num_cliente) as numcliente, inf_dt, to_date(fec_apertura) as fec_apertura",
-            "bigint(num_cliente) as numcliente, mob, mis_dt, fec_apertura",
+            "bigint(num_cliente) as numcliente, mob, mis_dt",
             "cliente as numcliente, to_date(fe_informacion) as fe_informacion, a5"
         ],
         "libname": [

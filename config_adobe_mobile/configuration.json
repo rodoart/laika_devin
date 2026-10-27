@@ -1,0 +1,4732 @@
+{
+    "bureau_pull": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_cus_db"
+            ],
+            "table_name": [
+                "adv_colocacion_1_t_m"
+            ],
+            "select_variables": [
+                "fe_informacion,cliente as numcliente,A5,mop0tpotro,mop0tpbnx,mop0hipbnx,mop0hipootro,mop0autobnx,mop0autootro,mop0cpbnx,mop0cpotro,mop0tcotro,mop0tcdep,mop0tcbnx,mop0tcamex,sdodepotro,sdovenamex,sdovendep,sdototro,sdovenautotro,sdovenotro,sdovenhipotro,sdovencpotro,sdotbnx,sdovenautbnx,sdovenbnx,sdovenhipbnx,sdovencpbnx,sdoautotro,sdotcotros,sdohipotro,sdocpotro,sdoautbnx,sdotcbnx,sdohipbnx,sdocpbnx,lineamex,lineamex2,lineadep,lineadep2,lineaotros,lineaotros2,lineabnx,lineabnx2,sdodepotro2,sdoautotro2,sdohipotro2,sdocpotro2,sdotcotros2,sdoamex2,sdoautbnx2,sdohipbnx2,sdocpbnx2,sdotcbnx2,pagamex,pagdepotro,pagautotro,pagtcotro,paghipotro,pagcpotro,pagautbnx,pagtcbnx,paghipbnx,pagcpbnx,tsdoatcrestotroch,tsdoatchisrt,tsdoaamexhisrt,tlmtctcrhisrt,tcmxamexhisrt,tsdovtcrestotroch,tsdovtcrestbnxch,tsdovtcrestch,tsdoatcrestbnxch,tsdoatcrestch"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                3
+            ],
+            "name_mis": [
+                "fe_informacion"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "A5",
+                    "mop0tpotro",
+                    "mop0tpbnx",
+                    "mop0hipbnx",
+                    "mop0hipootro",
+                    "tot_bal_due_offus",
+                    "tot_bal_due_offus_al",
+                    "tot_bal_due_offus_cc",
+                    "tot_bal_due_offus_mg",
+                    "tot_bal_due_offus_pl",
+                    "tot_bal_due_onus",
+                    "tot_bal_due_onus_al",
+                    "tot_bal_due_onus_cc",
+                    "tot_bal_due_onus_mg",
+                    "tot_bal_due_onus_pl",
+                    "tot_bal_offus_al",
+                    "tot_bal_offus_cc",
+                    "tot_bal_offus_mg",
+                    "tot_bal_offus_pl",
+                    "tot_bal_onus_al",
+                    "tot_bal_onus_cc",
+                    "tot_bal_onus_mg",
+                    "tot_bal_onus_pl",
+                    "tot_cl_amex",
+                    "tot_cl_amex_open",
+                    "tot_cl_dept",
+                    "tot_cl_dept_open",
+                    "tot_cl_offus",
+                    "tot_cl_offus_open",
+                    "tot_cl_onus",
+                    "tot_cl_onus_open",
+                    "tot_curr_bal_dept_open",
+                    "tot_curr_bal_offus_open_al",
+                    "tot_curr_bal_offus_open_mg",
+                    "tot_curr_bal_offus_open_pl",
+                    "tot_curr_bal_offus_open_tc",
+                    "tot_curr_bal_amex_open_tc",
+                    "tot_curr_bal_onus_open_al",
+                    "tot_curr_bal_onus_open_mg",
+                    "tot_curr_bal_onus_open_pl",
+                    "tot_curr_bal_onus_open_tc",
+                    "tot_pay_amex",
+                    "tot_pay_dept",
+                    "tot_pay_offus_al",
+                    "tot_pay_offus_cc",
+                    "tot_pay_offus_mg",
+                    "tot_pay_offus_pl",
+                    "tot_pay_onus_al",
+                    "tot_pay_onus_cc",
+                    "tot_pay_onus_mg",
+                    "tot_pay_onus_pl",
+                    "tot_curr_bal_offus_res_cc",
+                    "tot_bal_curr_all_open",
+                    "tot_bal_curr_amex",
+                    "tot_cl_all_2",
+                    "tot_cl_amex_open_2",
+                    "tot_cur_due_offus_res_cc",
+                    "tot_cur_due_onus_res_cc",
+                    "tot_curr_bal_due_res_cc",
+                    "tot_curr_bal_onus_res_cc",
+                    "tot_curr_bal_res_cc",
+                    "mop_tc_amx",
+                    "mop_tc_bnx",
+                    "mop_tc_dep",
+                    "mop_tc_otro",
+                    "mop_cp_otro",
+                    "mop_cp_bnx",
+                    "mop_au_otro",
+                    "mop_au_bnx",
+                    "mop_hi_otro",
+                    "mop_hi_bnx",
+                    "mop_tp_bnx",
+                    "mop_tp_otro"
+                ],
+                "source": [
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro"
+                ],
+                "metodo": [
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_historic",
+                    "fill_stat"
+                ],
+                "grouped": [
+                    [
+                        "numcliente",
+                        "vintage_date"
+                    ],
+                    [
+                        "tfrom"
+                    ]
+                ],
+                "valor": [
+                    "Real 0",
+                    "1"
+                ],
+                "id_variables": [
+                    "historico"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "liabilities_test2_historic",
+                    "credit_card_processed_data_historic",
+                    "adv_colocacion_1_t_m_historic"
+                ],
+                "source": [
+                    "liabilities",
+                    "credit_card",
+                    "bureau"
+                ],
+                "sources": [
+                    "bureau",
+                    "liabilities",
+                    "credit_card"
+                ],
+                "mobs_tipo": [
+                    "mobs_bureau"
+                ]
+            }
+        },
+        "group_by": {
+            "table_name": "adv_colocacion_1_t_m_historic",
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "query_dict": {
+                "variable": [
+                    "a5",
+                    "sdodepotro",
+                    "sdovenamex",
+                    "sdovendep",
+                    "sdototro",
+                    "sdovenautotro",
+                    "sdovenotro",
+                    "sdovenhipotro",
+                    "sdovencpotro",
+                    "sdotbnx",
+                    "sdovenautbnx",
+                    "sdovenbnx",
+                    "sdovenhipbnx",
+                    "sdovencpbnx",
+                    "sdoautotro",
+                    "sdotcotros",
+                    "sdohipotro",
+                    "sdocpotro",
+                    "sdoautbnx",
+                    "sdotcbnx",
+                    "sdohipbnx",
+                    "sdocpbnx",
+                    "lineamex",
+                    "lineamex2",
+                    "lineadep",
+                    "lineadep2",
+                    "lineaotros",
+                    "lineaotros2",
+                    "lineabnx",
+                    "lineabnx2",
+                    "sdodepotro2",
+                    "sdoautotro2",
+                    "sdohipotro2",
+                    "sdocpotro2",
+                    "sdotcotros2",
+                    "sdoamex2",
+                    "sdoautbnx2",
+                    "sdohipbnx2",
+                    "sdocpbnx2",
+                    "sdotcbnx2",
+                    "pagamex",
+                    "pagdepotro",
+                    "pagautotro",
+                    "pagtcotro",
+                    "paghipotro",
+                    "pagcpotro",
+                    "pagautbnx",
+                    "pagtcbnx",
+                    "paghipbnx",
+                    "pagcpbnx",
+                    "tsdoatcrestotroch",
+                    "tsdoatchisrt",
+                    "tsdoaamexhisrt",
+                    "tlmtctcrhisrt",
+                    "tcmxamexhisrt",
+                    "tsdovtcrestotroch",
+                    "tsdovtcrestbnxch",
+                    "tsdovtcrestch",
+                    "tsdoatcrestbnxch",
+                    "tsdoatcrestch",
+                    "mop0tcamex",
+                    "mop0tcbnx",
+                    "mop0tcdep",
+                    "mop0tcotro",
+                    "mop0cpotro",
+                    "mop0cpbnx",
+                    "mop0autootro",
+                    "mop0autobnx",
+                    "mop0hipootro",
+                    "mop0hipbnx",
+                    "mop0tpbnx",
+                    "mop0tpotro",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    ""
+                ],
+                "agg": [
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "max",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    ""
+                ],
+                "feature": [
+                    "a5",
+                    "tot_bal_dept",
+                    "tot_bal_due_amex",
+                    "tot_bal_due_dept",
+                    "tot_bal_due_offus",
+                    "tot_bal_due_offus_al",
+                    "tot_bal_due_offus_cc",
+                    "tot_bal_due_offus_mg",
+                    "tot_bal_due_offus_pl",
+                    "tot_bal_due_onus",
+                    "tot_bal_due_onus_al",
+                    "tot_bal_due_onus_cc",
+                    "tot_bal_due_onus_mg",
+                    "tot_bal_due_onus_pl",
+                    "tot_bal_offus_al",
+                    "tot_bal_offus_cc",
+                    "tot_bal_offus_mg",
+                    "tot_bal_offus_pl",
+                    "tot_bal_onus_al",
+                    "tot_bal_onus_cc",
+                    "tot_bal_onus_mg",
+                    "tot_bal_onus_pl",
+                    "tot_cl_amex",
+                    "tot_cl_amex_open",
+                    "tot_cl_dept",
+                    "tot_cl_dept_open",
+                    "tot_cl_offus",
+                    "tot_cl_offus_open",
+                    "tot_cl_onus",
+                    "tot_cl_onus_open",
+                    "tot_curr_bal_dept_open",
+                    "tot_curr_bal_offus_open_al",
+                    "tot_curr_bal_offus_open_mg",
+                    "tot_curr_bal_offus_open_pl",
+                    "tot_curr_bal_offus_open_tc",
+                    "tot_curr_bal_amex_open_tc",
+                    "tot_curr_bal_onus_open_al",
+                    "tot_curr_bal_onus_open_mg",
+                    "tot_curr_bal_onus_open_pl",
+                    "tot_curr_bal_onus_open_tc",
+                    "tot_pay_amex",
+                    "tot_pay_dept",
+                    "tot_pay_offus_al",
+                    "tot_pay_offus_cc",
+                    "tot_pay_offus_mg",
+                    "tot_pay_offus_pl",
+                    "tot_pay_onus_al",
+                    "tot_pay_onus_cc",
+                    "tot_pay_onus_mg",
+                    "tot_pay_onus_pl",
+                    "tot_curr_bal_offus_res_cc",
+                    "tot_bal_curr_all_open",
+                    "tot_bal_curr_amex",
+                    "tot_cl_all_2",
+                    "tot_cl_amex_open_2",
+                    "tot_cur_due_offus_res_cc",
+                    "tot_cur_due_onus_res_cc",
+                    "tot_curr_bal_due_res_cc",
+                    "tot_curr_bal_onus_res_cc",
+                    "tot_curr_bal_res_cc",
+                    "mop_tc_amx",
+                    "mop_tc_bnx",
+                    "mop_tc_dep",
+                    "mop_tc_otro",
+                    "mop_cp_otro",
+                    "mop_cp_bnx",
+                    "mop_au_otro",
+                    "mop_au_bnx",
+                    "mop_hi_otro",
+                    "mop_hi_bnx",
+                    "mop_tp_bnx",
+                    "mop_tp_otro",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    ""
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "bureau_pull",
+            "table_name": "adv_colocacion_1_t_m_historic",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "mt",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "rev_balance": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db"
+            ],
+            "table_name": [
+                "profit_loss_cc_t_m",
+                "int_crd_epp_snapshot_t_m",
+                "int_crd_plan_snapshot_c_t_m"
+            ],
+            "select_variables": [
+                "informationdate, NUMCLIENTE as numcliente, CRD_ACCT_NBR as crd_acct_nbr, cast(int_rev as double) as eir, cast(mob as double) as monthsombooks",
+                "mis_dt, crd_acct_nbr, epp_orig_loan_amt as original_balance, loan_outstnd_bal_lcy as current_balance, loan_stat as estatus, promo_id, curr_int_rte as tasa, loan_tnr as plazo, loan_open_mob_nbr as plazo_actual, loan_dt as fecha_aceptacion",
+                "mis_dt, crd_acct_nbr, plan_nbr, curr_bal_lcyamt as current_balance, int_bnp_lcyamt as int_grav_exent, calc_rte as tasa"
+            ],
+            "type_date": [
+                "-",
+                "-",
+                "-"
+            ],
+            "retraso": [
+                1,
+                1,
+                1
+            ],
+            "name_mis": [
+                "informationdate",
+                "mis_dt",
+                "mis_dt"
+            ],
+            "table_pivote": [
+                "master_data",
+                "master_data",
+                "master_data"
+            ],
+            "key_pivote": [
+                "crd_acct_nbr",
+                "crd_acct_nbr",
+                "crd_acct_nbr"
+            ],
+            "name_vintage_pivote": [
+                "vintage",
+                "vintage",
+                "vintage"
+            ],
+            "key_source": [
+                "crd_acct_nbr",
+                "crd_acct_nbr",
+                "crd_acct_nbr"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "A5",
+                    "mop0tpotro",
+                    "mop0tpbnx",
+                    "mop0hipbnx",
+                    "mop0hipootro",
+                    "tot_bal_due_offus",
+                    "tot_bal_due_offus_al",
+                    "tot_bal_due_offus_cc",
+                    "tot_bal_due_offus_mg",
+                    "tot_bal_due_offus_pl",
+                    "tot_bal_due_onus",
+                    "tot_bal_due_onus_al",
+                    "tot_bal_due_onus_cc",
+                    "tot_bal_due_onus_mg",
+                    "tot_bal_due_onus_pl",
+                    "tot_bal_offus_al",
+                    "tot_bal_offus_cc",
+                    "tot_bal_offus_mg",
+                    "tot_bal_offus_pl",
+                    "tot_bal_onus_al",
+                    "tot_bal_onus_cc",
+                    "tot_bal_onus_mg",
+                    "tot_bal_onus_pl",
+                    "tot_cl_amex",
+                    "tot_cl_amex_open",
+                    "tot_cl_dept",
+                    "tot_cl_dept_open",
+                    "tot_cl_offus",
+                    "tot_cl_offus_open",
+                    "tot_cl_onus",
+                    "tot_cl_onus_open",
+                    "tot_curr_bal_dept_open",
+                    "tot_curr_bal_offus_open_al",
+                    "tot_curr_bal_offus_open_mg",
+                    "tot_curr_bal_offus_open_pl",
+                    "tot_curr_bal_offus_open_tc",
+                    "tot_curr_bal_amex_open_tc",
+                    "tot_curr_bal_onus_open_al",
+                    "tot_curr_bal_onus_open_mg",
+                    "tot_curr_bal_onus_open_pl",
+                    "tot_curr_bal_onus_open_tc",
+                    "tot_pay_amex",
+                    "tot_pay_dept",
+                    "tot_pay_offus_al",
+                    "tot_pay_offus_cc",
+                    "tot_pay_offus_mg",
+                    "tot_pay_offus_pl",
+                    "tot_pay_onus_al",
+                    "tot_pay_onus_cc",
+                    "tot_pay_onus_mg",
+                    "tot_pay_onus_pl",
+                    "tot_curr_bal_offus_res_cc",
+                    "tot_bal_curr_all_open",
+                    "tot_bal_curr_amex",
+                    "tot_cl_all_2",
+                    "tot_cl_amex_open_2",
+                    "tot_cur_due_offus_res_cc",
+                    "tot_cur_due_onus_res_cc",
+                    "tot_curr_bal_due_res_cc",
+                    "tot_curr_bal_onus_res_cc",
+                    "tot_curr_bal_res_cc",
+                    "mop_tc_amx",
+                    "mop_tc_bnx",
+                    "mop_tc_dep",
+                    "mop_tc_otro",
+                    "mop_cp_otro",
+                    "mop_cp_bnx",
+                    "mop_au_otro",
+                    "mop_au_bnx",
+                    "mop_hi_otro",
+                    "mop_hi_bnx",
+                    "mop_tp_bnx",
+                    "mop_tp_otro"
+                ],
+                "source": [
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro"
+                ],
+                "metodo": [
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_historic",
+                    "fill_stat"
+                ],
+                "grouped": [
+                    [
+                        "numcliente",
+                        "vintage_date"
+                    ],
+                    [
+                        "tfrom"
+                    ]
+                ],
+                "valor": [
+                    "Real 0",
+                    "1"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "liabilities_test2_historic",
+                    "credit_card_processed_data_historic",
+                    "adv_colocacion_1_t_m_historic"
+                ],
+                "source": [
+                    "liabilities",
+                    "credit_card",
+                    "bureau"
+                ],
+                "sources": [
+                    "bureau",
+                    "liabilities",
+                    "credit_card"
+                ],
+                "mobs_tipo": [
+                    "mobs_bureau"
+                ]
+            }
+        },
+        "group_by": {
+            "table_names": {
+                "epp": "int_crd_epp_snapshot_t_m_historic",
+                "plan": "int_crd_plan_snapshot_c_t_m_historic",
+                "cpp": "profit_loss_cc_t_m_historic",
+                "catPromosID": "gcprcmsbx_work.catalogo_promoid_112021"
+            },
+            "primaryKey": [
+                "crd_acct_nbr",
+                "vintage_date",
+                "tfrom"
+            ],
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "querys_dict": {
+                "epp_dict": {
+                    "ofertas": [
+                        [
+                            0,
+                            1,
+                            "7",
+                            "T0"
+                        ],
+                        [
+                            0,
+                            2,
+                            "03",
+                            "T0"
+                        ],
+                        [
+                            0,
+                            2,
+                            "1T",
+                            "T0"
+                        ],
+                        [
+                            0,
+                            5,
+                            "40BAL",
+                            "Balcon"
+                        ],
+                        [
+                            0,
+                            3,
+                            "40B",
+                            "Disponible"
+                        ],
+                        [
+                            0,
+                            2,
+                            "SE",
+                            "Efectivo"
+                        ],
+                        [
+                            0,
+                            2,
+                            "2P",
+                            "PPP"
+                        ],
+                        [
+                            0,
+                            2,
+                            "6R",
+                            "RES"
+                        ]
+                    ]
+                }
+            }
+        },
+        "pivoting": {
+            "source": "rev_balance",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "liabilities": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db"
+            ],
+            "table_name": [
+                "snapshot_maestra_t_m",
+                "snapshot_perfiles_t_m",
+                "snapshot_perf_ejec_t_m",
+                "snapshot_cheques_t_m",
+                "snapshot_otros_t_m",
+                "snapshot_pagomatico_t_m"
+            ],
+            "select_variables": [
+                "mis_date, id_cuenta16, fec_apertura, cast(num_cliente as double) as numcliente,cast(num_contrato as double),cast(cve_moneda as double),cast(cve_estatus_cta as double),cast(sdo_capital as double),cast(saldo_mensual as double),cast(sdo_prom_mensual as double),cast(sdo_promedio_mes as double),cast(indapertura as double),cast(indcancelada as double),cast(IndActivaSdo as double),cast(IndRecibeDispersion as double),cast(IndActivaTxns as double),cast(CgoCnt as double),cast(CgoImp as double),cast(AboCnt as double),cast(AboImp as double),cast(CgoCntRetATMTot as double),cast(CgoImpRetATMTot as double),cast(CgoCntSucTot as double),cast(CgoImpSucTot as double),cast(AboCntSucTot as double),cast(AboImpSucTot as double),cast(CgoCntRetSuc as double),cast(CgoImpRetSuc as double),cast(CgoCntRetInst as double),cast(CgoImpRetInst as double),cast(CgoCntRetATMBnm as double),cast(CgoImpRetATMBnm as double),cast(CgoCntRetATMRed as double),cast(CgoImpRetATMRed as double),cast(CgoCntTraspInv as double),cast(CgoImpTraspInv as double),cast(CgoCntTraspTerc as double),cast(CgoImpTraspTerc as double),cast(CgoCntCmprsTPV as double),cast(CgoImpCmprsTPV as double),cast(CgoCntTransfIntrbnc as double),cast(CgoImpTransfIntrbnc as double),cast(CgoCntCobrChq as double),cast(CgoImpCobrChq as double),cast(CgoCntCobrOrd as double),cast(CgoImpCobrOrd as double),cast(CgoCntPagoServ as double),cast(CgoImpPagoServ as double),cast(CgoCntPagoDom as double),cast(CgoImpPagoDom as double),cast(CgoCntFondeoOtro as double),cast(CgoImpFondeoOtro as double),cast(CgoCntOtrosRelev as double),cast(CgoImpOtrosRelev as double),cast(CgoCntOtrosNoRelev as double),cast(CgoImpOtrosNoRelev as double),cast(AboCntDepEfe as double),cast(AboImpDepEfe as double),cast(AboCntDepDocFrme as double),cast(AboImpDepDocFrme as double),cast(AboCntDepDocSBC as double),cast(AboImpDepDocSBC as double),cast(AboCntDepMix as double),cast(AboImpDepMix as double),cast(AboCntDepTarj as double),cast(AboImpDepTarj as double),cast(AboCntDepNomina as double),cast(AboImpDepNomina as double),cast(AboCntDepRend as double),cast(AboImpDepRend as double),cast(AboCntTraspInvDec as double),cast(AboImpTraspInvDec as double),cast(AboCntTraspInvVenc as double),cast(AboImpTraspInvVenc as double),cast(AboCntTraspInvCan as double),cast(AboImpTraspInvCan as double),cast(AboCntTraspInvRet as double),cast(AboImpTraspInvRet as double),cast(AboCntTraspProg as double),cast(AboImpTraspProg as double),cast(AboCntTraspRef as double),cast(AboImpTraspRef as double),cast(AboCntTrnsIntbnc as double),cast(AboImpTrnsIntbnc as double),cast(AboCntDispCred as double),cast(AboImpDispCred as double),cast(AboCntOrdnPgo as double),cast(AboImpOrdnPgo as double),cast(AboCntBonfComImp as double),cast(AboImpBonfComImp as double),cast(AboCntOtrosRelev as double),cast(AboImpOtrosRelev as double),cast(AboCntOtrosNoRelev as double),cast(AboImpOtrosNoRelev as double))",
+                "mis_date, id_cuenta16, fec_apertura, cast(num_cliente as double) as numcliente,cast(num_contrato as double),cast(cve_moneda as double),cast(cve_estatus_cta as double),cast(sdo_capital as double),cast(saldo_mensual as double),cast(sdo_prom_mensual as double),cast(sdo_promedio_mes as double),cast(indapertura as double),cast(indcancelada as double),cast(IndActivaSdo as double),cast(IndRecibeDispersion as double),cast(IndActivaTxns as double),cast(CgoCnt as double),cast(CgoImp as double),cast(AboCnt as double),cast(AboImp as double),cast(CgoCntRetATMTot as double),cast(CgoImpRetATMTot as double),cast(CgoCntSucTot as double),cast(CgoImpSucTot as double),cast(AboCntSucTot as double),cast(AboImpSucTot as double),cast(CgoCntRetSuc as double),cast(CgoImpRetSuc as double),cast(CgoCntRetInst as double),cast(CgoImpRetInst as double),cast(CgoCntRetATMBnm as double),cast(CgoImpRetATMBnm as double),cast(CgoCntRetATMRed as double),cast(CgoImpRetATMRed as double),cast(CgoCntTraspInv as double),cast(CgoImpTraspInv as double),cast(CgoCntTraspTerc as double),cast(CgoImpTraspTerc as double),cast(CgoCntCmprsTPV as double),cast(CgoImpCmprsTPV as double),cast(CgoCntTransfIntrbnc as double),cast(CgoImpTransfIntrbnc as double),cast(CgoCntCobrChq as double),cast(CgoImpCobrChq as double),cast(CgoCntCobrOrd as double),cast(CgoImpCobrOrd as double),cast(CgoCntPagoServ as double),cast(CgoImpPagoServ as double),cast(CgoCntPagoDom as double),cast(CgoImpPagoDom as double),cast(CgoCntFondeoOtro as double),cast(CgoImpFondeoOtro as double),cast(CgoCntOtrosRelev as double),cast(CgoImpOtrosRelev as double),cast(CgoCntOtrosNoRelev as double),cast(CgoImpOtrosNoRelev as double),cast(AboCntDepEfe as double),cast(AboImpDepEfe as double),cast(AboCntDepDocFrme as double),cast(AboImpDepDocFrme as double),cast(AboCntDepDocSBC as double),cast(AboImpDepDocSBC as double),cast(AboCntDepMix as double),cast(AboImpDepMix as double),cast(AboCntDepTarj as double),cast(AboImpDepTarj as double),cast(AboCntDepNomina as double),cast(AboImpDepNomina as double),cast(AboCntDepRend as double),cast(AboImpDepRend as double),cast(AboCntTraspInvDec as double),cast(AboImpTraspInvDec as double),cast(AboCntTraspInvVenc as double),cast(AboImpTraspInvVenc as double),cast(AboCntTraspInvCan as double),cast(AboImpTraspInvCan as double),cast(AboCntTraspInvRet as double),cast(AboImpTraspInvRet as double),cast(AboCntTraspProg as double),cast(AboImpTraspProg as double),cast(AboCntTraspRef as double),cast(AboImpTraspRef as double),cast(AboCntTrnsIntbnc as double),cast(AboImpTrnsIntbnc as double),cast(AboCntDispCred as double),cast(AboImpDispCred as double),cast(AboCntOrdnPgo as double),cast(AboImpOrdnPgo as double),cast(AboCntBonfComImp as double),cast(AboImpBonfComImp as double),cast(AboCntOtrosRelev as double),cast(AboImpOtrosRelev as double),cast(AboCntOtrosNoRelev as double),cast(AboImpOtrosNoRelev as double))",
+                "mis_date, cast(snapshot as double), cast(num_sucdepto as double), cast(num_cliente as double) as numcliente, cast(num_contrato as double), cast(producto as double), cast(instrumento as double), cast(id_cuenta16 as double), cast(id_producto as double), cast(cve_moneda as double), cast(cve_estatus_cta as double), fec_apertura, fec_ult_mov, cast(sdo_capital as double), cast(sdo_promedio_mes as double), cast(indapertura as double), cast(indcancelada as double), cast(indactivasdo as double), cast(indattritionlight as double), cast(indattritionhard as double), cast(indactivatxns as double), cast(indactivaatm as double), cast(indinactivaart61 as double), cast(rankusotpvcta as double), cast(comis_intercambio as double), cast(margen_financiero as double), cast(ipab as double), cast(cgocnt as double), cast(cgoimp as double), cast(abocnt as double), cast(aboimp as double), cast(cgocntretatmtot as double), cast(cgoimpretatmtot as double), cast(cgocntcmprstpv as double), cast(cgoimpcmprstpv as double),cast(cve_agr_baseline_prod as double),cast(cve_supergrupo_prod as double),cast(desc_producto as double)",
+                "mis_date, fec_apertura, cast(num_cliente as double) as numcliente,cast(num_contrato as double),cast(cve_moneda as double),cast(cve_estatus_cta as double),cast(sdo_capital as double),cast(saldo_mensual as double),cast(sdo_prom_mensual as double),cast(sdo_promedio_mes as double),cast(indapertura as double),cast(indcancelada as double),cast(IndActivaSdo as double),cast(IndRecibeDispersion as double),cast(IndActivaTxns as double),cast(CgoCnt as double),cast(CgoImp as double),cast(AboCnt as double),cast(AboImp as double),cast(CgoCntRetATMTot as double),cast(CgoImpRetATMTot as double),cast(CgoCntSucTot as double),cast(CgoImpSucTot as double),cast(AboCntSucTot as double),cast(AboImpSucTot as double),cast(CgoCntRetSuc as double),cast(CgoImpRetSuc as double),cast(CgoCntRetInst as double),cast(CgoImpRetInst as double),cast(CgoCntRetATMBnm as double),cast(CgoImpRetATMBnm as double),cast(CgoCntRetATMRed as double),cast(CgoImpRetATMRed as double),cast(CgoCntTraspInv as double),cast(CgoImpTraspInv as double),cast(CgoCntTraspTerc as double),cast(CgoImpTraspTerc as double),cast(CgoCntCmprsTPV as double),cast(CgoImpCmprsTPV as double),cast(CgoCntTransfIntrbnc as double),cast(CgoImpTransfIntrbnc as double),cast(CgoCntCobrChq as double),cast(CgoImpCobrChq as double),cast(CgoCntCobrOrd as double),cast(CgoImpCobrOrd as double),cast(CgoCntPagoServ as double),cast(CgoImpPagoServ as double),cast(CgoCntPagoDom as double),cast(CgoImpPagoDom as double),cast(CgoCntFondeoOtro as double),cast(CgoImpFondeoOtro as double),cast(CgoCntOtrosRelev as double),cast(CgoImpOtrosRelev as double),cast(CgoCntOtrosNoRelev as double),cast(CgoImpOtrosNoRelev as double),cast(AboCntDepEfe as double),cast(AboImpDepEfe as double),cast(AboCntDepDocFrme as double),cast(AboImpDepDocFrme as double),cast(AboCntDepDocSBC as double),cast(AboImpDepDocSBC as double),cast(AboCntDepMix as double),cast(AboImpDepMix as double),cast(AboCntDepTarj as double),cast(AboImpDepTarj as double),cast(AboCntDepNomina as double),cast(AboImpDepNomina as double),cast(AboCntDepRend as double),cast(AboImpDepRend as double),cast(AboCntTraspInvDec as double),cast(AboImpTraspInvDec as double),cast(AboCntTraspInvVenc as double),cast(AboImpTraspInvVenc as double),cast(AboCntTraspInvCan as double),cast(AboImpTraspInvCan as double),cast(AboCntTraspInvRet as double),cast(AboImpTraspInvRet as double),cast(AboCntTraspProg as double),cast(AboImpTraspProg as double),cast(AboCntTraspRef as double),cast(AboImpTraspRef as double),cast(AboCntTrnsIntbnc as double),cast(AboImpTrnsIntbnc as double),cast(AboCntDispCred as double),cast(AboImpDispCred as double),cast(AboCntOrdnPgo as double),cast(AboImpOrdnPgo as double),cast(AboCntBonfComImp as double),cast(AboImpBonfComImp as double),cast(AboCntOtrosRelev as double),cast(AboImpOtrosRelev as double),cast(AboCntOtrosNoRelev as double),cast(AboImpOtrosNoRelev as double))",
+                "mis_date, id_cuenta16, fec_apertura, cast(num_cliente as double) as numcliente,cast(num_contrato as double),cast(cve_moneda as double),cast(cve_estatus_cta as double),cast(sdo_capital as double),cast(saldo_mensual as double),cast(sdo_prom_mensual as double),cast(sdo_promedio_mes as double),cast(indapertura as double),cast(indcancelada as double),cast(IndActivaSdo as double),cast(IndRecibeDispersion as double),cast(IndActivaTxns as double),cast(CgoCnt as double),cast(CgoImp as double),cast(AboCnt as double),cast(AboImp as double),cast(CgoCntRetATMTot as double),cast(CgoImpRetATMTot as double),cast(CgoCntSucTot as double),cast(CgoImpSucTot as double),cast(AboCntSucTot as double),cast(AboImpSucTot as double),cast(CgoCntRetSuc as double),cast(CgoImpRetSuc as double),cast(CgoCntRetInst as double),cast(CgoImpRetInst as double),cast(CgoCntRetATMBnm as double),cast(CgoImpRetATMBnm as double),cast(CgoCntRetATMRed as double),cast(CgoImpRetATMRed as double),cast(CgoCntTraspInv as double),cast(CgoImpTraspInv as double),cast(CgoCntTraspTerc as double),cast(CgoImpTraspTerc as double),cast(CgoCntCmprsTPV as double),cast(CgoImpCmprsTPV as double),cast(CgoCntTransfIntrbnc as double),cast(CgoImpTransfIntrbnc as double),cast(CgoCntCobrChq as double),cast(CgoImpCobrChq as double),cast(CgoCntCobrOrd as double),cast(CgoImpCobrOrd as double),cast(CgoCntPagoServ as double),cast(CgoImpPagoServ as double),cast(CgoCntPagoDom as double),cast(CgoImpPagoDom as double),cast(CgoCntFondeoOtro as double),cast(CgoImpFondeoOtro as double),cast(CgoCntOtrosRelev as double),cast(CgoImpOtrosRelev as double),cast(CgoCntOtrosNoRelev as double),cast(CgoImpOtrosNoRelev as double),cast(AboCntDepEfe as double),cast(AboImpDepEfe as double),cast(AboCntDepDocFrme as double),cast(AboImpDepDocFrme as double),cast(AboCntDepDocSBC as double),cast(AboImpDepDocSBC as double),cast(AboCntDepMix as double),cast(AboImpDepMix as double),cast(AboCntDepTarj as double),cast(AboImpDepTarj as double),cast(AboCntDepNomina as double),cast(AboImpDepNomina as double),cast(AboCntDepRend as double),cast(AboImpDepRend as double),cast(AboCntTraspInvDec as double),cast(AboImpTraspInvDec as double),cast(AboCntTraspInvVenc as double),cast(AboImpTraspInvVenc as double),cast(AboCntTraspInvCan as double),cast(AboImpTraspInvCan as double),cast(AboCntTraspInvRet as double),cast(AboImpTraspInvRet as double),cast(AboCntTraspProg as double),cast(AboImpTraspProg as double),cast(AboCntTraspRef as double),cast(AboImpTraspRef as double),cast(AboCntTrnsIntbnc as double),cast(AboImpTrnsIntbnc as double),cast(AboCntDispCred as double),cast(AboImpDispCred as double),cast(AboCntOrdnPgo as double),cast(AboImpOrdnPgo as double),cast(AboCntBonfComImp as double),cast(AboImpBonfComImp as double),cast(AboCntOtrosRelev as double),cast(AboImpOtrosRelev as double),cast(AboCntOtrosNoRelev as double),cast(AboImpOtrosNoRelev as double))",
+                "mis_date, id_cuenta16, fec_apertura, cast(num_cliente as double) as numcliente,cast(num_contrato as double),cast(cve_moneda as double),cast(cve_estatus_cta as double),cast(sdo_capital as double),cast(saldo_mensual as double),cast(sdo_prom_mensual as double),cast(sdo_promedio_mes as double),cast(indapertura as double),cast(indcancelada as double),cast(IndActivaSdo as double),cast(IndRecibeDispersion as double),cast(IndActivaTxns as double),cast(CgoCnt as double),cast(CgoImp as double),cast(AboCnt as double),cast(AboImp as double),cast(CgoCntRetATMTot as double),cast(CgoImpRetATMTot as double),cast(CgoCntSucTot as double),cast(CgoImpSucTot as double),cast(AboCntSucTot as double),cast(AboImpSucTot as double),cast(CgoCntRetSuc as double),cast(CgoImpRetSuc as double),cast(CgoCntRetInst as double),cast(CgoImpRetInst as double),cast(CgoCntRetATMBnm as double),cast(CgoImpRetATMBnm as double),cast(CgoCntRetATMRed as double),cast(CgoImpRetATMRed as double),cast(CgoCntTraspInv as double),cast(CgoImpTraspInv as double),cast(CgoCntTraspTerc as double),cast(CgoImpTraspTerc as double),cast(CgoCntCmprsTPV as double),cast(CgoImpCmprsTPV as double),cast(CgoCntTransfIntrbnc as double),cast(CgoImpTransfIntrbnc as double),cast(CgoCntCobrChq as double),cast(CgoImpCobrChq as double),cast(CgoCntCobrOrd as double),cast(CgoImpCobrOrd as double),cast(CgoCntPagoServ as double),cast(CgoImpPagoServ as double),cast(CgoCntPagoDom as double),cast(CgoImpPagoDom as double),cast(CgoCntFondeoOtro as double),cast(CgoImpFondeoOtro as double),cast(CgoCntOtrosRelev as double),cast(CgoImpOtrosRelev as double),cast(CgoCntOtrosNoRelev as double),cast(CgoImpOtrosNoRelev as double),cast(AboCntDepEfe as double),cast(AboImpDepEfe as double),cast(AboCntDepDocFrme as double),cast(AboImpDepDocFrme as double),cast(AboCntDepDocSBC as double),cast(AboImpDepDocSBC as double),cast(AboCntDepMix as double),cast(AboImpDepMix as double),cast(AboCntDepTarj as double),cast(AboImpDepTarj as double),cast(AboCntDepNomina as double),cast(AboImpDepNomina as double),cast(AboCntDepRend as double),cast(AboImpDepRend as double),cast(AboCntTraspInvDec as double),cast(AboImpTraspInvDec as double),cast(AboCntTraspInvVenc as double),cast(AboImpTraspInvVenc as double),cast(AboCntTraspInvCan as double),cast(AboImpTraspInvCan as double),cast(AboCntTraspInvRet as double),cast(AboImpTraspInvRet as double),cast(AboCntTraspProg as double),cast(AboImpTraspProg as double),cast(AboCntTraspRef as double),cast(AboImpTraspRef as double),cast(AboCntTrnsIntbnc as double),cast(AboImpTrnsIntbnc as double),cast(AboCntDispCred as double),cast(AboImpDispCred as double),cast(AboCntOrdnPgo as double),cast(AboImpOrdnPgo as double),cast(AboCntBonfComImp as double),cast(AboImpBonfComImp as double),cast(AboCntOtrosRelev as double),cast(AboImpOtrosRelev as double),cast(AboCntOtrosNoRelev as double),cast(AboImpOtrosNoRelev as double))"
+            ],
+            "type_date": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+            ],
+            "retraso": [
+                2,
+                2,
+                2,
+                2,
+                2,
+                2
+            ],
+            "name_mis": [
+                "mis_date",
+                "mis_date",
+                "mis_date",
+                "mis_date",
+                "mis_date",
+                "mis_date"
+            ],
+            "table_pivote": [
+                "master_data",
+                "master_data",
+                "master_data",
+                "master_data",
+                "master_data",
+                "master_data"
+            ],
+            "key_pivote": [
+                "num_contrato_maestra",
+                "num_contrato_perfiles",
+                "num_contrato_perf_ejec",
+                "num_contrato_cheques",
+                "num_contrato_otros",
+                "id_cuenta16"
+            ],
+            "name_vintage_pivote": [
+                "vintage",
+                "vintage",
+                "vintage",
+                "vintage",
+                "vintage",
+                "vintage"
+            ],
+            "key_source": [
+                "num_contrato",
+                "num_contrato",
+                "num_contrato",
+                "num_contrato",
+                "num_contrato",
+                "id_cuenta16"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "source": [
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities",
+                    "Liabilities"
+                ],
+                "variable": [
+                    "sdo_prom_mensual",
+                    "sdo_promedio_mes",
+                    "abocnt",
+                    "abocntbonfcomimp",
+                    "abocntdepdocfrme",
+                    "abocntdepdocsbc",
+                    "abocntdepefe",
+                    "abocntdepmix",
+                    "abocntdepnomina",
+                    "abocntdeprend",
+                    "abocntdeptarj",
+                    "abocntdispcred",
+                    "abocntordnpgo",
+                    "abocntotrosnorelev",
+                    "abocntotrosrelev",
+                    "abocntsuctot",
+                    "abocnttraspinvcan",
+                    "abocnttraspinvdec",
+                    "abocnttraspinvret",
+                    "abocnttraspinvvenc",
+                    "abocnttraspprog",
+                    "abocnttraspref",
+                    "abocnttrnsintbnc",
+                    "aboimp",
+                    "aboimpbonfcomimp",
+                    "aboimpdepdocfrme",
+                    "aboimpdepdocsbc",
+                    "aboimpdepefe",
+                    "aboimpdepmix",
+                    "aboimpdepnomina",
+                    "aboimpdeprend",
+                    "aboimpdeptarj",
+                    "aboimpdispcred",
+                    "aboimpordnpgo",
+                    "aboimpotrosnorelev",
+                    "aboimpotrosrelev",
+                    "aboimpsuctot",
+                    "aboimptraspinvcan",
+                    "aboimptraspinvdec",
+                    "aboimptraspinvret",
+                    "aboimptraspinvvenc",
+                    "aboimptraspprog",
+                    "aboimptraspref",
+                    "aboimptrnsintbnc",
+                    "cgocnt",
+                    "cgocntcmprstpv",
+                    "cgocntcobrchq",
+                    "cgocntcobrord",
+                    "cgocntfondeootro",
+                    "cgocntotrosnorelev",
+                    "cgocntotrosrelev",
+                    "cgocntpagodom",
+                    "cgocntpagoserv",
+                    "cgocntretatmbnm",
+                    "cgocntretatmred",
+                    "cgocntretatmtot",
+                    "cgocntretinst",
+                    "cgocntretsuc",
+                    "cgocntsuctot",
+                    "cgocnttransfintrbnc",
+                    "cgocnttraspinv",
+                    "cgocnttraspterc",
+                    "cgoimp",
+                    "cgoimpcmprstpv",
+                    "cgoimpcobrchq",
+                    "cgoimpcobrord",
+                    "cgoimpfondeootro",
+                    "cgoimpotrosnorelev",
+                    "cgoimpotrosrelev",
+                    "cgoimppagodom",
+                    "cgoimppagoserv",
+                    "cgoimpretatmbnm",
+                    "cgoimpretatmred",
+                    "cgoimpretatmtot",
+                    "cgoimpretinst",
+                    "cgoimpretsuc",
+                    "cgoimpsuctot",
+                    "cgoimptransfintrbnc",
+                    "cgoimptraspinv",
+                    "cgoimptraspterc",
+                    "saldo_mensual",
+                    "sdo_capital",
+                    "sdo_prom_mensual",
+                    "sdo_promedio_mes",
+                    "abocnt",
+                    "abocntbonfcomimp",
+                    "abocntdepdocfrme",
+                    "abocntdepdocsbc",
+                    "abocntdepefe",
+                    "abocntdepmix",
+                    "abocntdepnomina",
+                    "abocntdeprend",
+                    "abocntdeptarj",
+                    "abocntdispcred",
+                    "abocntordnpgo",
+                    "abocntotrosnorelev",
+                    "abocntotrosrelev",
+                    "abocntsuctot",
+                    "abocnttraspinvcan",
+                    "abocnttraspinvdec",
+                    "abocnttraspinvret",
+                    "abocnttraspinvvenc",
+                    "abocnttraspprog",
+                    "abocnttraspref",
+                    "abocnttrnsintbnc",
+                    "aboimp",
+                    "aboimpbonfcomimp",
+                    "aboimpdepdocfrme",
+                    "aboimpdepdocsbc",
+                    "aboimpdepefe",
+                    "aboimpdepmix",
+                    "aboimpdepnomina",
+                    "aboimpdeprend",
+                    "aboimpdeptarj",
+                    "aboimpdispcred",
+                    "aboimpordnpgo",
+                    "aboimpotrosnorelev",
+                    "aboimpotrosrelev",
+                    "aboimpsuctot",
+                    "aboimptraspinvcan",
+                    "aboimptraspinvdec",
+                    "aboimptraspinvret",
+                    "aboimptraspinvvenc",
+                    "aboimptraspprog",
+                    "aboimptraspref",
+                    "aboimptrnsintbnc",
+                    "cgocnt",
+                    "cgocntcmprstpv",
+                    "cgocntcobrchq",
+                    "cgocntcobrord",
+                    "cgocntfondeootro",
+                    "cgocntotrosnorelev",
+                    "cgocntotrosrelev",
+                    "cgocntpagodom",
+                    "cgocntpagoserv",
+                    "cgocntretatmbnm",
+                    "cgocntretatmred",
+                    "cgocntretatmtot",
+                    "cgocntretinst",
+                    "cgocntretsuc",
+                    "cgocntsuctot",
+                    "cgocnttransfintrbnc",
+                    "cgocnttraspinv",
+                    "cgocnttraspterc",
+                    "cgoimp",
+                    "cgoimpcmprstpv",
+                    "cgoimpcobrchq",
+                    "cgoimpcobrord",
+                    "cgoimpfondeootro",
+                    "cgoimpotrosnorelev",
+                    "cgoimpotrosrelev",
+                    "cgoimppagodom",
+                    "cgoimppagoserv",
+                    "cgoimpretatmbnm",
+                    "cgoimpretatmred",
+                    "cgoimpretatmtot",
+                    "cgoimpretinst",
+                    "cgoimpretsuc",
+                    "cgoimpsuctot",
+                    "cgoimptransfintrbnc",
+                    "cgoimptraspinv",
+                    "cgoimptraspterc",
+                    "saldo_mensual",
+                    "sdo_capital"
+                ],
+                "metodo": [
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Historico",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_debito",
+                    "fill_value"
+                ],
+                "grouped": [
+                    [
+                        "numcliente",
+                        "num_contrato",
+                        "vintage_date"
+                    ],
+                    [
+                        ""
+                    ]
+                ],
+                "valor": [
+                    [
+                        "vintage_date",
+                        "tfrom_date",
+                        "tfrom",
+                        "fec_apertura",
+                        "fec_ult_mov",
+                        "proc_dt"
+                    ],
+                    "Real 0",
+                    "1"
+                ],
+                "id_variables": [
+                    "Historico"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "liabilities_test2_historic",
+                    "credit_card_processed_data_historic",
+                    "adv_colocacion_1_t_m_historic"
+                ],
+                "source": [
+                    "liabilities",
+                    "credit_card",
+                    "bureau"
+                ],
+                "sources": [
+                    "bureau",
+                    "liabilities",
+                    "credit_card"
+                ],
+                "mobs_tipo": [
+                    "mobs_liabilities"
+                ]
+            }
+        },
+        "group_by": {
+            "table_names": {
+                "cheq": "snapshot_cheques_t_m_historic",
+                "maes": "snapshot_maestra_t_m_historic",
+                "otro": "snapshot_otros_t_m_historic",
+                "peje": "snapshot_perf_ejec_t_m_historic",
+                "perf": "snapshot_perfiles_t_m_historic"
+            },
+            "pagomatico": "snapshot_pagomatico_t_m_historic",
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "df_names": [
+                "maes",
+                "cheq",
+                "otro",
+                "peje",
+                "perf"
+            ],
+            "PGMT_QUERY_DICT": {
+                "variable": [
+                    "cgocnt",
+                    "cgoimp",
+                    "abocnt",
+                    "aboimp",
+                    "sdo_capital"
+                ],
+                "agg": [
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum"
+                ]
+            },
+            "sel_cols": [
+                "cgocnt",
+                "cgoimp",
+                "abocnt",
+                "aboimp",
+                "saldo_mensual"
+            ],
+            "maes_new_cols": [
+                "carg_mstra",
+                "impcarg_mstra",
+                "abon_mstra",
+                "impabon_mstra",
+                "saldo_mstra"
+            ],
+            "perf_new_cols": [
+                "carg_perf",
+                "impcarg_perf",
+                "abon_perf",
+                "impabon_perf",
+                "saldo_perf"
+            ],
+            "peje_new_cols": [
+                "carg_perf_ejec",
+                "impcarg_perf_ejec",
+                "abon_perf_ejec",
+                "impabon_perf_ejec",
+                "saldo_perf_ejec"
+            ],
+            "cheq_new_cols": [
+                "carg_cheq",
+                "impcarg_cheq",
+                "abon_cheq",
+                "impabon_cheq",
+                "saldo_cheq"
+            ],
+            "otro_new_cols": [
+                "carg_otr_cap",
+                "impcarg_otr_cap",
+                "abon_otr_cap",
+                "impabon_otr_cap",
+                "saldo_otr_cap"
+            ],
+            "pgom_new_cols": [
+                "carg_pagtco",
+                "impcarg_pagtco",
+                "abon_pagtco",
+                "impabon_pagtco",
+                "saldo_pagtco"
+            ],
+            "filter_cols": [
+                "cgocnt",
+                "cgoimp",
+                "abocnt",
+                "aboimp",
+                "saldo_mensual"
+            ],
+            "pgom_cols": [
+                "vintage_date",
+                "tfrom",
+                "cgocnt",
+                "cgoimp",
+                "abocnt",
+                "aboimp",
+                "sdo_capital"
+            ],
+            "query_dict": {
+                "variable": [
+                    "saldo_mensual",
+                    "cgocnt",
+                    "cgoimp",
+                    "cgocntretatmtot",
+                    "cgoimpretatmtot",
+                    "cgocntsuctot",
+                    "cgoimpsuctot",
+                    "cgocntretsuc",
+                    "cgoimpretsuc",
+                    "cgocntretinst",
+                    "cgoimpretinst",
+                    "cgocntretatmbnm",
+                    "cgoimpretatmbnm",
+                    "cgocntretatmred",
+                    "cgoimpretatmred",
+                    "cgocnttraspinv",
+                    "cgoimptraspinv",
+                    "cgocnttraspterc",
+                    "cgoimptraspterc",
+                    "cgocntcmprstpv",
+                    "cgoimpcmprstpv",
+                    "cgocnttransfintrbnc",
+                    "cgoimptransfintrbnc",
+                    "cgocntcobrchq",
+                    "cgoimpcobrchq",
+                    "cgocntcobrord",
+                    "cgoimpcobrord",
+                    "cgocntpagoserv",
+                    "cgoimppagoserv",
+                    "cgocntpagodom",
+                    "cgoimppagodom",
+                    "cgocntfondeootro",
+                    "cgoimpfondeootro",
+                    "cgocntotrosrelev",
+                    "cgoimpotrosrelev",
+                    "cgocntotrosnorelev",
+                    "cgoimpotrosnorelev",
+                    "abocnt",
+                    "aboimp",
+                    "abocntsuctot",
+                    "aboimpsuctot",
+                    "abocntdepefe",
+                    "aboimpdepefe",
+                    "abocntdepdocfrme",
+                    "aboimpdepdocfrme",
+                    "abocntdepdocsbc",
+                    "aboimpdepdocsbc",
+                    "abocntdepmix",
+                    "aboimpdepmix",
+                    "abocntdeptarj",
+                    "aboimpdeptarj",
+                    "abocntdepnomina",
+                    "aboimpdepnomina",
+                    "abocntdeprend",
+                    "aboimpdeprend",
+                    "abocnttraspinvdec",
+                    "aboimptraspinvdec",
+                    "abocnttraspinvvenc",
+                    "aboimptraspinvvenc",
+                    "abocnttraspinvcan",
+                    "aboimptraspinvcan",
+                    "abocnttraspinvret",
+                    "aboimptraspinvret",
+                    "abocnttraspprog",
+                    "aboimptraspprog",
+                    "abocnttraspref",
+                    "aboimptraspref",
+                    "abocnttrnsintbnc",
+                    "aboimptrnsintbnc",
+                    "abocntdispcred",
+                    "aboimpdispcred",
+                    "abocntordnpgo",
+                    "aboimpordnpgo",
+                    "abocntbonfcomimp",
+                    "aboimpbonfcomimp",
+                    "abocntotrosrelev",
+                    "aboimpotrosrelev",
+                    "abocntotrosnorelev",
+                    "aboimpotrosnorelev"
+                ],
+                "agg": [
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum"
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "liabilities",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "mt",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "payroll_income": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_prd_db"
+            ],
+            "table_name": [
+                "asigna_nomina_dt1_t_m"
+            ],
+            "select_variables": [
+                "process_date, num_cliente, num_cliente_2, num_cliente_3, cast(sum_importe as double) as importe_tefs, cast(sum_importe_1 as double) as importe_tef_1, cast(sum_importe_2 as double) as importe_tef_2"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "process_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "importe_tefs",
+                    "importe_tef_1",
+                    "importe_tef_2"
+                ],
+                "source": [
+                    "payroll_income",
+                    "payroll_income",
+                    "payroll_income"
+                ],
+                "metodo": [
+                    "Real 0",
+                    "Real 0",
+                    "Real 0"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_value"
+                ],
+                "grouped": [
+                    ""
+                ],
+                "valor": [
+                    "Real 0"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "missing_treatment/asigna_nomina_dt1_t_m_historic"
+                ],
+                "source": [
+                    "payroll_income"
+                ],
+                "sources": [
+                    "payroll_income"
+                ],
+                "mobs_tipo": [
+                    "mobs_payroll_income"
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "payroll_income",
+            "table_name": "asigna_nomina_dt1_t_m_historic",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "process_date",
+                "tfrom_date"
+            ]
+        },
+        "group_by": {
+            "rename": {
+                "enable": "True",
+                "columns_to_rename": {
+                    "sum_importe": "income_tefs",
+                    "sum_importe_1": "income_tef_1",
+                    "sum_importe_2": "income_tef_2"
+                }
+            },
+            "fix_1": {
+                "enable": "True",
+                "months_to_fix_1": [
+                    5,
+                    11,
+                    12
+                ],
+                "prefix": "fix_1",
+                "prefixes_to_apply": [
+                    "None"
+                ],
+                "prefixes_to_drop": [
+                    "None"
+                ]
+            },
+            "fix_2": {
+                "enable": "True",
+                "prefix": "fix_2",
+                "prefixes_to_apply": [
+                    "fix_1"
+                ],
+                "prefixes_to_drop": [
+                    "fix_1"
+                ]
+            },
+            "cap_and_floor": {
+                "enable": "true",
+                "q_floor": 0,
+                "q_cap": 0.995,
+                "error": 1e-05,
+                "prefix": "capped",
+                "prefixes_to_apply": [
+                    "fix_2"
+                ],
+                "prefixes_to_drop": [
+                    "fix_2"
+                ]
+            },
+            "normalize": {
+                "enable": "True",
+                "prefix": "norm",
+                "prefixes_to_apply": [
+                    "capped"
+                ],
+                "prefixes_to_drop": [
+                    "capped"
+                ]
+            }
+        },
+        "steps_list": [
+            "extract",
+            "mt",
+            "pivoting",
+            "groupby",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "payroll_streaks": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db"
+            ],
+            "table_name": [
+                "asigna_nomina_dt1_t_m",
+                "nomina_dt1_t_m"
+            ],
+            "select_variables": [
+                "process_date, num_cliente, num_cliente_2, num_cliente_3, cast(tef as double) as tef, cast(tef_1 as double) as tef_1, cast(tef_2 as double) as tef_2",
+                "process_date, cast(fecha as date) as fecha, num_cliente, num_cliente_2, num_cliente_3, cast(tef as double) as tef, cast(importe as double) as importe"
+            ],
+            "type_date": [
+                "",
+                ""
+            ],
+            "retraso": [
+                0,
+                0
+            ],
+            "name_mis": [
+                "process_date",
+                "process_date"
+            ],
+            "table_pivote": [
+                "master_data",
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente",
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage",
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente",
+                "numcliente"
+            ]
+        },
+        "weeks": {
+            "tfrom_method": "payroll",
+            "date_column_for_weekly_tfrom": [
+                "process_date",
+                "fecha"
+            ],
+            "type_of_date_column": [
+                "monthly",
+                "daily"
+            ],
+            "sql_date_format": [
+                "yyyy-MM-dd",
+                "yyyy-MM-dd"
+            ],
+            "drop_columns_at_the_end": [
+                [],
+                [
+                    "fecha"
+                ]
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "importe"
+                ],
+                "source": [
+                    "payroll_streaks"
+                ],
+                "metodo": [
+                    "Real 0"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_value"
+                ],
+                "grouped": [
+                    "",
+                    ""
+                ],
+                "valor": [
+                    "Real 0"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "extract/asigna_nomina_dt1_t_m_historic"
+                ],
+                "source": [
+                    "payroll_streaks"
+                ],
+                "sources": [
+                    "payroll_streaks"
+                ],
+                "mobs_tipo": [
+                    "mobs_payroll_streaks"
+                ]
+            }
+        },
+        "group_by": {
+            "parameters": {
+                "weeks_per_month": 4
+            },
+            "rename": {
+                "enable": "True",
+                "columns_to_rename": {
+                    "paid_in_week": "pattern"
+                }
+            },
+            "raw_pattern": {
+                "enable": "True",
+                "prefix": "raw",
+                "remove_previous_prefix": "False",
+                "prefixes_to_apply": [
+                    "None"
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_weekly": {
+                "enable": "True",
+                "prefix": "srt_shr_w",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_monthly": {
+                "enable": "False",
+                "prefix": "srt_shr_m",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_fortnightly": {
+                "enable": "False",
+                "prefix": "srt_shr_f",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern": {
+                "enable": "True",
+                "prefix": "srt_shr",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_weekly": {
+                "enable": "True",
+                "prefix": "shr_w",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_monthly": {
+                "enable": "False",
+                "prefix": "shr_m",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_fortnightly": {
+                "enable": "False",
+                "prefix": "shr_f",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern": {
+                "enable": "True",
+                "prefix": "shr",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_monthly_optimist": {
+                "enable": "False",
+                "prefix": "srt_shr_m_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_forced_fortnightly_optimist": {
+                "enable": "False",
+                "prefix": "srt_shr_f_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "sorted_shortened_pattern_optimist": {
+                "enable": "False",
+                "prefix": "srt_shr_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_monthly_optimist": {
+                "enable": "False",
+                "prefix": "shr_m_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_forced_fortnightly_optimist": {
+                "enable": "False",
+                "prefix": "shr_f_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "shortened_pattern_optimist": {
+                "enable": "False",
+                "prefix": "shr_op",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "payment_type_pattern": {
+                "enable": "False",
+                "prefix": "type_of_payment_is",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "unusual_pattern": {
+                "enable": "True",
+                "prefix": "unusual",
+                "remove_previous_prefix": "True",
+                "prefixes_to_apply": [
+                    ""
+                ],
+                "prefixes_to_drop": []
+            },
+            "reverse_pattern": {
+                "enable": "True",
+                "prefix": "rev",
+                "remove_previous_prefix": "False",
+                "prefixes_to_apply": [
+                    "raw",
+                    "srt_shr_w",
+                    "srt_shr",
+                    "shr_w",
+                    "shr"
+                ],
+                "prefixes_to_drop": []
+            },
+            "inverse_pattern": {
+                "enable": "True",
+                "prefix": "inv",
+                "remove_previous_prefix": "False",
+                "prefixes_to_apply": [
+                    "raw",
+                    "srt_shr_w",
+                    "srt_shr",
+                    "shr_w",
+                    "shr",
+                    "rev",
+                    "unusual"
+                ],
+                "prefixes_to_drop": [
+                    "pattern"
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "payroll_streaks",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date"
+            ]
+        },
+        "fe": {
+            "ignore_this_value_when_calculating_mt_features": 9.0,
+            "frequency_sufix": "w"
+        },
+        "steps_list": [
+            "extract",
+            "weeks",
+            "mt",
+            "groupby",
+            "pivoting",
+            "fe",
+            "va"
+        ]
+    },
+    "adobe_bancanet": {
+        "extract": {
+            "libname": [
+                "gcgdlkmxpsd_dch_db"
+            ],
+            "table_name": [
+                "adobeanalytics_hit_data_mexicoprod_t_d"
+            ],
+            "select_variables": [
+                "post_visid_high, post_visid_low, visit_num, post_evar5, date_time, file_date, post_evar1, post_evar3, pagename, prop11, post_clickmaplinkbyregion, evar25, post_evar25, visit_page_num"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "file_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ],
+            "adobe": {
+                "hash_id_db": "gcgdlkmxpsd_cams_db.int_xs_b001_albnxfcrm_snap_t_m",
+                "clickstream_filters": [
+                    {
+                        "key": "pagename",
+                        "page_names": [
+                            "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Creditopersonal",
+                            "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Disponiblebanamex",
+                            "MX|BNP3|SESION|FINAL"
+                        ]
+                    },
+                    {
+                        "key": "post_evar25",
+                        "page_names": [
+                            "MX|BNP|Dashboard|Overlay|Con Disponible Banamex",
+                            "MX|BNP|Dashboard|Overlay|Logra m"
+                        ]
+                    },
+                    {
+                        "key": "post_clickmaplinkbyregion",
+                        "page_names": [
+                            "Iniciar sesi"
+                        ]
+                    }
+                ],
+                "event_filter": "",
+                "use_event_filter": false,
+                "keep_columns": [
+                    "numcliente",
+                    "session_id",
+                    "file_date",
+                    "date_time",
+                    "pagename",
+                    "post_evar1",
+                    "post_evar3",
+                    "post_clickmaplinkbyregion",
+                    "evar25",
+                    "post_evar25",
+                    "prop11",
+                    "visit_page_num"
+                ]
+            }
+        },
+        "weeks": {
+            "tfrom_method": "force_4_weeks",
+            "date_column_for_weekly_tfrom": [
+                "file_date"
+            ],
+            "type_of_date_column": [
+                "daily"
+            ],
+            "sql_date_format": [
+                "yyyy-MM-dd"
+            ],
+            "drop_columns_at_the_end": [
+                []
+            ]
+        },
+        "missing_treatment": {
+            "mobs": {
+                "table_name": [
+                    "extract/adobeanalytics_hit_data_mexicoprod_t_d_historic"
+                ],
+                "source": [
+                    "adobe"
+                ],
+                "sources": [
+                    "adobe"
+                ],
+                "mobs_tipo": [
+                    "mobs_adobe"
+                ]
+            }
+        },
+        "group_by": {
+            "prefix": "bnt",
+            "time_vars": [
+                "T_inicio",
+                "T_vista",
+                "T_session"
+            ],
+            "time_stats": [
+                "sum",
+                "mean",
+                "min",
+                "max",
+                "stddev"
+            ],
+            "flags": {
+                "PIL_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains_any",
+                        "value": [
+                            "Logra",
+                            "PERSONAL"
+                        ]
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "PIL_interested": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Creditopersonal|CAPTURA"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith",
+                        "value": "OfertasCitibanamex"
+                    }
+                ],
+                "LOP_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|Con Disponible Banamex"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "LOP_interested": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP3|OTROS_PRODUCTOS|OFERTAS_CITI|Disponiblebanamex|CAPTURA"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith",
+                        "value": "OfertasCitibanamex"
+                    }
+                ],
+                "CLI_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains",
+                        "value": "Aumenta tu l"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "HIP_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains",
+                        "value": "Hipoteca"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ],
+                "NOM_view": [
+                    {
+                        "col": "evar25",
+                        "op": "startswith",
+                        "value": "MX|BNP|Dashboard|Overlay|"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "contains",
+                        "value": "Nomina"
+                    },
+                    {
+                        "col": "evar25",
+                        "op": "endswith_any",
+                        "value": [
+                            "NoPorAhora",
+                            "ConoceMas"
+                        ]
+                    }
+                ]
+            },
+            "domains": {
+                "weekly": {
+                    "enabled": true
+                },
+                "fortnightly": {
+                    "enabled": true
+                },
+                "last_days": {
+                    "enabled": true,
+                    "windows": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        30,
+                        45,
+                        60,
+                        75,
+                        90,
+                        105,
+                        120,
+                        135,
+                        150,
+                        165,
+                        180
+                    ],
+                    "flag_stats": [
+                        "sum"
+                    ],
+                    "time_stats": [
+                        "sum",
+                        "mean"
+                    ]
+                },
+                "daily_seq": {
+                    "enabled": true,
+                    "days": 14
+                }
+            }
+        },
+        "pivoting": {
+            "source": "adobe_bancanet",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date"
+            ],
+            "drop_null_values": true,
+            "keep_pivot_clients": true
+        },
+        "fe": {
+            "ignore_this_value_when_calculating_mt_features": -99999,
+            "frequency_sufix": "w"
+        },
+        "steps_list": [
+            "extract",
+            "weeks",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "adobe_mobile": {
+        "extract": {
+            "libname": [
+                "gcgdlkmxpsd_dch_db"
+            ],
+            "table_name": [
+                "adobeanalytics_hit_data_mxmprod_t_d"
+            ],
+            "select_variables": [
+                "post_visid_high, post_visid_low, visit_num, post_evar5, CAST(TRIM(date_time) AS TIMESTAMP) AS date_time, file_date, UPPER(TRIM(pagename)) AS pagename, UPPER(TRIM(post_evar3)) AS post_evar3, post_evar1, prop11, evar25, evar30, post_evar63, post_evar25, visit_page_num"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "file_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ],
+            "adobe": {
+                "hash_id_db": "gcgdlkmxpsd_cams_db.int_xs_b001_albnxfcrm_snap_t_m",
+                "clickstream_filters": [
+                    {
+                        "key": "pagename",
+                        "page_names": [
+                            "MX|Mobile|Dashboard|Productos|MOB-"
+                        ]
+                    },
+                    {
+                        "key": "post_evar63",
+                        "page_names": [
+                            "MX|Mobile|Dashboard|DIS",
+                            "MX|Mobile|CPA"
+                        ]
+                    },
+                    {
+                        "key": "evar30",
+                        "page_names": [
+                            "zzzzvvvv"
+                        ]
+                    }
+                ],
+                "event_filter": "",
+                "use_event_filter": false,
+                "keep_columns": [
+                    "numcliente",
+                    "session_id",
+                    "file_date",
+                    "date_time",
+                    "pagename",
+                    "post_evar1",
+                    "post_evar3",
+                    "evar25",
+                    "evar30",
+                    "post_evar63",
+                    "post_evar25",
+                    "prop11",
+                    "visit_page_num"
+                ]
+            }
+        },
+        "weeks": {
+            "tfrom_method": "force_4_weeks",
+            "date_column_for_weekly_tfrom": [
+                "file_date"
+            ],
+            "type_of_date_column": [
+                "daily"
+            ],
+            "sql_date_format": [
+                "yyyy-MM-dd"
+            ],
+            "drop_columns_at_the_end": [
+                []
+            ]
+        },
+        "missing_treatment": {
+            "mobs": {
+                "table_name": [
+                    "extract/adobeanalytics_hit_data_mxmprod_t_d_historic"
+                ],
+                "source": [
+                    "adobe"
+                ],
+                "sources": [
+                    "adobe"
+                ],
+                "mobs_tipo": [
+                    "mobs_adobe"
+                ]
+            }
+        },
+        "group_by": {
+            "prefix": "mob",
+            "time_vars": [
+                "T_inicio",
+                "T_vista",
+                "T_session"
+            ],
+            "time_stats": [
+                "sum",
+                "mean",
+                "min",
+                "max",
+                "stddev"
+            ],
+            "flags": {
+                "Flag_interest_LOP": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "DIS"
+                    }
+                ],
+                "Flag_interest_PIL": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "CP"
+                    }
+                ],
+                "Flag_interest_NOM": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "CN"
+                    }
+                ],
+                "Flag_interest_CLI": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "CLI"
+                    }
+                ],
+                "Flag_interest_HIP": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "HIP"
+                    }
+                ],
+                "Flag_interest_TDC": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "TDC"
+                    }
+                ],
+                "Flag_interest_BAL": [
+                    {
+                        "col": "post_evar3",
+                        "op": "eq",
+                        "value": "OFERTASPARAMETRICAS"
+                    },
+                    {
+                        "col": "post_evar63",
+                        "op": "contains",
+                        "value": "BAL"
+                    }
+                ]
+            },
+            "domains": {
+                "weekly": {
+                    "enabled": true
+                },
+                "fortnightly": {
+                    "enabled": true
+                },
+                "last_days": {
+                    "enabled": true,
+                    "windows": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        30,
+                        45,
+                        60,
+                        75,
+                        90,
+                        105,
+                        120,
+                        135,
+                        150,
+                        165,
+                        180,
+                        240,
+                        330,
+                        360
+                    ],
+                    "flag_stats": [
+                        "sum"
+                    ],
+                    "time_stats": [
+                        "sum",
+                        "mean",
+                        "stddev"
+                    ]
+                },
+                "daily_seq": {
+                    "enabled": true,
+                    "days": 14
+                }
+            }
+        },
+        "pivoting": {
+            "source": "adobe_mobile",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date"
+            ],
+            "drop_null_values": true,
+            "keep_pivot_clients": true
+        },
+        "fe": {
+            "ignore_this_value_when_calculating_mt_features": -99999,
+            "frequency_sufix": "w"
+        },
+        "steps_list": [
+            "extract",
+            "weeks",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "channels": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_dch_db"
+            ],
+            "table_name": [
+                "total_multi_cte_t_m"
+            ],
+            "select_variables": [
+                "cast(last_day(to_date(proc_dt)) as string) as proc_dt,cast(NUM_CLIENTE as double) as numcliente, cast(ATM as double),cast(TNX_ATM as double),cast(IMP_ATM as double),cast(ATM_NF as double),cast(TNX_ATM_No_fin as double),cast(SAB as double),cast(TNX_SAB as double),cast(IMP_SAB as double),cast(SAB_NF as double),cast(TNX_SAB_No_fin as double),cast(BNET_EMP as double),cast(BNET_PERS as double),cast(TNX_BNET_EMPR as double),cast(TNX_BANCANET_PERS as double),cast(IMP_BNET_EMPR as double),cast(IMP_BANCANET_PERS as double),cast(BNET_EMP_NF as double),cast(BNET_PERS_NF as double),cast(TNX_BNET_EMPR_NOFIN as double),cast(TNX_BNET_PERS_NOFIN as double),cast(APP as double),cast(TNX_App as double),cast(IMP_App as double),cast(APP_NF as double),cast(TNX_APP_NOFIN as double),cast(SUCU as double),cast(TNX_SUC_FIN as double),cast(IMP_SUC_FIN as double),cast(TPV as double),cast(TNX_TPV as double),cast(IMP_TPV as double),cast(IVR as double),cast(CSR as double),cast(TNX_IVR as double),cast(TNX_CSR as double),cast(IMP_IVR as double),cast(IMP_CSR as double),cast(IVR_NF as double),cast(CSR_NF as double),cast(TNX_IVR_No_fin as double),cast(TNX_CSR_No_fin as double),cast(CORRES as double),cast(TNX_Corr_fin as double),cast(IMP_Corr_fin as double),cast(SIM as double),cast(TNX_SIM as double),cast(IMP_SIM as double),cast(SIM_NF as double),cast(TNX_SIM_Nofin as double),cast(CITID as double),cast(TNX_CitiDirect as double),cast(IMP_CitiDirect as double),cast(DIGI as double),cast(TNX_Digitem as double),cast(IMP_Digitem as double),cast(OTROS as double),cast(TNX_Otros as double),cast(IMP_Otros as double)"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                2
+            ],
+            "name_mis": [
+                "proc_dt"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "atm",
+                    "tnx_atm",
+                    "imp_atm",
+                    "atm_nf",
+                    "tnx_atm_no_fin",
+                    "sab",
+                    "tnx_sab",
+                    "imp_sab",
+                    "sab_nf",
+                    "tnx_sab_no_fin",
+                    "bnet_emp",
+                    "bnet_pers",
+                    "tnx_bnet_empr",
+                    "tnx_bancanet_pers",
+                    "imp_bnet_empr",
+                    "imp_bancanet_pers",
+                    "bnet_emp_nf",
+                    "bnet_pers_nf",
+                    "tnx_bnet_empr_nofin",
+                    "tnx_bnet_pers_nofin",
+                    "app",
+                    "tnx_app",
+                    "imp_app",
+                    "app_nf",
+                    "tnx_app_nofin",
+                    "sucu",
+                    "tnx_suc_fin",
+                    "imp_suc_fin",
+                    "tpv",
+                    "tnx_tpv",
+                    "imp_tpv",
+                    "ivr",
+                    "csr",
+                    "tnx_ivr",
+                    "tnx_csr",
+                    "imp_ivr",
+                    "imp_csr",
+                    "ivr_nf",
+                    "csr_nf",
+                    "tnx_ivr_no_fin",
+                    "tnx_csr_no_fin",
+                    "corres",
+                    "tnx_corr_fin",
+                    "imp_corr_fin",
+                    "sim",
+                    "tnx_sim",
+                    "imp_sim",
+                    "sim_nf",
+                    "tnx_sim_nofin",
+                    "citid",
+                    "tnx_citidirect",
+                    "imp_citidirect",
+                    "digi",
+                    "tnx_digitem",
+                    "imp_digitem",
+                    "otros",
+                    "tnx_otros",
+                    "imp_otros"
+                ],
+                "source": [
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels",
+                    "channels"
+                ],
+                "metodo": [
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_value"
+                ],
+                "grouped": [
+                    "numcliente"
+                ],
+                "valor": [
+                    "Real 0"
+                ],
+                "id_variables": [
+                    ""
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "liabilities_test2_historic",
+                    "credit_card_processed_data_historic",
+                    "adv_colocacion_1_t_m_historic"
+                ],
+                "source": [
+                    "liabilities",
+                    "credit_card",
+                    "bureau"
+                ],
+                "sources": [
+                    "bureau",
+                    "liabilities",
+                    "credit_card"
+                ],
+                "mobs_tipo": [
+                    "max_liab_cc"
+                ]
+            }
+        },
+        "group_by": {
+            "table_name": "total_multi_cte_t_m_historic",
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "query_str": "select cast(numcliente as string), atm, tnx_atm, imp_atm, atm_nf, tnx_atm_no_fin as tnx_atm_nf, sab, tnx_sab, imp_sab, sab_nf, tnx_sab_no_fin as tnx_sab_nf, bnet_emp, bnet_pers, tnx_bnet_empr, tnx_bancanet_pers, imp_bnet_empr, imp_bancanet_pers, bnet_emp_nf, bnet_pers_nf, tnx_bnet_empr_nofin, tnx_bnet_pers_nofin, app, tnx_app, imp_app, app_nf, tnx_app_nofin as tnx_app_nf, sucu as branch, tnx_suc_fin as tnx_branch, imp_suc_fin as imp_branch, tpv, tnx_tpv, imp_tpv, ivr, csr, tnx_ivr, tnx_csr, imp_ivr, imp_csr, ivr_nf, csr_nf, tnx_ivr_no_fin, tnx_csr_no_fin, corres, tnx_corr_fin, imp_corr_fin, sim, tnx_sim, imp_sim, sim_nf, tnx_sim_nofin as tnx_sim_nf, citid, tnx_citidirect as tnx_citid, imp_citidirect as imp_citid, digi, tnx_digitem as tnx_digi, imp_digitem as imp_digi, otros, tnx_otros, imp_otros, vintage_date, tfrom from channels",
+            "query_dict": {
+                "flags": {
+                    "bnet": [
+                        "bnet_emp",
+                        "bnet_pers"
+                    ],
+                    "bnet_nf": [
+                        "bnet_emp_nf",
+                        "bnet_pers_nf"
+                    ],
+                    "audiom": [
+                        "ivr",
+                        "csr"
+                    ],
+                    "audiom_nf": [
+                        "ivr_nf",
+                        "csr_nf"
+                    ]
+                },
+                "sums": {
+                    "tnx_bnet": [
+                        "tnx_bnet_empr",
+                        "tnx_bancanet_pers"
+                    ],
+                    "imp_bnet": [
+                        "imp_bnet_empr",
+                        "imp_bancanet_pers"
+                    ],
+                    "tnx_bnet_nf": [
+                        "tnx_bnet_empr_nofin",
+                        "tnx_bnet_pers_nofin"
+                    ],
+                    "tnx_audiom": [
+                        "tnx_ivr",
+                        "tnx_csr"
+                    ],
+                    "imp_audiom": [
+                        "imp_ivr",
+                        "imp_csr"
+                    ],
+                    "tnx_audiom_nf": [
+                        "tnx_ivr_no_fin",
+                        "tnx_csr_no_fin"
+                    ]
+                }
+            }
+        },
+        "pivoting": {
+            "source": "channels",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "financiera": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_prd_db"
+            ],
+            "table_name": [
+                "int_nxs_se_finaypns_snap_t_m"
+            ],
+            "select_variables": [
+                "proc_dt,numcliente,cast(cve_ayp as double),cast(saldo as double),0.0 as saldoaj"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                2
+            ],
+            "name_mis": [
+                "proc_dt"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "A5",
+                    "mop0tpotro",
+                    "mop0tpbnx",
+                    "mop0hipbnx",
+                    "mop0hipootro",
+                    "tot_bal_due_offus",
+                    "tot_bal_due_offus_al",
+                    "tot_bal_due_offus_cc",
+                    "tot_bal_due_offus_mg",
+                    "tot_bal_due_offus_pl",
+                    "tot_bal_due_onus",
+                    "tot_bal_due_onus_al",
+                    "tot_bal_due_onus_cc",
+                    "tot_bal_due_onus_mg",
+                    "tot_bal_due_onus_pl",
+                    "tot_bal_offus_al",
+                    "tot_bal_offus_cc",
+                    "tot_bal_offus_mg",
+                    "tot_bal_offus_pl",
+                    "tot_bal_onus_al",
+                    "tot_bal_onus_cc",
+                    "tot_bal_onus_mg",
+                    "tot_bal_onus_pl",
+                    "tot_cl_amex",
+                    "tot_cl_amex_open",
+                    "tot_cl_dept",
+                    "tot_cl_dept_open",
+                    "tot_cl_offus",
+                    "tot_cl_offus_open",
+                    "tot_cl_onus",
+                    "tot_cl_onus_open",
+                    "tot_curr_bal_dept_open",
+                    "tot_curr_bal_offus_open_al",
+                    "tot_curr_bal_offus_open_mg",
+                    "tot_curr_bal_offus_open_pl",
+                    "tot_curr_bal_offus_open_tc",
+                    "tot_curr_bal_amex_open_tc",
+                    "tot_curr_bal_onus_open_al",
+                    "tot_curr_bal_onus_open_mg",
+                    "tot_curr_bal_onus_open_pl",
+                    "tot_curr_bal_onus_open_tc",
+                    "tot_pay_amex",
+                    "tot_pay_dept",
+                    "tot_pay_offus_al",
+                    "tot_pay_offus_cc",
+                    "tot_pay_offus_mg",
+                    "tot_pay_offus_pl",
+                    "tot_pay_onus_al",
+                    "tot_pay_onus_cc",
+                    "tot_pay_onus_mg",
+                    "tot_pay_onus_pl",
+                    "tot_curr_bal_offus_res_cc",
+                    "tot_bal_curr_all_open",
+                    "tot_bal_curr_amex",
+                    "tot_cl_all_2",
+                    "tot_cl_amex_open_2",
+                    "tot_cur_due_offus_res_cc",
+                    "tot_cur_due_onus_res_cc",
+                    "tot_curr_bal_due_res_cc",
+                    "tot_curr_bal_onus_res_cc",
+                    "tot_curr_bal_res_cc",
+                    "mop_tc_amx",
+                    "mop_tc_bnx",
+                    "mop_tc_dep",
+                    "mop_tc_otro",
+                    "mop_cp_otro",
+                    "mop_cp_bnx",
+                    "mop_au_otro",
+                    "mop_au_bnx",
+                    "mop_hi_otro",
+                    "mop_hi_bnx",
+                    "mop_tp_bnx",
+                    "mop_tp_otro"
+                ],
+                "source": [
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro"
+                ],
+                "metodo": [
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_historic",
+                    "fill_stat"
+                ],
+                "grouped": [
+                    [
+                        "numcliente",
+                        "vintage_date"
+                    ],
+                    [
+                        "tfrom"
+                    ]
+                ],
+                "valor": [
+                    "Real 0",
+                    "1"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "liabilities_test2_historic",
+                    "credit_card_processed_data_historic",
+                    "adv_colocacion_1_t_m_historic"
+                ],
+                "source": [
+                    "liabilities",
+                    "credit_card",
+                    "bureau"
+                ],
+                "sources": [
+                    "bureau",
+                    "liabilities",
+                    "credit_card"
+                ],
+                "mobs_tipo": [
+                    "mobs_bureau"
+                ]
+            }
+        },
+        "group_by": {
+            "table_name": "int_nxs_se_finaypns_snap_t_m_historic",
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "query_dict": {
+                "variable": [
+                    [
+                        "adela"
+                    ],
+                    [
+                        "cheques"
+                    ],
+                    [
+                        "bancanet"
+                    ],
+                    [
+                        "comercial"
+                    ],
+                    [
+                        "credichq"
+                    ],
+                    [
+                        "ctamtra"
+                    ],
+                    [
+                        "debito"
+                    ],
+                    [
+                        "hipotecario"
+                    ],
+                    [
+                        "inversion"
+                    ],
+                    [
+                        "miahorro"
+                    ],
+                    [
+                        "otros"
+                    ],
+                    [
+                        "pagomatico"
+                    ],
+                    [
+                        "perfiles"
+                    ],
+                    [
+                        "personales"
+                    ],
+                    [
+                        "plazo"
+                    ],
+                    [
+                        "pyme"
+                    ],
+                    [
+                        "seguros"
+                    ],
+                    [
+                        "servicios"
+                    ],
+                    [
+                        "tarjetas"
+                    ],
+                    [
+                        "tarjetas",
+                        "pyme",
+                        "personales",
+                        "hipotecario",
+                        "credichq",
+                        "comercial",
+                        "adela"
+                    ],
+                    [
+                        "plazo",
+                        "perfiles",
+                        "pagomatico",
+                        "miahorro",
+                        "inversion",
+                        "debito",
+                        "ctamtra",
+                        "cheques"
+                    ]
+                ],
+                "agg": [
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum",
+                    "sum"
+                ],
+                "feature": [
+                    "adela_b1",
+                    "cheques_b1",
+                    "bancanet_b1",
+                    "comercial_b1",
+                    "credichq_b1",
+                    "ctamtra_b1",
+                    "debito_b1",
+                    "hipotecario_b1",
+                    "inversion_b1",
+                    "miahorro_b1",
+                    "otros_b1",
+                    "pagomatico_b1",
+                    "perfiles_b1",
+                    "personales_b1",
+                    "plazo_b1",
+                    "pyme_b1",
+                    "seguros_b1",
+                    "servicios_b1",
+                    "tarjetas_b1",
+                    "assets_b1",
+                    "liabilities_b1"
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "financiera",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "giros_credito": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_prd_db"
+            ],
+            "table_name": [
+                "int_xs_mgrs_mgiros_hist_t_m"
+            ],
+            "select_variables": [
+                "proc_dt, id_cuenta16 as crd_acct_nbr, cast(bin as double), producto,familia, cast(cargo_recurrente as double), cast(ext as double), cve_pais, cast(actividad as double),  quita_acentos(macrogiro) as c2, macrogiro_us, quita_acentos(giro) as c3 , cast(purchase as double), cast(purchasetx as double), cast(cnt_tarjetas as double), cast(cnt_ctes as double), cast(num_negafiliado as double)"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                2
+            ],
+            "name_mis": [
+                "proc_dt"
+            ],
+            "table_pivote": [
+                "p"
+            ],
+            "key_pivote": [
+                "crd_acct_nbr"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "crd_acct_nbr"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "A5",
+                    "mop0tpotro",
+                    "mop0tpbnx",
+                    "mop0hipbnx",
+                    "mop0hipootro",
+                    "tot_bal_due_offus",
+                    "tot_bal_due_offus_al",
+                    "tot_bal_due_offus_cc",
+                    "tot_bal_due_offus_mg",
+                    "tot_bal_due_offus_pl",
+                    "tot_bal_due_onus",
+                    "tot_bal_due_onus_al",
+                    "tot_bal_due_onus_cc",
+                    "tot_bal_due_onus_mg",
+                    "tot_bal_due_onus_pl",
+                    "tot_bal_offus_al",
+                    "tot_bal_offus_cc",
+                    "tot_bal_offus_mg",
+                    "tot_bal_offus_pl",
+                    "tot_bal_onus_al",
+                    "tot_bal_onus_cc",
+                    "tot_bal_onus_mg",
+                    "tot_bal_onus_pl",
+                    "tot_cl_amex",
+                    "tot_cl_amex_open",
+                    "tot_cl_dept",
+                    "tot_cl_dept_open",
+                    "tot_cl_offus",
+                    "tot_cl_offus_open",
+                    "tot_cl_onus",
+                    "tot_cl_onus_open",
+                    "tot_curr_bal_dept_open",
+                    "tot_curr_bal_offus_open_al",
+                    "tot_curr_bal_offus_open_mg",
+                    "tot_curr_bal_offus_open_pl",
+                    "tot_curr_bal_offus_open_tc",
+                    "tot_curr_bal_amex_open_tc",
+                    "tot_curr_bal_onus_open_al",
+                    "tot_curr_bal_onus_open_mg",
+                    "tot_curr_bal_onus_open_pl",
+                    "tot_curr_bal_onus_open_tc",
+                    "tot_pay_amex",
+                    "tot_pay_dept",
+                    "tot_pay_offus_al",
+                    "tot_pay_offus_cc",
+                    "tot_pay_offus_mg",
+                    "tot_pay_offus_pl",
+                    "tot_pay_onus_al",
+                    "tot_pay_onus_cc",
+                    "tot_pay_onus_mg",
+                    "tot_pay_onus_pl",
+                    "tot_curr_bal_offus_res_cc",
+                    "tot_bal_curr_all_open",
+                    "tot_bal_curr_amex",
+                    "tot_cl_all_2",
+                    "tot_cl_amex_open_2",
+                    "tot_cur_due_offus_res_cc",
+                    "tot_cur_due_onus_res_cc",
+                    "tot_curr_bal_due_res_cc",
+                    "tot_curr_bal_onus_res_cc",
+                    "tot_curr_bal_res_cc",
+                    "mop_tc_amx",
+                    "mop_tc_bnx",
+                    "mop_tc_dep",
+                    "mop_tc_otro",
+                    "mop_cp_otro",
+                    "mop_cp_bnx",
+                    "mop_au_otro",
+                    "mop_au_bnx",
+                    "mop_hi_otro",
+                    "mop_hi_bnx",
+                    "mop_tp_bnx",
+                    "mop_tp_otro"
+                ],
+                "source": [
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro"
+                ],
+                "metodo": [
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_historic",
+                    "fill_stat"
+                ],
+                "grouped": [
+                    [
+                        "numcliente",
+                        "vintage_date"
+                    ],
+                    [
+                        "tfrom"
+                    ]
+                ],
+                "valor": [
+                    "Real 0",
+                    "1"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            },
+            "mobs": {
+                "table_name": [
+                    "liabilities_test2_historic",
+                    "credit_card_processed_data_historic",
+                    "adv_colocacion_1_t_m_historic"
+                ],
+                "source": [
+                    "liabilities",
+                    "credit_card",
+                    "bureau"
+                ],
+                "sources": [
+                    "bureau",
+                    "liabilities",
+                    "credit_card"
+                ],
+                "mobs_tipo": [
+                    "mobs_bureau"
+                ]
+            }
+        },
+        "group_by": {
+            "table_name": "int_xs_mgrs_mgiros_hist_t_m_historic",
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "query_dict": {
+                "accesorios y servicios de informatica": "informatic_service",
+                "aerolineas": "airline",
+                "alojamiento": "hotel",
+                "alquiler de automoviles vehiculos": "car_rental",
+                "alto riesgo": "high_risk",
+                "arte": "art",
+                "articulos de especialidad": "specialty_items",
+                "articulos para el hogar": "houseware",
+                "articulos y servicios personales": "personal_items",
+                "automotriz": "automotive",
+                "automoviles y vehiculos": "vehicle",
+                "comida/abarrotes": "grocery",
+                "construccion": "building",
+                "distribuidores mayoristas y fabricantes": "wholesale",
+                "diversiones y entretenimiento": "amuse",
+                "educacion": "education",
+                "electronica": "electronics",
+                "entretenimiento": "entertainment",
+                "entretenimiento - deportes": "sports",
+                "equipos": "equipment",
+                "gastos de viaje": "travel_expenses",
+                "joyerias": "jewels",
+                "jugueterias": "toy_stores",
+                "libros-periodicos": "books",
+                "mascotas/animales domesticos": "pets",
+                "materiales/equipos de oficina": "office_supplies",
+                "medicina": "medicine",
+                "mercancia general": "general",
+                "negocio extranjero": "business_out",
+                "organismos": "organisms",
+                "otros bienes y servicios": "other_services",
+                "pasatiempos": "leisure",
+                "plantas": "plants",
+                "proveedores de pedido por correo/pedido por telefono": "supplier",
+                "proveedores de servicios": "service",
+                "proveedores de servicios personales": "personal_services",
+                "quimicos/petroleo": "chemicals",
+                "regalos": "gifts",
+                "reparaciones": "repairs",
+                "restaurantes": "restaurant",
+                "servicios comerciales": "commercial_services",
+                "servicios de contratistas ": "contractor_services",
+                "servicios de limpieza": "cleaning_services",
+                "servicios financieros": "fin_service",
+                "servicios gubernamentales ": "gov_services",
+                "servicios profesionales y organizaciones por membresias ": "membership",
+                "servicios publicos": "utility",
+                "sin clasificar": "sin_clasificar",
+                "supermercados": "super",
+                "tiendas de ropa": "cloth",
+                "tiendas/almacenes departamentales": "dept",
+                "transporte": "transport"
+            }
+        },
+        "pivoting": {
+            "source": "giros_credito",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
+    "corporate": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_cus_db"
+            ],
+            "table_name": [
+                "cust_corp_profile_dt1_t_m"
+            ],
+            "select_variables": [
+                "process_date, num_cliente as numcliente, cast(cat_tef as double),cast(tot_cli as double),cast(tot_val as double),cast(tot_baja as double),cast(tot_alta as double),cast(maxg as double),cast(t_altas_i2 as double),cast(t_bajas_i2 as double),cast(t_act_i2 as double),cast(t_altas_i4 as double),cast(t_bajas_i4 as double),cast(t_act_i4 as double),cast(t_altas_i5 as double),cast(t_bajas_i5 as double),cast(t_act_i5 as double),cast(t_altas_i10 as double),cast(t_bajas_i10 as double),cast(t_act_i10 as double),cast(t_altas_a2 as double),cast(t_bajas_a2 as double),cast(t_act_a2 as double),cast(t_altas_a4 as double),cast(t_bajas_a4 as double),cast(t_act_a4 as double),cast(t_altas_a5 as double),cast(t_bajas_a5 as double),cast(t_act_a5 as double),cast(t_altas_a10 as double),cast(t_bajas_a10 as double),cast(t_act_a10 as double),cast(t_ind_altas_i2 as double),cast(t_ind_bajas_i2 as double),cast(t_ind_act_i2 as double),cast(t_ind_altas_i4 as double),cast(t_ind_bajas_i4 as double),cast(t_ind_act_i4 as double),cast(t_ind_altas_i5 as double),cast(t_ind_bajas_i5 as double),cast(t_ind_act_i5 as double),cast(t_ind_altas_i10 as double),cast(t_ind_bajas_i10 as double),cast(t_ind_act_i10 as double),cast(t_altas_ab as double),cast(t_bajas_ab as double),cast(t_act_ab as double),cast(pct_se2 as double),cast(pct_se4 as double),cast(pct_se5 as double),cast(pct_se10 as double),cast(pct_sn2 as double),cast(pct_sn4 as double),cast(pct_sn5 as double),cast(pct_sn10 as double),cast(pct_pt2 as double),cast(pct_pt4 as double),cast(pct_pt5 as double),cast(pct_pt10 as double),cast(pct_ag2 as double),cast(pct_ag4 as double),cast(pct_ag5 as double),cast(pct_ag10 as double),cast(tot_alta_i2 as double),cast(tot_act_i2 as double),cast(tot_baja_i2 as double),cast(tot_alta_i4 as double),cast(tot_act_i4 as double),cast(tot_baja_i4 as double),cast(tot_alta_i5 as double),cast(tot_act_i5 as double),cast(tot_baja_i5 as double),cast(tot_alta_i10 as double),cast(tot_act_i10 as double),cast(tot_baja_i10 as double),cast(arch_corp_3m as double),cast(arch_corp_12m as double),cast(antig as double) as bnmx_company_seniority,f_group_industry,seg,cast(pct_ind_i2 as double),cast(pct_ind_i4 as double),cast(pct_ind_i5 as double),cast(pct_ind_i10 as double),cast(pct_i2 as double),cast(pct_i4 as double),cast(pct_i5 as double),cast(pct_i10 as double), cast(pct_iv2 as double),cast(pct_iv4 as double),cast(pct_iv5 as double),cast(pct_iv10 as double)"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "process_date"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "numcliente"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "numcliente"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "cat_tef",
+                    "tot_cli",
+                    "tot_val",
+                    "tot_baja",
+                    "tot_alta",
+                    "maxg",
+                    "t_altas_i2",
+                    "t_bajas_i2",
+                    "t_act_i2",
+                    "t_altas_i4",
+                    "t_bajas_i4",
+                    "t_act_i4",
+                    "t_altas_i5",
+                    "t_bajas_i5",
+                    "t_act_i5",
+                    "t_altas_i10",
+                    "t_bajas_i10",
+                    "t_act_i10",
+                    "t_altas_a2",
+                    "t_bajas_a2",
+                    "t_act_a2",
+                    "t_altas_a4",
+                    "t_bajas_a4",
+                    "t_act_a4",
+                    "t_altas_a5",
+                    "t_bajas_a5",
+                    "t_act_a5",
+                    "t_altas_a10",
+                    "t_bajas_a10",
+                    "t_act_a10",
+                    "t_ind_altas_i2",
+                    "t_ind_bajas_i2",
+                    "t_ind_act_i2",
+                    "t_ind_altas_i4",
+                    "t_ind_bajas_i4",
+                    "t_ind_act_i4",
+                    "t_ind_altas_i5",
+                    "t_ind_bajas_i5",
+                    "t_ind_act_i5",
+                    "t_ind_altas_i10",
+                    "t_ind_bajas_i10",
+                    "t_ind_act_i10",
+                    "t_altas_ab",
+                    "t_bajas_ab",
+                    "t_act_ab",
+                    "pct_se2",
+                    "pct_se4",
+                    "pct_se5",
+                    "pct_se10",
+                    "pct_sn2",
+                    "pct_sn4",
+                    "pct_sn5",
+                    "pct_sn10",
+                    "pct_pt2",
+                    "pct_pt4",
+                    "pct_pt5",
+                    "pct_pt10",
+                    "pct_ag2",
+                    "pct_ag4",
+                    "pct_ag5",
+                    "pct_ag10",
+                    "tot_alta_i2",
+                    "tot_act_i2",
+                    "tot_baja_i2",
+                    "tot_alta_i4",
+                    "tot_act_i4",
+                    "tot_baja_i4",
+                    "tot_alta_i5",
+                    "tot_act_i5",
+                    "tot_baja_i5",
+                    "tot_alta_i10",
+                    "tot_act_i10",
+                    "tot_baja_i10",
+                    "bnmx_company_seniority",
+                    "arch_corp_3m",
+                    "arch_corp_12m",
+                    "antig",
+                    "pct_ind_i2",
+                    "pct_ind_i4",
+                    "pct_ind_i5",
+                    "pct_ind_i10",
+                    "pct_i2",
+                    "pct_i4",
+                    "pct_i5",
+                    "pct_i10",
+                    "pct_iv2",
+                    "pct_iv4",
+                    "pct_iv5",
+                    "pct_iv10"
+                ],
+                "source": [
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate",
+                    "corporate"
+                ],
+                "metodo": [
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0",
+                    "Real 0"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_value"
+                ],
+                "grouped": [
+                    ""
+                ],
+                "valor": [
+                    "Real 0"
+                ],
+                "id_variables": [
+                    "Real"
+                ]
+            }
+        },
+        "pivoting": {
+            "source": "corporate",
+            "table_name": "cust_corp_profile_dt1_t_m_historic",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom",
+                "tfrom_date",
+                "process_date"
+            ]
+        },
+        "group_by": {
+            "table_name": "cust_corp_profile_dt1_t_m_historic",
+            "conditions": [
+                "p = col('seg').isin('PENSIONADOS')",
+                "g = col('seg').isin('GOBIERNO')",
+                "ind_i2_0 = col('pct_ind_i2') == 0",
+                "ind_i2_1 = col('pct_ind_i2') == 1",
+                "ind_i5_0 = col('pct_ind_i5') == 0",
+                "ind_i5_1 = col('pct_ind_i5') == 1",
+                "ind_i5_2 = col('pct_ind_i5') == 2",
+                "ind_i5_3 = col('pct_ind_i5') == 3",
+                "ind_i5_4 = col('pct_ind_i5') == 4",
+                "iv_i2_0 = col('pct_iv2') == 0",
+                "iv_i2_1 = col('pct_iv2') == 1",
+                "iv_i5_0 = col('pct_iv5') == 0",
+                "iv_i5_1 = col('pct_iv5') == 1",
+                "iv_i5_2 = col('pct_iv5') == 2",
+                "iv_i5_3 = col('pct_iv5') == 3",
+                "iv_i5_4 = col('pct_iv5') == 4"
+            ],
+            "new_columns": [
+                "cat_ind_i2_seg",
+                "cat_iv2_seg",
+                "cat_ind_i5_seg",
+                "cat_iv5_seg"
+            ],
+            "drop_columns": [
+                "f_group_industry",
+                "seg"
+            ]
+        },
+        "ratios": {
+            "raw_name": "raw_features",
+            "percentiles": [
+                2,
+                4,
+                5,
+                10
+            ],
+            "lista_fe": [
+                "avgmov",
+                "max",
+                "min",
+                "mean"
+            ],
+            "keep_var": "id_msf_tools_v2_12315",
+            "prefix": "ratio",
+            "list_raw_n_features": [
+                "avgmov_features",
+                "max_features",
+                "mean_features",
+                "min_features",
+                "sum_features"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "mt",
+            "pivoting",
+            "fe",
+            "ratios",
+            "va"
+        ]
+    },
+    "need_crd_acct_nbr": [
+        "rev_balance",
+        "pnl",
+        "giros_credito",
+        "pnl_new"
+    ],
+    "need_contratos": [
+        "liabilities",
+        "mokitara"
+    ],
+    "lag_ecm_pivot": 2,
+    "lag_liabilities_pivot": 2,
+    "mis_col_liabilities_pivot": "inf_dt",
+    "query_ecm": "SELECT proc_dt, cast(numcliente as double), crd_acct_nbr FROM gcgd1kmxpsd_cus_db.int_xs_ecm3_cta_hist_t_m",
+    "queries_liabilities": [
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_maestra FROM gcprcmsbx_work.liabilities_test2 where snapshot='maestra'",
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perfiles FROM gcprcmsbx_work.liabilities_test2 where snapshot='perfiles'",
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perf_ejec FROM gcprcmsbx_work.liabilities_test2 where snapshot='perfiles_ejecutivo'",
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_cheques FROM gcprcmsbx_work.liabilities_test2 where snapshot='cheques'",
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_otros FROM gcprcmsbx_work.liabilities_test2 where snapshot='otros'",
+        "SELECT mis_date as inf_dt,cast(num_cliente as double) as numcliente,id_cuenta16 FROM gcgd1kmxpsd_prd_db.snapshot_pagomatico_t_m"
+    ],
+    "mobs_preparation": {
+        "select_variables": [
+            "bigint(num_cliente) as numcliente, inf_dt, to_date(fec_apertura) as fec_apertura",
+            "bigint(num_cliente) as numcliente, mob, mis_dt",
+            "cliente as numcliente, to_date(fe_informacion) as fe_informacion, A5"
+        ],
+        "libname": [
+            "gcprcmsbx_work",
+            "gcprcmsbx_work",
+            "gcgd1kmxpsd_cus_db"
+        ],
+        "table_name": [
+            "liabilities_test2",
+            "credit_card_processed_data",
+            "adv_colocacion_1_t_m"
+        ],
+        "type_date": [
+            "-",
+            "-",
+            "-"
+        ],
+        "retraso": [
+            1,
+            1,
+            3
+        ],
+        "name_mis": [
+            "inf_dt",
+            "mis_dt",
+            "fe_informacion"
+        ],
+        "table_pivote": [
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data",
+            "master_data"
+        ],
+        "key_pivote": [
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente"
+        ],
+        "name_vintage_pivote": [
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage",
+            "vintage"
+        ],
+        "key_source": [
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente",
+            "numcliente"
+        ]
+    },
+    "list_no_mobs": [
+        "incremental_features",
+        "raw_features",
+        "rmeans_features",
+        "rt_features",
+        "vp_features"
+    ]
+}
