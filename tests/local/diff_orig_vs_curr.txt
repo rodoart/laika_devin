@@ -7,7 +7,7 @@ rev_balance, channels, financiera, giros_credito.
 Workdirs: tests/local/workdir_orig vs tests/local/workdir_curr.
 
 Resultado (207 parquets comparados):
-  OK    180  schema + valores identicos
+  OK    179  schema + valores identicos
   TYPE   18  mismos valores, solo dtype (tfrom_date/vintage_date
              string->date en extract/mt/mobs_preparation/mobs)
   ORDER   8  vector_assembler: mismo multiset por fila — el orden de
@@ -16,7 +16,13 @@ Resultado (207 parquets comparados):
   FILL    1  rev_balance/features/raw_features: null -> 0 (post-fill
              coherente con el docstring "null filled"; ademas corrige
              el crash de resume con arrays None en los UDF _mt)
-  DIFF    0  diferencias reales de valores
+  DIFF    1  pivot_prepared: el actual conserva ``id_cuenta16``
+             (el original la produce via la 6a query de
+             queries_liabilities pero la descarta en la proyeccion
+             final — bug latente). La columna extra retiene la
+             multiplicidad cartesiana del join (68 vs 20 filas), que
+             es justo lo que necesita el extract de liabilities para
+             la tabla snapshot_pagomatico_t_m (key_pivote id_cuenta16)
   FALTA   0
   EXTRA   0
 
@@ -36,6 +42,23 @@ config prod-fiel: credit_card sin fec_apertura + vintage string):
      persistido aunque ``_path_new_pivot`` ya este seteado — una
      preparacion muerta a medias ya no propaga el pivot malo a las
      fuentes siguientes (crash en cascada del mail: resuelto)
+  Fase 2 ademas verifica que ``id_cuenta16`` llega al pivot
+     re-preparado (6a query de queries_liabilities +
+     _pivot_cols_needed) — el crash liabilities/pagomatico del mail:
+     resuelto
+
+Fixes adicionales del tercer mail (fotos 2026-10-27):
+  - liabilities extract Column 'id_cuenta16' does not exist: en prod
+    queries_liabilities tiene solo 5 queries — ninguna produce
+    id_cuenta16 — y _pivot_cols_needed la descartaba de todas formas.
+    Se agrego la query de snapshot='pagomatico' a la config y
+    id_cuenta16 a cols_pivot. En prod liabilities NUNCA habia pasado
+    de la tabla 6 (siempre fue un mail source).
+  - rev_balance groupby Column 'promoId' does not exist: el archivo
+    desplegado es identico al nuestro (withColumnRenamed promo_id ->
+    promoId) pero en su entorno el rename no produce nodo en el plan.
+    Se reemplazo por select con alias explicitos (equivalente,
+    inmune al quirk de withColumnRenamed de su Spark).
 
 Notas:
   - El original no era ejecutable tal cual: el worktree lleva parches

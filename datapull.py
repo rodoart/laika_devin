@@ -1000,7 +1000,8 @@ class DataPull():
             cols_pivot += ['crd_acct_nbr']
         if self._check_contratos(sources):
             cols_pivot += ['num_contrato_maestra', 'num_contrato_perfiles',
-            'num_contrato_perf_ejec', 'num_contrato_cheques', 'num_contrato_otros']
+            'num_contrato_perf_ejec', 'num_contrato_cheques',
+            'num_contrato_otros', 'id_cuenta16']
         return cols_pivot
 
     def _check_crd_acct_nbr(self, sources: List[str]) -> bool:

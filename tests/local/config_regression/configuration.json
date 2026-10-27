@@ -150,6 +150,76 @@
             "va"
         ]
     },
+    "rev_balance": {
+        "extract": {
+            "libname": [
+                "global_temp"
+            ],
+            "table_name": [
+                "ccp_t_m"
+            ],
+            "select_variables": [
+                "proc_dt, crd_acct_nbr, bigint(num_cliente) as numcliente, cast(eir as double) as eir, monthsonbooks"
+            ],
+            "type_date": [
+                ""
+            ],
+            "retraso": [
+                0
+            ],
+            "name_mis": [
+                "proc_dt"
+            ],
+            "table_pivote": [
+                "master_data"
+            ],
+            "key_pivote": [
+                "crd_acct_nbr"
+            ],
+            "name_vintage_pivote": [
+                "vintage"
+            ],
+            "key_source": [
+                "crd_acct_nbr"
+            ]
+        },
+        "group_by": {
+            "table_names": {
+                "epp": "epp",
+                "plan": "plan",
+                "cpp": "ccp_t_m_historic",
+                "catPromosID": "global_temp.cat_promos"
+            },
+            "primaryKey": [
+                "crd_acct_nbr",
+                "vintage_date",
+                "tfrom"
+            ],
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "querys_dict": {
+                "epp_dict": {}
+            }
+        },
+        "pivoting": {
+            "source": "rev_balance",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "pivoting",
+            "fe",
+            "va"
+        ]
+    },
     "liabilities": {
         "extract": {
             "libname": [
@@ -1797,12 +1867,13 @@
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perfiles FROM global_temp.liabilities_test2 where snapshot='perfiles'",
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perf_ejec FROM global_temp.liabilities_test2 where snapshot='perfiles_ejecutivo'",
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_cheques FROM global_temp.liabilities_test2 where snapshot='cheques'",
-        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_otros FROM global_temp.liabilities_test2 where snapshot='otros'"
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_otros FROM global_temp.liabilities_test2 where snapshot='otros'",
+        "SELECT inf_dt,num_cliente as numcliente,id_cuenta16 FROM global_temp.liabilities_test2 where snapshot='pagomatico'"
     ],
     "mobs_preparation": {
         "select_variables": [
             "bigint(num_cliente) as numcliente, inf_dt, to_date(fec_apertura) as fec_apertura",
-            "bigint(num_cliente) as numcliente, mob, mis_dt",
+            "bigint(num_cliente) as numcliente, mob, mis_dt, fec_apertura",
             "cliente as numcliente, to_date(fe_informacion) as fe_informacion, a5"
         ],
         "libname": [
@@ -1877,75 +1948,5 @@
         "rmeans_features",
         "rt_features",
         "vp_features"
-    ],
-    "rev_balance": {
-        "extract": {
-            "libname": [
-                "global_temp"
-            ],
-            "table_name": [
-                "ccp_t_m"
-            ],
-            "select_variables": [
-                "proc_dt, crd_acct_nbr, bigint(num_cliente) as numcliente, cast(eir as double) as eir, monthsonbooks"
-            ],
-            "type_date": [
-                ""
-            ],
-            "retraso": [
-                0
-            ],
-            "name_mis": [
-                "proc_dt"
-            ],
-            "table_pivote": [
-                "master_data"
-            ],
-            "key_pivote": [
-                "crd_acct_nbr"
-            ],
-            "name_vintage_pivote": [
-                "vintage"
-            ],
-            "key_source": [
-                "crd_acct_nbr"
-            ]
-        },
-        "group_by": {
-            "table_names": {
-                "epp": "epp",
-                "plan": "plan",
-                "cpp": "ccp_t_m_historic",
-                "catPromosID": "global_temp.cat_promos"
-            },
-            "primaryKey": [
-                "crd_acct_nbr",
-                "vintage_date",
-                "tfrom"
-            ],
-            "group_by_key": [
-                "numcliente",
-                "vintage_date",
-                "tfrom"
-            ],
-            "querys_dict": {
-                "epp_dict": {}
-            }
-        },
-        "pivoting": {
-            "source": "rev_balance",
-            "pivot_key": [
-                "numcliente",
-                "vintage_date",
-                "tfrom"
-            ]
-        },
-        "steps_list": [
-            "extract",
-            "groupby",
-            "pivoting",
-            "fe",
-            "va"
-        ]
-    }
+    ]
 }

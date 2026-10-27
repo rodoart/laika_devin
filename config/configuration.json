@@ -647,6 +647,350 @@
             "va"
         ]
     },
+    "rev_balance": {
+        "extract": {
+            "libname": [
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db",
+                "gcgd1kmxpsd_prd_db"
+            ],
+            "table_name": [
+                "profit_loss_cc_t_m",
+                "int_crd_epp_snapshot_t_m",
+                "int_crd_plan_snapshot_c_t_m"
+            ],
+            "select_variables": [
+                "informationdate, NUMCLIENTE as numcliente, CRD_ACCT_NBR as crd_acct_nbr, cast(int_rev as double) as eir, cast(mob as double) as monthsombooks",
+                "mis_dt, crd_acct_nbr, epp_orig_loan_amt as original_balance, loan_outstnd_bal_lcy as current_balance, loan_stat as estatus, promo_id, curr_int_rte as tasa, loan_tnr as plazo, loan_open_mob_nbr as plazo_actual, loan_dt as fecha_aceptacion",
+                "mis_dt, crd_acct_nbr, plan_nbr, curr_bal_lcyamt as current_balance, int_bnp_lcyamt as int_grav_exent, calc_rte as tasa"
+            ],
+            "type_date": [
+                "-",
+                "-",
+                "-"
+            ],
+            "retraso": [
+                1,
+                1,
+                1
+            ],
+            "name_mis": [
+                "informationdate",
+                "mis_dt",
+                "mis_dt"
+            ],
+            "table_pivote": [
+                "master_data",
+                "master_data",
+                "master_data"
+            ],
+            "key_pivote": [
+                "crd_acct_nbr",
+                "crd_acct_nbr",
+                "crd_acct_nbr"
+            ],
+            "name_vintage_pivote": [
+                "vintage",
+                "vintage",
+                "vintage"
+            ],
+            "key_source": [
+                "crd_acct_nbr",
+                "crd_acct_nbr",
+                "crd_acct_nbr"
+            ]
+        },
+        "missing_treatment": {
+            "fill_variables": {
+                "variable": [
+                    "A5",
+                    "mop0tpotro",
+                    "mop0tpbnx",
+                    "mop0hipbnx",
+                    "mop0hipootro",
+                    "tot_bal_due_offus",
+                    "tot_bal_due_offus_al",
+                    "tot_bal_due_offus_cc",
+                    "tot_bal_due_offus_mg",
+                    "tot_bal_due_offus_pl",
+                    "tot_bal_due_onus",
+                    "tot_bal_due_onus_al",
+                    "tot_bal_due_onus_cc",
+                    "tot_bal_due_onus_mg",
+                    "tot_bal_due_onus_pl",
+                    "tot_bal_offus_al",
+                    "tot_bal_offus_cc",
+                    "tot_bal_offus_mg",
+                    "tot_bal_offus_pl",
+                    "tot_bal_onus_al",
+                    "tot_bal_onus_cc",
+                    "tot_bal_onus_mg",
+                    "tot_bal_onus_pl",
+                    "tot_cl_amex",
+                    "tot_cl_amex_open",
+                    "tot_cl_dept",
+                    "tot_cl_dept_open",
+                    "tot_cl_offus",
+                    "tot_cl_offus_open",
+                    "tot_cl_onus",
+                    "tot_cl_onus_open",
+                    "tot_curr_bal_dept_open",
+                    "tot_curr_bal_offus_open_al",
+                    "tot_curr_bal_offus_open_mg",
+                    "tot_curr_bal_offus_open_pl",
+                    "tot_curr_bal_offus_open_tc",
+                    "tot_curr_bal_amex_open_tc",
+                    "tot_curr_bal_onus_open_al",
+                    "tot_curr_bal_onus_open_mg",
+                    "tot_curr_bal_onus_open_pl",
+                    "tot_curr_bal_onus_open_tc",
+                    "tot_pay_amex",
+                    "tot_pay_dept",
+                    "tot_pay_offus_al",
+                    "tot_pay_offus_cc",
+                    "tot_pay_offus_mg",
+                    "tot_pay_offus_pl",
+                    "tot_pay_onus_al",
+                    "tot_pay_onus_cc",
+                    "tot_pay_onus_mg",
+                    "tot_pay_onus_pl",
+                    "tot_curr_bal_offus_res_cc",
+                    "tot_bal_curr_all_open",
+                    "tot_bal_curr_amex",
+                    "tot_cl_all_2",
+                    "tot_cl_amex_open_2",
+                    "tot_cur_due_offus_res_cc",
+                    "tot_cur_due_onus_res_cc",
+                    "tot_curr_bal_due_res_cc",
+                    "tot_curr_bal_onus_res_cc",
+                    "tot_curr_bal_res_cc",
+                    "mop_tc_amx",
+                    "mop_tc_bnx",
+                    "mop_tc_dep",
+                    "mop_tc_otro",
+                    "mop_cp_otro",
+                    "mop_cp_bnx",
+                    "mop_au_otro",
+                    "mop_au_bnx",
+                    "mop_hi_otro",
+                    "mop_hi_bnx",
+                    "mop_tp_bnx",
+                    "mop_tp_otro"
+                ],
+                "source": [
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro",
+                    "buro"
+                ],
+                "metodo": [
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico",
+                    "historico"
+                ]
+            },
+            "fill_methods": {
+                "metodo": [
+                    "fill_historic",
+                    "fill_stat"
+                ],
+                "grouped": [
+                    [
+                        "numcliente",
+                        "vintage_date"
+                    ],
+                    [
+                        "tfrom"
+                    ]
+                ],
+                "valor": [
+                    "Real 0",
+                    "1"
+                ],
+                "id_variables": [
+                    "historico",
+                    "Real"
+                ]
+            },
+            "mobs": "__GAP__"
+        },
+        "group_by": {
+            "table_names": {
+                "epp": "int_crd_epp_snapshot_t_m_historic",
+                "plan": "int_crd_plan_snapshot_c_t_m_historic",
+                "cpp": "profit_loss_cc_t_m_historic",
+                "catPromosID": "gcprcmsbx_work.catalogo_promoid_112021"
+            },
+            "primaryKey": [
+                "crd_acct_nbr",
+                "vintage_date",
+                "tfrom"
+            ],
+            "group_by_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ],
+            "querys_dict": {
+                "epp_dict": "__GAP__"
+            }
+        },
+        "pivoting": {
+            "source": "rev_balance",
+            "pivot_key": [
+                "numcliente",
+                "vintage_date",
+                "tfrom"
+            ]
+        },
+        "steps_list": [
+            "extract",
+            "groupby",
+            "pivoting",
+            "fe",
+            "mobs",
+            "va"
+        ]
+    },
     "liabilities": {
         "extract": {
             "libname": [
@@ -3831,7 +4175,8 @@
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perfiles FROM gcprcmsbx_work.liabilities_test2 where snapshot='perfiles'",
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_perf_ejec FROM gcprcmsbx_work.liabilities_test2 where snapshot='perfiles_ejecutivo'",
         "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_cheques FROM gcprcmsbx_work.liabilities_test2 where snapshot='cheques'",
-        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_otros FROM gcprcmsbx_work.liabilities_test2 where snapshot='otros'"
+        "SELECT inf_dt,num_cliente as numcliente,num_contrato as num_contrato_otros FROM gcprcmsbx_work.liabilities_test2 where snapshot='otros'",
+        "SELECT inf_dt,num_cliente as numcliente,id_cuenta16 FROM gcprcmsbx_work.liabilities_test2 where snapshot='pagomatico'"
     ],
     "mobs_preparation": {
         "select_variables": [

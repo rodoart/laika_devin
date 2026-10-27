@@ -175,18 +175,23 @@ def write_fixtures(spark) -> None:
     ).write.mode("overwrite").parquet(str(FIXTURES / "adv_colocacion"))
 
     # --- liabilities_test2 (mobs_preparation + queries_liabilities) -----
+    # pagomatico: la 6a query de queries_liabilities extrae id_cuenta16
+    # (key_pivote de la tabla snapshot_pagomatico_t_m de liabilities).
     lrows = []
     snaps = ["maestra", "perfiles", "perfiles_ejecutivo", "cheques",
              "otros"]
     for i, mo in enumerate(_months("2025-02", "2025-08")):
         lrows.append(("101", mo[:8] + "28", "2020-01-15",
-                      f"CTA-101-{i}", snaps[i % 5]))
+                      f"CTA-101-{i}", f"CTA16-101-{i}", snaps[i % 5]))
         lrows.append(("105", mo[:8] + "28", "2021-06-01",
-                      f"CTA-105-{i}", snaps[(i + 2) % 5]))
-    lrows.append(("106", "2025-06-28", "2025-05-01", "CTA-106", "maestra"))
+                      f"CTA-105-{i}", f"CTA16-105-{i}", snaps[(i + 2) % 5]))
+        lrows.append(("101", mo[:8] + "28", "2020-01-15",
+                      f"CTA-101-P{i}", f"CTA16-101-P{i}", "pagomatico"))
+    lrows.append(("106", "2025-06-28", "2025-05-01", "CTA-106",
+                  "CTA16-106", "maestra"))
     spark.createDataFrame(
         lrows, ["num_cliente", "inf_dt", "fec_apertura", "num_contrato",
-                "snapshot"]
+                "id_cuenta16", "snapshot"]
     ).write.mode("overwrite").parquet(str(FIXTURES / "liabilities_test2"))
 
     # --- credit_card_processed_data (mobs_preparation) -----------------

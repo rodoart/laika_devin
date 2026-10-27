@@ -50,8 +50,9 @@ class RevBalanceAggregate(BaseAggregate):
         import pyspark.sql.functions as fn
         promoID = sqlContext.sql(
             "select * from {0}".format(agg_dict['table_names']['catPromosID']))
-        promoID = promoID.withColumnRenamed("promo_id", "promoId").select(
-            ["promoId", "grupo"]).withColumnRenamed("grupo", "oferta")
+        promoID = promoID.select(
+            fn.col("promo_id").alias("promoId"),
+            fn.col("grupo").alias("oferta"))
 
         epp_df = sqlContext.read.parquet(
             epp_path).withColumnRenamed("proc_dt", "mis_dt")

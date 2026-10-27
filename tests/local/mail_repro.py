@@ -116,7 +116,8 @@ def main():
     cols2 = pivot_cols(WORKDIR)
     print("pivot_prepared tras fase 2:", cols2)
     assert "crd_acct_nbr" in cols2 and \
-        "num_contrato_maestra" in cols2, cols2
+        "num_contrato_maestra" in cols2 and \
+        "id_cuenta16" in cols2, cols2
     va = WORKDIR / reg.YEAR_ID / "giros_credito" / "vector_assembler"
     assert (va / "_SUCCESS").exists(), "giros_credito va falta"
     print("FASE 2 OK — pivot_prepared re-preparado, extract funciona")
