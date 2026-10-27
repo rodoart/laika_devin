@@ -9,7 +9,7 @@ Class and Functions required to aggregate (general)
 
 import os
 import pandas as pd
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, lit
 from typing import Any, Dict, List
 from .base import BaseAggregate
 
@@ -93,48 +93,80 @@ class LiabilitiesPullAggregate(BaseAggregate):
         -------
         None
         """
-        # Get the auxliar path
+        # El aggregate materializa auxiliar/outputs/df_<key> por cada
+        # tabla de missing_treatment + df_pgom de pagomatico, los une y
+        # agrega. ``table_names`` es el dict {key: tabla_historic} y
+        # ``pagomatico`` la tabla del pagomatico (clave hermana).
         aux_path = self._sibling_path("auxiliar/outputs")
-        maestra = self.sqlContext.read.parquet(
-            os.path.join(aux_path, "maestra"))
-        maestra = maestra.withColumn("numcliente", col(
-            "numcliente").cast("string"))
-        selected_columns = self.agg_dict['sel_cols']
-        selected_group = self.agg_dict['group_by_key']
-        sel_colums = [col(column) for column in (
-            selected_group + selected_columns)]
-        maestra = maestra.select(*sel_colums)
-        onus_capt_snap = self.sqlContext.read.parquet(
-            self._table_path())
-        sel_vars = [col(column) for column in (
-            ["numcliente"] + self.agg_dict["pgom_cols"])]
-        df_pgom = onus_capt_snap.select(sel_vars)
-        df_maes = maestra.filter('producto=="MAESTRA"')
-        df_perf = maestra.filter('producto=="PERFILES"')
-        df_peje = maestra.filter('producto=="PGJ"')
-        df_cheq = maestra.filter('producto=="CHEQUES"')
-        df_otro = maestra.filter('producto=="OTRO"')
-        liabilities_list = ["maes", "perf", "peje", "cheq", "otro"]
-        liabilities_dfs = [df_maes, df_perf, df_peje, df_cheq, df_otro]
-        filter_col = self.agg_dict['filter_cols']
-        queries_dict = {}
-        for df, liab in zip(liabilities_dfs, liabilities_list):
-            df.createOrReplaceTempView("df_agg_temp_df_"+liab)
-            queries_dict[liab] = self._create_groupby_query(
-                self.agg_dict, liab, filter_col)
-        df_pgom.createOrReplaceTempView("df_agg_temp_pgom")
-        queries_dict["pgom"] = self._create_groupby_query_pagomatico(
-            self.agg_dict, filter_col)
-        liabilities_grouped = []
-        for df in liabilities_list + ["pgom"]:
-            liabilities_grouped.append(
-                self.sqlContext.sql(queries_dict[df]))
-        df_maes, df_perf, df_peje, df_cheq, df_otro, df_pgom = liabilities_grouped
+        for key, value in self.agg_dict["table_names"].items():
+            liabilities_df = self.sqlContext.read.parquet(
+                os.path.join(self.previous_path, value))
+            filter_columns = liabilities_df.columns
+            selected_columns = [colu for colu in self.agg_dict[
+                "query_dict"]["variable"] if colu in filter_columns]
+            liabilities_df = liabilities_df.filter(
+                liabilities_df.numcliente.isNotNull())
+            liabilities_df = liabilities_df.select(
+                self.agg_dict["group_by_key"] + selected_columns)
+            liabilities_df.createOrReplaceTempView("df_agg_temp_df_"+key)
+            sql_query = self._create_groupby_query(
+                self.agg_dict, key, filter_columns)
+            liabilities_df = self.sqlContext.sql(sql_query)
+            liabilities_df = liabilities_df.withColumn("src", lit(key))
+            liabilities_df = liabilities_df.fillna(0)
+            self._save_parquet(liabilities_df,
+                               os.path.join(aux_path, "df_"+key))
 
-        # Calculate ONUS
-        onus_capt_snap = onus_capt_snap.select(
-            *sel_colums, *selected_group)
-        onus_capt_snap_tmp = onus_capt_snap.groupby(
+        pagomatico_df = self.sqlContext.read.parquet(
+            os.path.join(self.previous_path, self.agg_dict["pagomatico"]))
+        pagomatico_df = pagomatico_df.withColumnRenamed(
+            "num_cliente", "numcliente")
+        filter_columns_pgom = pagomatico_df.columns
+        selected_columns_pgom = [colu for colu in self.agg_dict[
+            "PGMT_QUERY_DICT"]["variable"] if colu in filter_columns_pgom]
+        pagomatico_df = pagomatico_df.filter(
+            pagomatico_df.numcliente.isNotNull())
+        pagomatico_df = pagomatico_df.select(
+            self.agg_dict["group_by_key"] + selected_columns_pgom)
+        pagomatico_df.createOrReplaceTempView("df_agg_temp_pgom")
+        sql_query = self._create_groupby_query_pagomatico(
+            self.agg_dict, selected_columns_pgom)
+        pagomatico_df = self.sqlContext.sql(sql_query)
+        pagomatico_df = pagomatico_df.withColumn("src", lit("pgom"))
+        if "sdo_capital" in filter_columns_pgom:
+            pagomatico_df = pagomatico_df.withColumnRenamed(
+                "sdo_capital", "saldo_mensual")
+        pagomatico_df = pagomatico_df.fillna(0)
+        self._save_parquet(pagomatico_df,
+                           os.path.join(aux_path, "df_pgom"))
+
+        df_maes = self.sqlContext.read.parquet(aux_path+"/df_maes")
+        df_perf = self.sqlContext.read.parquet(aux_path+"/df_perf")
+        df_peje = self.sqlContext.read.parquet(aux_path+"/df_peje")
+        df_cheq = self.sqlContext.read.parquet(aux_path+"/df_cheq")
+        df_otro = self.sqlContext.read.parquet(aux_path+"/df_otro")
+        df_pgom = self.sqlContext.read.parquet(aux_path+"/df_pgom")
+
+        columns_to_add = [
+            x for x in df_perf.columns if x not in df_pgom.columns]
+        for column in columns_to_add:
+            df_pgom = df_pgom.withColumn(column, lit(None))
+
+        all_liabilities = df_maes.unionByName(df_perf)\
+            .unionByName(df_peje)\
+            .unionByName(df_cheq)\
+            .unionByName(df_otro)\
+            .unionByName(df_pgom)
+
+        self._save_parquet(all_liabilities, os.path.join(
+            self.previous_path, "appends"))
+        all_liabilities = self.sqlContext.read.parquet(
+            os.path.join(self.previous_path, "appends"))
+
+        # ``selected_columns`` queda con las vars de la ULTIMA tabla del
+        # loop (orden de insercion de ``table_names``) — comportamiento
+        # fiel al original
+        onus_capt_snap_tmp = all_liabilities.groupBy(
             self.agg_dict["group_by_key"]).sum(*selected_columns)
 
         for variable in selected_columns:

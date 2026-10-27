@@ -521,6 +521,12 @@ def make_config() -> None:
         },
         "group_by": {
             "table_name": "onus_capt_snap_t_m_historic",
+            # table_names/pagomatico son el contrato real del aggregate:
+            # itera el dict, agrega cada tabla de mt a df_<key> en
+            # auxiliar/outputs, las une (appends) y hace el sum final
+            "table_names": {k: "onus_capt_snap_t_m_historic" for k in
+                            ("maes", "perf", "peje", "cheq", "otro")},
+            "pagomatico": "onus_capt_snap_t_m_historic",
             "group_by_key": ["numcliente", "vintage_date", "tfrom"],
             # sel_cols es la variable comun a TODAS las vistas
             # (maes/perf/peje/cheq/otro/pgom) — el rename la exige en
