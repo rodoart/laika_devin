@@ -35,9 +35,14 @@ tests/local/hadoop/bin/*.exe
 .DS_Store
 Thumbs.db
 
+# Scratch local: fotos de mails/config, scripts temporales, crops, shims
+tmp/
+
 # Artefactos locales de Spark/Hive (warehouse, metastore derby)
 spark-warehouse/
 metastore_db/
 derby.log
 spark-events/
 *.crc
+
+*/tmp/*
