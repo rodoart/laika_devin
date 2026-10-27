@@ -214,18 +214,22 @@ def write_fixtures(spark) -> None:
         crows.append((mo[:8] + "28", "101",
                       ["PENSIONADOS", "GOBIERNO", "EMPRESAS"][i % 3],
                       "ind_a", 1, i % 2, i % 5, i % 2, i % 5,
-                      10 + i, 20 + i, 30 + i, 40 + i, 50 + i, 60 + i))
+                      10 + i, 20 + i, 30 + i, 40 + i, 50 + i, 60 + i,
+                      70 + i, 80 + i, 90 + i, 100 + i, 110 + i, 120 + i))
         crows.append((mo[:8] + "28", "105", "EMPRESAS", "ind_b",
                       2, 1, 4, 0, 2, 11 + i, 21 + i, 31 + i, 41 + i,
-                      51 + i, 61 + i))
+                      51 + i, 61 + i, 71 + i, 81 + i, 91 + i, 101 + i,
+                      111 + i, 121 + i))
     # pct fuera de rango -> cat = -99999
     crows.append(("2025-08-28", "106", "OTRO", "ind_c", 3, 7, 9, 7, 9,
-                  12, 22, 32, 42, 52, 62))
+                  12, 22, 32, 42, 52, 62, 72, 82, 92, 102, 112, 122))
     spark.createDataFrame(
         crows, ["process_date", "num_cliente", "seg", "f_group_industry",
                 "cat_tef", "pct_ind_i2", "pct_ind_i5", "pct_iv2",
                 "pct_iv5", "t_altas_i2", "t_bajas_i2", "t_act_i2",
-                "t_altas_a2", "t_bajas_a2", "t_act_a2"]
+                "t_altas_a2", "t_bajas_a2", "t_act_a2", "t_bajas_ab",
+                "t_act_ab", "tot_baja_i2", "tot_act_i2",
+                "t_ind_bajas_i2", "t_ind_act_i2"]
     ).write.mode("overwrite").parquet(str(FIXTURES / "cust_corp"))
 
     # --- credit_card_processed_data (mobs_preparation) -----------------
@@ -756,10 +760,9 @@ def make_config() -> None:
     }
 
     # ---- corporate: bloque sintetico (subset de vars prod) --------------
-    # steps_list sin "ratios": bug latente compartido con b7d2ecc — los
-    # nombres que genera _make_dicts_aux_corporate (sum_t_bajas_a_2_3m,
-    # t_act_i_2_0) no coinciden con los que produce fe (sum_t_bajas_a2_3m,
-    # t_act_i2_0); prod tampoco pasaria ese step.
+    # percentiles=[2] y lista_fe sin "avgmov" (no esta en lista_trans del
+    # e2e): los nombres que genera _make_dicts_aux_corporate usan el
+    # formato pegado de prod (sum_t_bajas_a2_3m, t_act_i2_0).
     rigid["corporate"] = {
         "extract": {
             "libname": ["global_temp"],
@@ -771,7 +774,12 @@ def make_config() -> None:
                 " cast(pct_iv2 as double), cast(pct_iv5 as double),"
                 " cast(t_altas_i2 as double), cast(t_bajas_i2 as double),"
                 " cast(t_act_i2 as double), cast(t_altas_a2 as double),"
-                " cast(t_bajas_a2 as double), cast(t_act_a2 as double)"],
+                " cast(t_bajas_a2 as double), cast(t_act_a2 as double),"
+                " cast(t_bajas_ab as double), cast(t_act_ab as double),"
+                " cast(tot_baja_i2 as double),"
+                " cast(tot_act_i2 as double),"
+                " cast(t_ind_bajas_i2 as double),"
+                " cast(t_ind_act_i2 as double)"],
             "type_date": [""],
             "retraso": [0],
             "name_mis": ["process_date"],
@@ -820,7 +828,17 @@ def make_config() -> None:
             "pivot_key": ["numcliente", "vintage_date", "tfrom",
                           "tfrom_date", "process_date"],
         },
-        "steps_list": ["extract", "groupby", "mt", "pivoting", "fe", "va"],
+        "ratios": {
+            "raw_name": "raw_features",
+            "percentiles": [2],
+            "lista_fe": ["max", "min", "mean"],
+            "keep_var": "id_msf_tools_v2_12315",
+            "prefix": "ratio",
+            "list_raw_n_features": ["max_features", "mean_features",
+                                    "min_features", "sum_features"],
+        },
+        "steps_list": ["extract", "groupby", "mt", "pivoting", "fe",
+                       "ratios", "va"],
     }
 
     # ---- claves globales que apuntan a fixtures -------------------------

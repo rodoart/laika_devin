@@ -158,40 +158,43 @@ class GenerateRatios:
             por fila).
         """
         lista_fe = self.ratios_dict["lista_fe"]
-        num_antiguedad = ['sum_t_bajas_a_{}_{}m'.format(
+        # Los percentiles van pegados al nombre de la variable en la
+        # tabla fuente (t_bajas_a2, t_act_i2, tot_baja_i2...), no
+        # separados por guion bajo — ``fe`` genera ``sum_t_bajas_a2_3m``.
+        num_antiguedad = ['sum_t_bajas_a{}_{}m'.format(
             anti, month) for anti in percentiles for month in time_window]*len(lista_fe)
         num_antiguedad_bloq = ['sum_t_bajas_ab_{}m'.format(
             month) for month in time_window]*len(lista_fe)
-        num_ingreso = ['sum_t_bajas_i_{}_{}m'.format(
+        num_ingreso = ['sum_t_bajas_i{}_{}m'.format(
             ingreso, month) for ingreso in percentiles for month in time_window]*len(lista_fe)
-        num_ingreso_v2 = ['sum_tot_baja_i_{}_{}m'.format(
+        num_ingreso_v2 = ['sum_tot_baja_i{}_{}m'.format(
             ingreso, month) for ingreso in percentiles for month in time_window]*len(lista_fe)
-        num_industria = ['sum_t_ind_bajas_i_{}_{}m'.format(
+        num_industria = ['sum_t_ind_bajas_i{}_{}m'.format(
             ingreso, month) for ingreso in percentiles for month in time_window]*len(lista_fe)
-        num_puntual = ['sum_t_bajas_i_{0}_{1}m'.format(anti, month) for anti in percentiles for month in time_window] + ['sum_t_bajas_a_{0}_{1}m'.format(
+        num_puntual = ['sum_t_bajas_i{0}_{1}m'.format(anti, month) for anti in percentiles for month in time_window] + ['sum_t_bajas_a{0}_{1}m'.format(
             anti, month) for anti in percentiles for month in time_window] + ['sum_t_bajas_ab_{0}m'.format(month) for month in
             time_window]
-        num_puntual_v2 = ['sum_tot_baja_i_{0}_{1}m'.format(
+        num_puntual_v2 = ['sum_tot_baja_i{0}_{1}m'.format(
             anti, month) for anti in percentiles for month in time_window]
-        num_puntual_industria = ['sum_t_ind_bajas_i_{0}_{1}m'.format(
+        num_puntual_industria = ['sum_t_ind_bajas_i{0}_{1}m'.format(
             anti, month) for anti in percentiles for month in time_window]
         numerador = num_antiguedad+num_antiguedad_bloq+num_ingreso+num_industria + \
             num_puntual+num_puntual_industria+num_ingreso_v2+num_puntual_v2
-        den_antiguedad = ['{2}_t_act_a_{0}_{1}m'.format(
+        den_antiguedad = ['{2}_t_act_a{0}_{1}m'.format(
             anti, month, item_fe) for item_fe in lista_fe for anti in percentiles for month in time_window]
         den_antiguedad_bloq = ['{1}_t_act_ab_{0}m'.format(
             month, item_fe) for item_fe in lista_fe for month in time_window]
-        den_ingreso = ['{2}_t_act_i_{0}_{1}m'.format(
+        den_ingreso = ['{2}_t_act_i{0}_{1}m'.format(
             ingreso, month, item_fe) for item_fe in lista_fe for ingreso in percentiles for month in time_window]
-        den_ingreso_v2 = ['{2}_tot_act_i_{0}_{1}m'.format(
+        den_ingreso_v2 = ['{2}_tot_act_i{0}_{1}m'.format(
             ingreso, month, item_fe) for item_fe in lista_fe for ingreso in percentiles for month in time_window]
-        den_industria = ['{2}_t_ind_act_i_{0}_{1}m'.format(
+        den_industria = ['{2}_t_ind_act_i{0}_{1}m'.format(
             ingreso, month, item_fe) for item_fe in lista_fe for ingreso in percentiles for month in time_window]
-        den_puntual = ['t_act_i_{0}_{1}'.format(anti, month) for anti in percentiles for month in [0]*len(time_window)]+['t_act_{0}_{1}'.format(
+        den_puntual = ['t_act_i{0}_{1}'.format(anti, month) for anti in percentiles for month in [0]*len(time_window)]+['t_act_a{0}_{1}'.format(
             anti, month) for anti in percentiles for month in [0]*len(time_window)]+['t_act_ab_{0}'.format(month) for month in [0]*len(time_window)]
-        den_puntual_v2 = ['tot_act_i_{0}_{1}'.format(
+        den_puntual_v2 = ['tot_act_i{0}_{1}'.format(
             anti, month) for anti in percentiles for month in [0]*len(time_window)]
-        den_puntual_industria = ['t_ind_act_i_{0}_{1}'.format(
+        den_puntual_industria = ['t_ind_act_i{0}_{1}'.format(
             anti, month) for anti in percentiles for month in [0]*len(time_window)]
         denominador = den_antiguedad+den_antiguedad_bloq+den_ingreso+den_industria + \
             den_puntual+den_puntual_industria+den_ingreso_v2+den_puntual_v2
