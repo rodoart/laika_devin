@@ -20,15 +20,22 @@ Resultado (207 parquets comparados):
   FALTA   0
   EXTRA   0
 
-Reproduccion del escenario de los mails (tmp/_mail_repro.py, config
-prod-fiel sin fec_apertura en credit_card):
+Reproduccion del escenario de los mails (tests/local/mail_repro.py,
+config prod-fiel: credit_card sin fec_apertura + vintage string):
   Fase 1 channels solo -> pivot_prepared plano [numcliente, vintage] +
      calculate_mobs produce mobs_credit_card/max_liab_cc via mob+tfrom
      (crash bureau_pull/channels mobs del mail: resuelto)
   Fase 2 giros_credito + liabilities sobre el pivot envenenado ->
      schema check detecta columnas faltantes, re-prepara a
      [numcliente, vintage, crd_acct_nbr, num_contrato_*] y ambas
-     fuentes completan (crash extract del mail: resuelto)
+     fuentes completan (crash extract del mail: resuelto). La
+     re-preparacion usa _get_vintages_dates con to_date() — el pivot
+     de prod trae vintage como string y el + relativedelta tronaba
+     con TypeError (segundo mail: resuelto)
+  Fase 3 la property ``pivot`` valida el schema del parquet
+     persistido aunque ``_path_new_pivot`` ya este seteado — una
+     preparacion muerta a medias ya no propaga el pivot malo a las
+     fuentes siguientes (crash en cascada del mail: resuelto)
 
 Notas:
   - El original no era ejecutable tal cual: el worktree lleva parches

@@ -69,6 +69,13 @@ SOURCES = ["payroll_streaks", "payroll_income", "bureau_pull",
 # se ejercita el path nuevo ``mob + tfrom`` (solo corre en el actual).
 CREDIT_CARD_FEC = os.environ.get("REG_CREDIT_CARD_FEC", "1") == "1"
 
+# ``vintage`` del pivot maestro de prod es STRING (no date) — el mail
+# ``TypeError: can only concatenate str (not "relativedelta") to str``
+# en ``_get_range_dates`` al re-preparar el pivot. El fixture usa dates
+# por defecto (el original b7d2ecc tiene el mismo bug latente y no
+# correria); ``REG_PIVOT_VINTAGE_STR=1`` lo deja prod-fiel.
+PIVOT_VINTAGE_STR = os.environ.get("REG_PIVOT_VINTAGE_STR", "0") == "1"
+
 
 def _months(start: str, end: str):
     """Primeros de mes 'YYYY-MM-01' en el rango [start, end] (YYYY-MM)."""
@@ -97,8 +104,10 @@ def write_fixtures(spark) -> None:
     FIXTURES.mkdir(parents=True)
 
     # --- pivot --------------------------------------------------------
+    pivot_rows = ([(c, str(v)) for c, v in PIVOT_ROWS]
+                  if PIVOT_VINTAGE_STR else PIVOT_ROWS)
     spark.createDataFrame(
-        PIVOT_ROWS, ["numcliente", "vintage"]
+        pivot_rows, ["numcliente", "vintage"]
     ).write.mode("overwrite").parquet(str(FIXTURES / "pivot"))
 
     # --- asigna_nomina (payroll_streaks + payroll_income) -------------

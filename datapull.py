@@ -166,11 +166,21 @@ class DataPull():
     def pivot(self) -> DataFrame:
         """Tabla pivot (cliente x vintage), preparada si alguna fuente la
         necesita enriquecida."""
+        # La re-lectura del parquet persistido también valida el schema:
+        # si ``_pivot_preparation`` murió a medias en una fuente
+        # anterior, ``_path_new_pivot`` queda apuntando a un pivot sin
+        # las columnas requeridas y recargarlo tal cual reproduce el
+        # crash en cascada del mail (Column 'num_contrato_maestra' /
+        # 'crd_acct_nbr' does not exist).
         try:
-            self._pivot = self.sqlContext.read.parquet(self._path_new_pivot)
-        except:
-            self._pivot = self._pivot_preparation(self.sources)
-        #
+            df = self.sqlContext.read.parquet(self._path_new_pivot)
+            needed = self._pivot_cols_needed(self.sources)
+            if all(c in df.columns for c in needed):
+                self._pivot = df
+                return self._pivot
+        except Exception:
+            pass
+        self._pivot = self._pivot_preparation(self.sources)
         return self._pivot
 
     def _get_sources(self) -> List[str]:
@@ -871,12 +881,7 @@ class DataPull():
         logging.info(f"Preparing Pivot for sources: {sources}")
         path_new_pivot = os.path.join(self.config_custom["working_path"], self.config_custom["year_id"], "pivot_prepared")
         self._path_new_pivot = path_new_pivot
-        cols_pivot = ['numcliente', 'vintage']
-        if self._check_crd_acct_nbr(sources):
-            cols_pivot += ['crd_acct_nbr']
-        if self._check_contratos(sources):
-            cols_pivot += ['num_contrato_maestra', 'num_contrato_perfiles',
-            'num_contrato_perf_ejec', 'num_contrato_cheques', 'num_contrato_otros']
+        cols_pivot = self._pivot_cols_needed(sources)
         # is_successful (dir + _SUCCESS): una escritura matada a medias
         # deja el dir sin _SUCCESS y se recomputa, no se recarga rota.
         # Además hay que validar el schema: el pivot_prepared es
@@ -986,6 +991,18 @@ class DataPull():
             for table in self.config_rigid["mobs_preparation"]["table_name"]
         )
 
+    def _pivot_cols_needed(self, sources: List[str]) -> List[str]:
+        """Columnas que debe tener el pivot para las fuentes dadas
+        (``numcliente``+``vintage`` más los enriquecimientos de
+        ``need_crd_acct_nbr``/``need_contratos``)."""
+        cols_pivot = ['numcliente', 'vintage']
+        if self._check_crd_acct_nbr(sources):
+            cols_pivot += ['crd_acct_nbr']
+        if self._check_contratos(sources):
+            cols_pivot += ['num_contrato_maestra', 'num_contrato_perfiles',
+            'num_contrato_perf_ejec', 'num_contrato_cheques', 'num_contrato_otros']
+        return cols_pivot
+
     def _check_crd_acct_nbr(self, sources: List[str]) -> bool:
         """Comprueba si alguna fuente necesita el número de tarjeta de crédito.
 
@@ -1064,7 +1081,13 @@ class DataPull():
             Todas las fechas de vintage del pivot (orden descendente).
         """
         pivot.createOrReplaceTempView("pivot_temporal")
-        vintages = self.sqlContext.sql("select distinct vintage from pivot_temporal").collect()
+        # to_date(): en prod ``vintage`` puede venir como string o
+        # timestamp según cómo se materializó el pivot maestro;
+        # ``_get_range_dates`` necesita objetos fecha para el
+        # ``+ relativedelta`` (con str truena TypeError).
+        vintages = self.sqlContext.sql(
+            "select distinct to_date(vintage) from pivot_temporal"
+            " where vintage is not null").collect()
         vintages = [vintages[p][0] for p in range(len(vintages))]
         vintages.sort(reverse = True)
         return vintages
