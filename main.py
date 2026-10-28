@@ -33,7 +33,7 @@ set("spark.executor.cores","3").\
 set("spark.executor.memory","12G").\
 set("spark.executor.memoryOverhead","24G").\
 set("spark.driver.memory","100G").\
-set('spark.yarn.queue','root.datalabs').\
+set('spark.yarn.queue', f"root.{os.environ.get('PYSPARK_QUEUE', 'datalabs')}").\
 set("spark.sql.autoBroadcastJoinThreshold","-1").\
 set("spark.sql.execution.arrow.enabled", "true").\
 set("spark.driver.maxResultSize","0G").\

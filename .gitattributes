@@ -1,0 +1,3 @@
+# Los scripts bash deben salir siempre con LF — un checkout Windows con
+# autocrlf=true produciría CRLF y el shebang/rutas se rompen en el cluster.
+*.sh text eol=lf

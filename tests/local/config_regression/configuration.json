@@ -305,6 +305,14 @@
         },
         "group_by": {
             "table_name": "onus_capt_snap_t_m_historic",
+            "table_names": {
+                "maes": "onus_capt_snap_t_m_historic",
+                "perf": "onus_capt_snap_t_m_historic",
+                "peje": "onus_capt_snap_t_m_historic",
+                "cheq": "onus_capt_snap_t_m_historic",
+                "otro": "onus_capt_snap_t_m_historic"
+            },
+            "pagomatico": "onus_capt_snap_t_m_historic",
             "group_by_key": [
                 "numcliente",
                 "vintage_date",

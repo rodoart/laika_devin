@@ -26,6 +26,11 @@ Variables de entorno:
 ``SUPERVISOR_WATCHDOG_INTERVAL``  período del watchdog en segundos (30)
 ``SUPERVISOR_MAX_RESTARTS``    reinicios antes de rendirse (10)
 ``PYSPARK_PORT``               puerto de la Spark UI del driver (4040)
+``SUPERVISOR_QUEUES``          colas YARN candidatas (CSV); en cada
+                               reinicio se elige la de más capacidad libre
+                               según ``yarn queue -status`` (vacío = fija)
+``SUPERVISOR_CLEANUP_SCRIPT``  script a ejecutar UNA vez cuando el
+                               pipeline termina con éxito (vacío = ninguno)
 =============================  ============================================
 
 Usage::
@@ -68,6 +73,14 @@ WATCHDOG_INTERVAL = float(os.environ.get("SUPERVISOR_WATCHDOG_INTERVAL", 30))
 MAX_RESTARTS = int(os.environ.get("SUPERVISOR_MAX_RESTARTS", 10))
 #: Puerto de la Spark UI del driver.
 SPARK_UI_PORT = int(os.environ.get("PYSPARK_PORT", 4040))
+#: Colas YARN candidatas (CSV o espacios): en cada (re)inicio se exporta al
+#: hijo la de más capacidad libre vía ``PYSPARK_QUEUE``. Vacío -> fija.
+QUEUES = [q.strip() for q in
+          os.environ.get("SUPERVISOR_QUEUES", "").replace(",", " ").split()
+          if q.strip()]
+#: Script de limpieza a ejecutar una única vez tras éxito del pipeline
+#: (p.ej. borrado de dirs temporales/staging; el script se auto-borra).
+CLEANUP_SCRIPT = os.environ.get("SUPERVISOR_CLEANUP_SCRIPT", "")
 
 #: (numActiveTasks, numCompleteTasks) agregados de los stages activos.
 TaskCounts = Tuple[int, int]
@@ -207,6 +220,109 @@ def _kill_tree(proc: "subprocess.Popen[str]") -> None:
                 pass
 
 
+# ---------------------------------------------------------------------------
+# Selección de cola YARN por capacidad disponible
+# ---------------------------------------------------------------------------
+
+#: Campos porcentuales de `yarn queue -status`: "Capacity : 20.0%".
+_QUEUE_FIELD_RE = re.compile(
+    r"(?im)^\s*([a-z][a-z ]*?)\s*:\s*(-?[0-9.]+)\s*%?\s*$")
+#: Recursos del fair scheduler: "Used Resources : <memory:4096, vCores:4>".
+_QUEUE_MEM_RE = re.compile(
+    r"(?im)^\s*([a-z][a-z ]*?)\s*:\s*<memory:([0-9]+)[^>]*>")
+
+
+def _yarn_queue_status(queue: str) -> Optional[str]:
+    """Salida de ``yarn queue -status <queue>`` o ``None`` si no se obtuvo.
+
+    Se intenta el nombre tal cual y después con prefijo ``root.`` —
+    algunos clusters solo aceptan el path absoluto de la cola.
+    """
+    for name in (queue, f"root.{queue}"):
+        try:
+            proc = subprocess.run(
+                ["yarn", "queue", "-status", name],
+                capture_output=True, text=True, timeout=30)
+        except Exception:
+            return None            # sin CLI yarn (local/windows)
+        if proc.returncode == 0 and "Queue Information" in proc.stdout:
+            return proc.stdout
+    return None
+
+
+def _queue_available(status_out: str) -> Optional[float]:
+    """Capacidad libre reportada por ``yarn queue -status`` (mayor = mejor).
+
+    - Capacity scheduler (porcentajes): ``efectivo_max - usado`` en
+      puntos porcentuales; max <= 0 (ilimitado) cae a ``capacity``.
+    - Fair scheduler (``<memory:N>``): fracción libre del fair share,
+      ``1 - used_mem / fair_mem`` en [0, 1].
+    """
+    fields = {m.group(1).strip().lower(): float(m.group(2))
+              for m in _QUEUE_FIELD_RE.finditer(status_out)}
+    used = next((fields[k] for k in
+                 ("absolute used capacity", "used capacity",
+                  "current capacity") if k in fields), None)
+    cap = next((fields[k] for k in
+                ("absolute maximum capacity", "absolute capacity",
+                 "maximum capacity", "capacity")
+                if fields.get(k, 0) > 0), None)
+    if used is not None:
+        return (cap if cap is not None else 100.0) - used
+    mem = {m.group(1).strip().lower(): float(m.group(2))
+           for m in _QUEUE_MEM_RE.finditer(status_out)}
+    used_mem = mem.get("used resources")
+    if used_mem is None:
+        return None
+    fair = next((mem[k] for k in
+                 ("max resources", "maximum resources",
+                  "steady fair share", "instantaneous fair share")
+                 if mem.get(k, 0) > 0), None)
+    if fair is None:
+        return 1.0              # sin límite reportado -> libre
+    return 1.0 - min(used_mem / fair, 1.0)
+
+
+def pick_queue() -> Optional[str]:
+    """Cola con más capacidad libre, o ``None`` si no se midió ninguna.
+
+    Best-effort: un fallo de ``yarn queue -status`` nunca bloquea el
+    reinicio — el hijo conserva el ``PYSPARK_QUEUE`` heredado.
+    """
+    best, best_free = None, float("-inf")
+    for queue in QUEUES:
+        status = _yarn_queue_status(queue)
+        free = _queue_available(status) if status else None
+        if free is None:
+            log(f"queue {queue}: sin datos (`yarn queue -status` falló)")
+            continue
+        log(f"queue {queue}: capacidad libre {free:g}")
+        if free > best_free:
+            best, best_free = queue, free
+    return best
+
+
+def _run_cleanup_script() -> None:
+    """Ejecuta ``SUPERVISOR_CLEANUP_SCRIPT`` si existe (best-effort)."""
+    if not CLEANUP_SCRIPT or not os.path.isfile(CLEANUP_SCRIPT):
+        return
+    script = os.path.abspath(CLEANUP_SCRIPT)
+    try:
+        # cwd=dir del script + basename como argv: evita traducir rutas
+        # absolutas entre python-Windows y bash-posix (msys/wsl)
+        proc = subprocess.run(
+            ["bash", os.path.basename(script)],
+            cwd=os.path.dirname(script), timeout=600,
+            capture_output=True, text=True)
+        for line in (proc.stdout or "").strip().splitlines():
+            log(f"[cleanup] {line}")
+        if proc.returncode != 0:
+            log(f"Cleanup script rc={proc.returncode}: "
+                f"{(proc.stderr or '').strip()}")
+    except Exception as exc:
+        log(f"Cleanup script falló ({exc}); se omite la limpieza")
+
+
 def run_child(monitor: PipelineMonitor) -> int:
     """Lanza el hijo y lo vigila.
 
@@ -216,6 +332,10 @@ def run_child(monitor: PipelineMonitor) -> int:
         Exit code del proceso, o ``-9`` si se mató por zombi.
     """
     env = dict(os.environ, PYTHONUNBUFFERED="1")
+    queue = pick_queue()
+    if queue:
+        env["PYSPARK_QUEUE"] = queue
+        log(f"Cola YARN seleccionada para este intento: {queue}")
     kwargs: dict = {}
     if not _IS_WINDOWS:
         kwargs["start_new_session"] = True   # grupo propio: killpg mata el árbol
@@ -257,6 +377,7 @@ def main() -> int:
         return_code = run_child(monitor)
         if return_code == 0:
             log("Pipeline finished successfully.")
+            _run_cleanup_script()
             return 0
         restarts += 1
         step = monitor.current_step
