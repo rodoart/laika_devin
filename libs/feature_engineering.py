@@ -215,7 +215,12 @@ class FeatureEngineering:
         aux = [str for str in cols_df if feature in str]
         dict_feat = {}
         n = len(feature)
-        aux_2 = [variable for variable in aux if variable.rindex("_") == n]
+        # clave solo de índice tfrom numérico no-negativo: un ``-N``
+        # sobreviviente se interpolaría sin comillas en el SQL y Spark
+        # lo parsea como resta (``col_-4`` -> ``col_ - 4``)
+        aux_2 = [variable for variable in aux
+                 if variable.rindex("_") == n
+                 and variable[n+1:].isdigit()]
         for feature_aux in aux_2:
             dict_feat[feature_aux[n+1:]] = feature_aux
         return dict_feat
@@ -235,15 +240,16 @@ class FeatureEngineering:
             List of all the disctinct variables in dataframe
         """
         variables = []
+        keep = []
         for variable in cols_df:
-            if "_" in variable:
-                if variable[variable.rindex("_")+1:].isdigit() and len(variable[variable.rindex("_")+1:])<=2:
-                    n = variable.rindex("_")
-                    variables.append(variable[:n])
-                else:
-                    cols_df.remove(variable)
-            else:
-                cols_df.remove(variable)
+            suffix = variable[variable.rindex("_")+1:] if "_" in variable else ""
+            if suffix.isdigit() and len(suffix) <= 2:
+                variables.append(variable[:variable.rindex("_")])
+                keep.append(variable)
+        # filtrado determinista in-place: el remove() dentro del for
+        # original brincaba elementos y dejaba columnas ``-N`` en
+        # cols_df, que luego entraban a list_mvars/lista_metodo
+        cols_df[:] = keep
         # orden determinista (set() no lo es) — el orden decide el orden de
         # columnas del parquet de features
         variables = sorted(set(variables))

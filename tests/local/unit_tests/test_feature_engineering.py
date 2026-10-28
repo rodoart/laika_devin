@@ -65,6 +65,24 @@ class TestVariableLists:
         assert d == {"0": "hitbureau_0", "1": "hitbureau_1",
                      "2": "hitbureau_2", "10": "hitbureau_10"}
 
+    def test_obtain_variables_negative_suffix(self):
+        """``a_-4``/``a_-2`` no deben sobrevivir en cols_df — el remove()
+        dentro del for original los dejaba pasar y luego entraban a
+        list_mvars, generando SQL ``array(a_-4,...)`` que Spark parsea
+        como resta (prod: Column 'mob_flag_interest_bal' does not exist).
+        """
+        fe = _fe_stub()
+        cols = ["a_-4", "a_-2", "a_0", "a_1", "a_2", "a_3"]
+        variables = fe._obtain_variables(cols)
+        assert variables == ["a"]
+        assert cols == ["a_0", "a_1", "a_2", "a_3"]
+
+    def test_list_mvars_ignores_negative_tfrom(self):
+        fe = _fe_stub()
+        cols = ["a_-4", "a_-2", "a_0", "a_1", "a_2", "a_3"]
+        out = fe._list_mvars(["a"], cols, 4)
+        assert out == [["a_0", "a_1", "a_2", "a_3"]]
+
     def test_list_mvars_period_2(self):
         fe = _fe_stub()
         cols = [f"a_{i}" for i in range(6)]
